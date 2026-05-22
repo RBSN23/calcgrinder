@@ -1,8 +1,9 @@
 # PROJ-1: Supabase Infrastructure Setup
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-22
 **Last Updated:** 2026-05-22
+**Deployed:** 2026-05-22 to https://calcgrinder.vercel.app
 
 ## Dependencies
 - None — this is the foundation feature; everything else depends on it.
@@ -1019,4 +1020,90 @@ later features and not blockers for PROJ-1 approval:
   first app deploy.
 
 ## Deployment
-_To be added by /deploy_
+
+**Deployed:** 2026-05-22
+**Production URL:** https://calcgrinder.vercel.app
+**Vercel team:** Voidforge (Hobby plan)
+**Git tag:** `v1.0.0-PROJ-1`
+
+### Vercel configuration
+
+- **Cron registered:** `/api/cron/purge` on schedule
+  `0 4 * * *` UTC. Confirmed in Settings → Cron Jobs.
+  Hobby tier execution drifts within the trigger hour
+  (04:00–04:59 UTC) — documented as acceptable in the PRD
+  and §3 Concurrent editing / forward constraints.
+- **Environment variables (Production + Preview):** the
+  five-variable minimal set actually consumed by PROJ-1's
+  deployed code —
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+  - `SUPABASE_SECRET_KEY`
+  - `CRON_SECRET`
+  - `RETENTION_PERIOD_DAYS`
+
+  **Intentionally NOT on Vercel** (inert until consumed by
+  a later feature, documented in `.env.local.example` for
+  awareness):
+  - `SYSADMIN_EMAIL`, `SYSADMIN_INITIAL_PASSWORD` —
+    seed-script-only; the script runs locally / in a
+    controlled environment, never on Vercel.
+  - `SYSADMIN_NOTIFICATION_EMAIL` — added with PROJ-3
+    (Auth & Approval) when the signup-notification code
+    starts reading it.
+  - `CYON_SMTP_HOST` / `_PORT` / `_USER` / `_PASS` — added
+    with PROJ-2 (Email Infrastructure) when nodemailer
+    starts using them.
+
+### Production verification (post-deploy curl)
+
+```bash
+# No auth → 401, empty body
+$ curl -i https://calcgrinder.vercel.app/api/cron/purge
+HTTP/2 401, content-length: 0  ✓
+
+# Correct bearer → 200 with stub payload
+$ curl -i -H "Authorization: Bearer $CRON_SECRET" \
+       https://calcgrinder.vercel.app/api/cron/purge
+HTTP/2 200, application/json
+{"ok":true,"purged":0,"retention_days":30}  ✓
+```
+
+The cron endpoint behaves identically in production and in
+local dev — the auth gate, the Node runtime, and the env-var
+resolution are wired correctly.
+
+### Section-5 production polish — intentionally deferred
+
+The /deploy skill's section 5 recommends setting up error
+tracking (Sentry), security headers, performance
+(Lighthouse), database optimisation, and rate limiting at
+first deploy. PROJ-1 deliberately defers all five:
+
+- **Sentry / error tracking** — no UI surface in PROJ-1
+  means there's almost nothing for Sentry to catch (the
+  cron endpoint's `console.error` lands in Vercel's logs
+  natively). Sentry wiring fits naturally with PROJ-4
+  (App Shell) when the first user-facing pages exist.
+- **Security headers** (X-Frame-Options, X-Content-Type-
+  Options, Referrer-Policy, HSTS) — live in
+  `next.config.ts` as a `headers()` function. PROJ-1's
+  `next.config.ts` is intentionally untouched; PROJ-4
+  owns `next.config.ts` and the root layout (already
+  recorded in the Decision Log).
+- **Lighthouse** — meaningless against a project with one
+  default Next.js home page and no styled surface.
+  Re-run with PROJ-4 when the first real pages ship.
+- **Database optimisation** — `profiles` is the only
+  table; `idx_profiles_email` and `idx_profiles_role` are
+  in place. The richer optimisation surfaces (joins,
+  N+1 prevention, `unstable_cache`) only become relevant
+  once calculator-domain tables exist (PROJ-9, PROJ-10).
+- **Rate limiting** — PROJ-1's only public surface is
+  `/api/cron/purge`, which is bot-only via Vercel's
+  authenticated cron path. Rate limiting becomes relevant
+  for the visitor `/c/<token>` surface (PROJ-11).
+
+All five items will be revisited in their natural-fit
+features (mostly PROJ-4 and PROJ-11). No production risk in
+deferring them at PROJ-1's stage.
