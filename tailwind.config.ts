@@ -50,6 +50,13 @@ const config: Config = {
   				'4': 'hsl(var(--chart-4))',
   				'5': 'hsl(var(--chart-5))'
   			},
+  			'auth-accent': {
+  				DEFAULT: 'hsl(var(--auth-accent))',
+  				foreground: 'hsl(var(--auth-accent-foreground))',
+  				soft: 'hsl(var(--auth-accent-soft))'
+  			},
+  			'auth-link': 'hsl(var(--auth-link))',
+  			'auth-surface-muted': 'hsl(var(--auth-surface-muted))',
   			sidebar: {
   				DEFAULT: 'hsl(var(--sidebar-background))',
   				foreground: 'hsl(var(--sidebar-foreground))',

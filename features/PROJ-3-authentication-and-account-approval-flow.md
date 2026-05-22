@@ -1,6 +1,6 @@
 # PROJ-3: Authentication & Account Approval Flow
 
-## Status: Architected
+## Status: In Progress
 **Created:** 2026-05-22
 **Last Updated:** 2026-05-22
 
@@ -834,6 +834,133 @@ validated absolute URL string — and is the only allowed
 reader of `process.env.APP_URL` in PROJ-3 code. This
 prevents accidental bypass of the protocol check by
 inlining `process.env.APP_URL` elsewhere.
+
+## Implementation Notes — Frontend (2026-05-22)
+
+`/frontend` completed the UI surface and form wiring. Backend
+work (DB migration, route handlers for the admin landing and
+`/auth/confirm`, the no-JS `/auth/sign-out` POST, and the
+middleware extension) is handed off to `/backend`.
+
+### Shipped
+
+- **Env scaffolding.** Added `APP_URL` to `.env.local.example`
+  with the documented inline comment. New module
+  `src/lib/auth/app-url.ts` is the single source of truth — Zod-
+  validated at module load, rejects trailing slashes, requires
+  `https:` outside `NODE_ENV=development` (PROJ-2 finding L2,
+  single boundary).
+- **Auth UI primitives** ported from `docs/design/auth.jsx` into
+  `src/components/auth/` (Tailwind + shadcn-style):
+  `AuthShell`, `AuthField`, `AuthInput`, `AuthSubmit` (uses
+  `useFormStatus` for pending state), `AuthLink`, `AuthDivider`,
+  `AuthFootLine`, `AuthHelpText`, `AuthErrorBanner` (error +
+  warning variants), `AuthGlyph` (muted / accent variants),
+  `AuthMessage`, `AuthIcons` (Clock / Mail / Check / X inline
+  SVG). Re-exported via `src/components/auth/index.ts`.
+- **Theme.** Wired `next-themes` via
+  `src/components/theme-provider.tsx`; root layout uses
+  `attribute="class"` + `defaultTheme="system"`. Added
+  `--auth-accent / --auth-accent-foreground / --auth-link /
+  --auth-accent-soft / --auth-surface-muted` CSS vars and the
+  corresponding Tailwind colour aliases.
+- **Route groups.**
+  - `src/app/(auth)/layout.tsx` — wraps children in `AuthShell`
+    and 302s approved users to `/dashboard`.
+  - `src/app/(app)/layout.tsx` — 302s anonymous users to
+    `/auth/login` and non-approved users to
+    `/auth/waiting-for-approval` (PROJ-4 will replace the
+    placeholder shell with the real top bar).
+- **Auth pages (8).** Login, signup, forgot-password,
+  reset-password, reset-success, sent-confirmation,
+  waiting-for-approval — each as a Server Component page
+  rendering a client form component that uses `useActionState`.
+  Pages match the layout fidelity of the prototype (wordmark,
+  ~360px column, glyphs, dividers, foot-lines). Visual identity
+  uses Tailwind tokens + the new `--auth-accent*` vars so
+  light / dark / system theme switching works.
+- **Server actions and schemas.**
+  - `loginAction` — Supabase `signInWithPassword`, then status-
+    based redirect (`approved` → `?next` / `/dashboard`,
+    `pending|declined` → `/auth/waiting-for-approval`). Returns
+    "No account exists" vs. "Wrong password" inline based on a
+    profile-table probe (PRD: enumeration defense not a v1 goal).
+  - `signupAction` — pre-flight email-exists probe, Supabase
+    `signUp`, profile name update, insert into `signup_approvals`
+    with a fresh 32-byte token, fire `signupNotification` mail.
+    At-least-once: SMTP failure is logged but does NOT roll back
+    the signup (PROJ-2 design).
+  - `forgotPasswordAction` — profile probe (returns "No account
+    exists" for unknown emails), then Supabase
+    `resetPasswordForEmail`.
+  - `resetPasswordAction` — Zod schema with `refine` for matching
+    passwords; Supabase `updateUser({ password })` on success.
+  - All actions invoke `signupSchema` / `loginSchema` / etc.
+    co-located next to each action (per Tech Design).
+  - Signup schema strips ASCII control chars (`\x00–\x1F`,
+    `\x7F`) from `name` and trims whitespace — PROJ-2 finding L1
+    mitigation.
+- **Token helper.** `src/lib/auth/token.ts` exports `randomToken()`
+  (`randomBytes(32).toString('base64url')`). The signup action
+  consumes it directly; the route handler at `route.ts` will
+  consume it after `/backend` builds it.
+- **Profile helper.** `src/lib/auth/getCurrentProfile.ts` —
+  React-cached `getCurrentProfile()` returning
+  `{ user, profile } | null`. Middleware + layout + page share a
+  single Supabase round-trip per request.
+- **Form-state contract.** Shared `FormState` and
+  `initialFormState` from `src/lib/auth/form-state.ts` —
+  field-level errors, banner-level error, optional inline-link
+  CTA, echoed values for re-render.
+- **Admin landing page** at
+  `src/app/auth/admin/[token]/[action]/page.tsx` — renders the
+  five result variants (`approved`, `declined`, `already-approved`,
+  `already-declined`, `invalid`) via `?result=…` query param
+  (with `name`, `email`, `date`, `mailError` companions). 404s on
+  any `action` other than `approve` / `decline`. The page is
+  pure UI; `/backend` adds the sibling `route.ts` that performs
+  the DB transaction and redirects here.
+- **App stub pages.** `/dashboard`, `/editor/[id]`, `/settings`
+  exist as protected placeholders (gated by `(app)/layout`).
+  Real implementations land in PROJ-5 / PROJ-8 / PROJ-14.
+- **Root redirect.** `src/app/page.tsx` redirects based on
+  current profile state (approved → `/dashboard`, signed-in →
+  `/auth/waiting-for-approval`, anonymous → `/auth/login`),
+  replacing the template scaffolding.
+- **Types stub.** Added a manual `signup_approvals` entry to
+  `src/lib/supabase/types.ts` with a comment noting `/backend`
+  will overwrite it on the next `supabase gen types` run.
+
+### Deferred to `/backend`
+
+- `signup_approvals` migration + RLS posture (table + UNIQUE +
+  policy-free RLS comment).
+- `src/app/auth/admin/[token]/[action]/route.ts` GET handler —
+  lookup, idempotent consume (`WHERE consumed_at IS NULL`),
+  `profiles.status` update, conditional `approvalConfirmation`
+  send, redirect to landing with `?result=…`.
+- `src/app/auth/confirm/route.ts` GET handler — dispatches on
+  `type` (signup / recovery / future email_change) and verifies
+  the OTP.
+- `src/app/auth/sign-out/route.ts` POST handler.
+- Middleware extension — public-path bypass + 302 to
+  `/auth/login?next=…` for private paths.
+- `src/lib/auth/route-gate.ts` (pure function + the 15-case test
+  matrix).
+- Test files: `signup/actions.test.ts`,
+  `admin/[token]/[action]/process.test.ts`,
+  `auth/confirm/route.test.ts`,
+  `tests/PROJ-3-auth-flow.spec.ts` (Playwright).
+- `docs/production/auth.md`.
+
+### Build & lint status
+
+- `npm run build` → green (13 routes generated, including all 8
+  auth surfaces and the admin landing).
+- `npm run lint` → no errors, no warnings.
+- Manual smoke: all auth surfaces return 200; root, `/dashboard`,
+  and `/auth/waiting-for-approval` correctly 307 anonymous
+  visitors to `/auth/login`.
 
 ## QA Test Results
 _To be added by /qa_

@@ -37,6 +37,15 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* PROJ-3 auth primitives — brand accent for the submit button and links.
+       The Calculator Theme System (PROJ-6) owns calculator-internal accents;
+       these are the app-shell-wide auth tokens. */
+    --auth-accent: 221 83% 53%;
+    --auth-accent-foreground: 0 0% 100%;
+    --auth-link: 221 83% 53%;
+    --auth-accent-soft: 221 100% 96%;
+    --auth-surface-muted: 240 4.8% 95.9%;
   }
 
   .dark {
@@ -72,6 +81,12 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    --auth-accent: 217 91% 60%;
+    --auth-accent-foreground: 0 0% 100%;
+    --auth-link: 213 94% 78%;
+    --auth-accent-soft: 222 47% 18%;
+    --auth-surface-muted: 240 3.7% 15.9%;
   }
 }
 
