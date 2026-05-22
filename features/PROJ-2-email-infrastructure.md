@@ -15,31 +15,30 @@
 
 ## User Stories
 
-- Als Deployer möchte ich, dass Supabase-Auth-Mails
-  (Passwort-Zurücksetzung, E-Mail-Verifikation, E-Mail-
-  Adress-Änderung) über meinen Cyon-SMTP-Server zugestellt
-  werden, damit alle ausgehenden Mails aus derselben
-  Absender-Domain stammen und ich SPF/DKIM-Records nur
-  einmal pflegen muss.
-- Als Deployer möchte ich nach dem Setup über
+- As a deployer, I want Supabase Auth emails (password
+  reset, email verification, email-address change) delivered
+  via my Cyon SMTP server, so that all outbound mail comes
+  from the same sender domain and I only have to maintain
+  SPF/DKIM records once.
+- As a deployer, I want to verify after setup via
   `npm run email:smoke -- --to <addr> --template <name>`
-  prüfen, dass SMTP und ein konkretes Template funktionieren,
-  damit ich Konfigurationsfehler finde, ohne den ganzen
-  Auth-Flow durchspielen zu müssen.
-- Als Entwickler möchte ich eine zentrale `sendMail()`-
-  Utility mit fail-fast Env-Validierung, damit PROJ-3 und
-  PROJ-14 keine eigene SMTP-Logik schreiben und keine
-  Credentials in Client-Bundles leaken können.
-- Als Sysadmin möchte ich bei jeder Neu-Registrierung eine
-  Notification-Mail mit Approve- und Decline-Link erhalten,
-  damit ich ohne Login ins Dashboard reagieren kann.
-- Als Registered User möchte ich nach erfolgter Genehmigung
-  eine Bestätigungsmail mit Login-Link erhalten, damit ich
-  weiß, dass mein Account jetzt nutzbar ist.
-- Als Registered User möchte ich bei einer Account-Löschungs-
-  Anfrage eine Bestätigungsmail mit Confirm-Link erhalten,
-  damit eine versehentliche Löschung nicht ohne explizite
-  Bestätigung wirksam wird.
+  that SMTP and a specific template work, so that I can
+  catch configuration errors without having to run through
+  the entire auth flow.
+- As a developer, I want a central `sendMail()` utility
+  with fail-fast env validation, so that PROJ-3 and PROJ-14
+  don't write their own SMTP logic and can't leak
+  credentials into client bundles.
+- As a sysadmin, I want to receive a notification email
+  with approve and decline links on every new signup, so
+  that I can act on it without logging into the dashboard.
+- As a registered user, I want to receive a confirmation
+  email with a login link once my account is approved, so
+  that I know my account is now usable.
+- As a registered user, I want to receive a confirmation
+  email with a confirm link when I request account deletion,
+  so that an accidental deletion can't take effect without
+  explicit confirmation.
 
 ## Out of Scope
 
@@ -117,58 +116,58 @@ flows compose them.
 
 ## Acceptance Criteria
 
-**Format:** Angenommen [Vorbedingung] / Wenn [Aktion] /
-Dann [Ergebnis]
+**Format:** Given [precondition] / When [action] /
+Then [result]
 
 ### `sendMail()` utility — transport & validation
 
-- [ ] Angenommen die fünf Env-Vars (`CYON_SMTP_HOST`, `CYON_SMTP_PORT`, `CYON_SMTP_USER`, `CYON_SMTP_PASS`, `EMAIL_FROM`) sind gesetzt, wenn `sendMail({ to, subject, text })` mit gültigen Werten aufgerufen wird, dann verschickt nodemailer die Mail über Cyon und die Promise resolved mit dem nodemailer-Result inklusive `messageId`.
-- [ ] Angenommen eine oder mehrere der fünf Env-Vars fehlen, wenn `sendMail()` aufgerufen wird, dann wirft die Funktion (bzw. der Modul-Initialisierungspfad) einen Error mit einer Zod-Validierungsmeldung, die alle fehlenden Felder benennt, und es findet kein SMTP-Connect-Versuch statt.
-- [ ] Angenommen Cyon liefert einen 5xx-SMTP-Fehler oder die TCP-Verbindung schlägt fehl, wenn `sendMail()` aufgerufen wird, dann rejected die Promise mit dem Original-nodemailer-Error; der Aufrufer (PROJ-3 / PROJ-14) entscheidet eigenständig über Logging und Folgehandlung. Kein PROJ-2-seitiger Retry, kein DB-Rollback durch PROJ-2.
-- [ ] Angenommen `src/lib/email/send.ts` enthält `import 'server-only'` als allerersten Import, wenn eine Client-Komponente versucht, `sendMail` zu importieren, dann scheitert der Next.js-Build mit der `server-only`-Fehlermeldung.
-- [ ] Angenommen `EMAIL_FROM` ist auf einen vollständigen RFC-5322-String mit Display-Name gesetzt (z. B. `Calcgrinder <noreply@voidforge.cc>`), wenn eine Mail verschickt wird, dann enthält der `From:`-Header genau diese Zeichenkette und der Display-Name "Calcgrinder" erscheint im Mail-Client des Empfängers.
-- [ ] Angenommen `EMAIL_FROM` enthält einen syntaktisch ungültigen RFC-5322-String, wenn `sendMail()` zum ersten Mal aufgerufen wird, dann scheitert die Funktion mit einer aussagekräftigen Validierungsmeldung, bevor nodemailer den SMTP-Handshake startet.
-- [ ] Angenommen `sendMail()` wird aufgerufen, wenn nodemailer die Mail aufbereitet, dann enthält der ausgehende Header **kein** `Reply-To:`-Feld (keine Setzung durch PROJ-2 unter keinen Umständen).
+- [ ] Given the five env vars (`CYON_SMTP_HOST`, `CYON_SMTP_PORT`, `CYON_SMTP_USER`, `CYON_SMTP_PASS`, `EMAIL_FROM`) are set, when `sendMail({ to, subject, text })` is called with valid values, then nodemailer sends the mail via Cyon and the promise resolves with the nodemailer result including `messageId`.
+- [ ] Given one or more of the five env vars are missing, when `sendMail()` is called, then the function (or the module init path) throws an error with a Zod validation message naming every missing field, and no SMTP connect attempt is made.
+- [ ] Given Cyon returns a 5xx SMTP error or the TCP connection fails, when `sendMail()` is called, then the promise rejects with the original nodemailer error; the caller (PROJ-3 / PROJ-14) decides independently about logging and follow-up. No PROJ-2-side retry, no DB rollback by PROJ-2.
+- [ ] Given `src/lib/email/send.ts` has `import 'server-only'` as its very first import, when a client component tries to import `sendMail`, then the Next.js build fails with the `server-only` error message.
+- [ ] Given `EMAIL_FROM` is set to a full RFC-5322 string with a display name (e.g. `Calcgrinder <noreply@voidforge.cc>`), when an email is sent, then the `From:` header carries exactly that string and the display name "Calcgrinder" appears in the recipient's mail client.
+- [ ] Given `EMAIL_FROM` contains a syntactically invalid RFC-5322 string, when `sendMail()` is called for the first time, then the function fails with a meaningful validation message before nodemailer starts the SMTP handshake.
+- [ ] Given `sendMail()` is called, when nodemailer prepares the email, then the outbound headers contain **no** `Reply-To:` field (never set by PROJ-2 under any circumstances).
 
 ### Template render functions — pure, deterministic
 
-- [ ] Angenommen `signupNotification({ newUserEmail, newUserName, approveUrl, declineUrl })` wird mit vier gültigen Werten aufgerufen, dann liefert die Funktion ein `{ subject, text }`-Objekt mit Subject `"New Calcgrinder signup — <newUserEmail>"` und einem Plain-Text-Body, der Name und Mail des neuen Users sowie `approveUrl` und `declineUrl` jeweils als komplette URL-Zeilen enthält (keine Verkürzung, kein HTML-Anchor).
-- [ ] Angenommen `approvalConfirmation({ recipientName, loginUrl })` wird aufgerufen, dann liefert die Funktion ein `{ subject, text }`-Objekt mit Subject `"Your Calcgrinder account is ready"` und einem Body, der `recipientName` als Begrüßung, einen Bestätigungssatz, die `loginUrl` und den Sign-Off `"— Calcgrinder"` enthält.
-- [ ] Angenommen `accountDeletionConfirmation({ recipientName, confirmDeletionUrl, retentionDays })` wird aufgerufen, dann liefert die Funktion ein `{ subject, text }`-Objekt mit Subject `"Confirm your Calcgrinder account deletion"` und einem Body, der in dieser Reihenfolge enthält: (1) "Du hast Löschung angefragt", (2) Confirm-URL, (3) "Nach Bestätigung scheduled for deletion in <retentionDays> days", (4) "Sign back in during that window to cancel", (5) "Falls du das nicht angefragt hast — ignoriere diese Mail", (6) Sign-Off `"— Calcgrinder"`.
-- [ ] Angenommen eine der drei Template-Funktionen wird zweimal mit identischen Inputs aufgerufen, wenn die Outputs verglichen werden, dann sind sie byte-identisch — keine Zeitstempel, keine Random-IDs, keine Locale-Effekte im Body.
-- [ ] Angenommen ein Pflichtfeld einer Template-Funktion ist `undefined`, leer oder kein gültiger URL-String (für URL-Felder), wenn die Funktion aufgerufen wird, dann scheitert sie mit einer Zod-Validierungsmeldung, bevor irgendein String aufgebaut wird.
-- [ ] Angenommen die Templates werden importiert, wenn der Import-Pfad inspiziert wird, dann importieren die drei Template-Module **kein** `server-only` und **kein** `process.env` — sie sind reine Funktionen über ihren Inputs.
+- [ ] Given `signupNotification({ newUserEmail, newUserName, approveUrl, declineUrl })` is called with four valid values, then the function returns a `{ subject, text }` object with subject `"New Calcgrinder signup — <newUserEmail>"` and a plain-text body containing the new user's name and email plus `approveUrl` and `declineUrl` each on their own complete URL line (no shortening, no HTML anchor).
+- [ ] Given `approvalConfirmation({ recipientName, loginUrl })` is called, then the function returns a `{ subject, text }` object with subject `"Your Calcgrinder account is ready"` and a body containing `recipientName` as the greeting, a confirmation sentence, the `loginUrl`, and the sign-off `"— Calcgrinder"`.
+- [ ] Given `accountDeletionConfirmation({ recipientName, confirmDeletionUrl, retentionDays })` is called, then the function returns a `{ subject, text }` object with subject `"Confirm your Calcgrinder account deletion"` and a body that contains, in this order: (1) "You requested account deletion", (2) confirm URL, (3) "Once confirmed, scheduled for deletion in <retentionDays> days", (4) "Sign back in during that window to cancel", (5) "If you didn't request this — ignore this email", (6) sign-off `"— Calcgrinder"`.
+- [ ] Given one of the three template functions is called twice with identical inputs, when the outputs are compared, then they are byte-identical — no timestamps, no random IDs, no locale effects in the body.
+- [ ] Given a required field of a template function is `undefined`, empty, or not a valid URL string (for URL fields), when the function is called, then it fails with a Zod validation message before any string is built.
+- [ ] Given the templates are imported, when the import path is inspected, then the three template modules import **no** `server-only` and **no** `process.env` — they are pure functions over their inputs.
 
 ### Supabase Auth template content (deployer-applied)
 
-- [ ] Angenommen `docs/production/email.md` enthält den Abschnitt **"Supabase Auth Email Templates"**, wenn der Deployer der Anleitung folgt, dann findet er fertige Copy-Paste-Blöcke (Subject + Body) für genau drei Templates: **Confirm signup**, **Reset password**, **Change email address**. Magic Link und Invite user sind explizit als "leave at Supabase default" markiert.
-- [ ] Angenommen die drei Auth-Templates sind im Supabase-Dashboard mit den dokumentierten Texten eingetragen, wenn ein realer Passwort-Reset über Supabase Auth ausgelöst wird, dann landet beim Empfänger eine plain-text-Mail mit dem dokumentierten Wortlaut, abgesendet vom konfigurierten `EMAIL_FROM`-Sender.
-- [ ] Angenommen die drei Auth-Templates sind eingetragen, wenn die Subjects inspiziert werden, dann lauten sie `"Confirm your Calcgrinder account"`, `"Reset your Calcgrinder password"` und `"Confirm your new Calcgrinder email"` — gleiche Stilebene wie die drei Custom-Templates.
+- [ ] Given `docs/production/email.md` contains the section **"Supabase Auth Email Templates"**, when the deployer follows the guide, then they find ready-to-use copy-paste blocks (subject + body) for exactly three templates: **Confirm signup**, **Reset password**, **Change email address**. Magic Link and Invite user are explicitly marked "leave at Supabase default".
+- [ ] Given the three auth templates are entered in the Supabase dashboard with the documented text, when a real password reset is triggered via Supabase Auth, then the recipient receives a plain-text email with the documented wording, sent from the configured `EMAIL_FROM` sender.
+- [ ] Given the three auth templates are entered, when the subjects are inspected, then they read `"Confirm your Calcgrinder account"`, `"Reset your Calcgrinder password"`, and `"Confirm your new Calcgrinder email"` — same stylistic register as the three custom templates.
 
 ### Supabase Auth SMTP configuration (deployer-applied)
 
-- [ ] Angenommen `docs/production/email.md` enthält den Abschnitt **"Supabase Auth Custom SMTP"**, wenn der Deployer den dort hinterlegten Schritten folgt, dann kann er in der Supabase-Cloud-Dashboard-UI unter **Authentication → Settings → SMTP Provider** die Cyon-Credentials eintragen, Custom SMTP aktivieren und über `npm run email:smoke` eine Test-Mail empfangen.
-- [ ] Angenommen Supabase Auth ist auf Custom SMTP umgestellt, wenn ein neuer User sich registriert und die Confirm-signup-Mail bekommt, dann zeigt der `Received:`-Header der Mail den Cyon-SMTP-Server und nicht den Supabase-Default-Sender.
+- [ ] Given `docs/production/email.md` contains the section **"Supabase Auth Custom SMTP"**, when the deployer follows the steps there, then they can enter the Cyon credentials in the Supabase Cloud Dashboard UI under **Authentication → Settings → SMTP Provider**, enable Custom SMTP, and receive a test email via `npm run email:smoke`.
+- [ ] Given Supabase Auth is switched to Custom SMTP, when a new user signs up and receives the Confirm-signup email, then the `Received:` header shows the Cyon SMTP server and not the Supabase default sender.
 
 ### Smoke-test CLI — single mode, real send
 
-- [ ] Angenommen alle PROJ-2-Env-Vars sind in `.env.local` gesetzt, wenn `npm run email:smoke -- --to test@example.com --template signup-notification` ausgeführt wird, dann rendert das Skript das `signupNotification`-Template mit hardgecodeten Dummy-Werten, verschickt es über Cyon, gibt die zurückgelieferte `messageId` auf stdout aus und exited mit Code 0.
-- [ ] Angenommen `--template approval-confirmation` oder `--template account-deletion-confirmation` wird übergeben, wenn das Skript ausgeführt wird, dann rendert es das jeweils zugehörige Template mit Dummies und sendet es genauso.
-- [ ] Angenommen `--to` fehlt oder enthält keine gültige Mail-Adresse, wenn das Skript ausgeführt wird, dann scheitert es fail-fast mit Exit-Code 1 und einer Zod-Validierungsmeldung, ohne SMTP zu verbinden.
-- [ ] Angenommen `--template` fehlt oder enthält einen Wert außerhalb der drei erlaubten Template-Namen, wenn das Skript ausgeführt wird, dann scheitert es fail-fast mit Exit-Code 1 und einer Zod-Validierungsmeldung, die die drei erlaubten Werte benennt.
-- [ ] Angenommen das Skript-Modul wird inspiziert, wenn nach Modi wie `--dry-run`, `--generic`, `--silent` etc. gesucht wird, dann existieren **keine** solchen Modi — die CLI hat genau zwei Flags (`--to`, `--template`), beide erforderlich.
+- [ ] Given all PROJ-2 env vars are set in `.env.local`, when `npm run email:smoke -- --to test@example.com --template signup-notification` is run, then the script renders the `signupNotification` template with hardcoded dummy values, sends it via Cyon, prints the returned `messageId` to stdout, and exits with code 0.
+- [ ] Given `--template approval-confirmation` or `--template account-deletion-confirmation` is passed, when the script is run, then it renders the corresponding template with dummies and sends it the same way.
+- [ ] Given `--to` is missing or does not contain a valid email address, when the script is run, then it fails fast with exit code 1 and a Zod validation message, without connecting to SMTP.
+- [ ] Given `--template` is missing or contains a value outside the three allowed template names, when the script is run, then it fails fast with exit code 1 and a Zod validation message naming the three allowed values.
+- [ ] Given the script module is inspected, when modes like `--dry-run`, `--generic`, `--silent`, etc. are looked for, then **no** such modes exist — the CLI has exactly two flags (`--to`, `--template`), both required.
 
 ### Tests — 4 files total
 
-- [ ] Angenommen `src/lib/email/templates/signup-notification.test.ts`, `approval-confirmation.test.ts` und `account-deletion-confirmation.test.ts` enthalten je einen Snapshot-Test auf den vollständigen `{ subject, text }`-Output mit festen Dummy-Inputs, wenn `npm test` ausgeführt wird, dann bestehen alle drei und CI scheitert auf jede unbeabsichtigte Wording-Änderung ohne Snapshot-Update.
-- [ ] Angenommen `src/lib/email/send.test.ts` enthält genau einen Test (Zod-Fail-Fast: fehlende Env-Vars → Throw vor jedem I/O), wenn `npm test` ausgeführt wird, dann besteht der Test. Es existiert **kein** Mock-Nodemailer-Happy-Path-Test (würde den Mock testen, nicht den Code) und **kein** Live-Cyon-CI-Test.
-- [ ] Angenommen die Tests verwenden `vi.stubEnv` für Env-Variablen, wenn ein einzelner Test isoliert läuft, dann setzt `afterEach(() => vi.unstubAllEnvs())` den Zustand sauber zurück (gleiches Muster wie PROJ-1).
+- [ ] Given `src/lib/email/templates/signup-notification.test.ts`, `approval-confirmation.test.ts`, and `account-deletion-confirmation.test.ts` each contain a snapshot test on the full `{ subject, text }` output with fixed dummy inputs, when `npm test` is run, then all three pass and CI fails on any unintentional wording change without a snapshot update.
+- [ ] Given `src/lib/email/send.test.ts` contains exactly one test (Zod fail-fast: missing env vars → throw before any I/O), when `npm test` is run, then the test passes. There is **no** mock-nodemailer happy-path test (would test the mock, not the code) and **no** live-Cyon CI test.
+- [ ] Given the tests use `vi.stubEnv` for env variables, when a single test runs in isolation, then `afterEach(() => vi.unstubAllEnvs())` resets the state cleanly (same pattern as PROJ-1).
 
 ### Env vars & documentation
 
-- [ ] Angenommen `.env.local.example` wird inspiziert, wenn der Diff zu PROJ-1 betrachtet wird, dann ist genau ein neuer Eintrag hinzugekommen: `EMAIL_FROM="Calcgrinder <noreply@calcgrinder.example.com>"` mit Inline-Kommentar zum RFC-5322-Format. Die vier Cyon-Variablen waren bereits Platzhalter aus PROJ-1; PROJ-2 ergänzt deren Inline-Kommentar mit "Port 587 (STARTTLS) empfohlen; 465 (implicit TLS) alternativ".
-- [ ] Angenommen `docs/production/email.md` existiert, wenn der Deployer der Datei folgt, dann findet er in dieser Reihenfolge: (1) DNS-/SPF-/DKIM-/DMARC-Setup mit konkreten Record-Beispielen für eine generische Domain, (2) `.env.local` Cyon-SMTP-Werte, (3) `npm run email:smoke` Verifikation, (4) Supabase-Dashboard-SMTP-Konfiguration, (5) Supabase-Auth-Template-Inhalte als Copy-Paste-Blöcke.
-- [ ] Angenommen `README.md` wird inspiziert, wenn der Setup-Abschnitt gelesen wird, dann verweist er auf `docs/production/email.md` als ausführliche Anleitung; der README selbst dupliziert die Inhalte nicht.
+- [ ] Given `.env.local.example` is inspected, when the diff against PROJ-1 is viewed, then exactly one new entry has been added: `EMAIL_FROM="Calcgrinder <noreply@calcgrinder.example.com>"` with an inline comment on the RFC-5322 format. The four Cyon variables were already placeholders from PROJ-1; PROJ-2 expands their inline comment to note "Port 587 (STARTTLS) recommended; 465 (implicit TLS) alternative".
+- [ ] Given `docs/production/email.md` exists, when the deployer follows the file, then they find, in this order: (1) DNS / SPF / DKIM / DMARC setup with concrete record examples for a generic domain, (2) `.env.local` Cyon SMTP values, (3) `npm run email:smoke` verification, (4) Supabase Dashboard SMTP configuration, (5) Supabase Auth template content as copy-paste blocks.
+- [ ] Given `README.md` is inspected, when the setup section is read, then it points to `docs/production/email.md` as the detailed guide; the README itself does not duplicate the content.
 
 ## Edge Cases
 

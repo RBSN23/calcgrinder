@@ -10,11 +10,11 @@
 
 ## User Stories
 
-- Als Deployer möchte ich Supabase-Cloud-Schema-Änderungen als versionskontrollierte Migrations ablegen, damit jede Schemaänderung reproduzierbar, peer-reviewbar und nachvollziehbar ist.
-- Als Deployer möchte ich nach einer Neuinstallation einen Sysadmin-Account per `npm run seed:sysadmin` ohne manuelles SQL bootstrapen, damit ich sofort ein arbeitsfähiges System habe.
-- Als Deployer möchte ich bestehende Nutzer per `--promote <email>` zu Sysadmins erheben, damit ich Co-Admins ohne ein separates Tool hinzufügen kann.
-- Als Entwickler möchte ich klar getrennte Supabase-Clients für Browser, Server und privilegierten Zugriff, damit ich beim Bau späterer Features nicht versehentlich den Secret Key in den Client-Bundle leake.
-- Als Deployer möchte ich, dass Vercel den nächtlichen Auto-Purge-Endpunkt automatisch aufruft, damit soft-gelöschte Kalkulatoren ohne manuelles Eingreifen nach Ablauf der Frist (PROJ-13) gelöscht werden.
+- As a deployer, I want to store Supabase Cloud schema changes as version-controlled migrations, so that every schema change is reproducible, peer-reviewable, and auditable.
+- As a deployer, I want to bootstrap a sysadmin account via `npm run seed:sysadmin` after a fresh install without any manual SQL, so that I have a working system immediately.
+- As a deployer, I want to promote existing users to sysadmin via `--promote <email>`, so that I can add co-admins without a separate tool.
+- As a developer, I want clearly separated Supabase clients for browser, server, and privileged access, so that I don't accidentally leak the secret key into the client bundle when building later features.
+- As a deployer, I want Vercel to call the nightly auto-purge endpoint automatically, so that soft-deleted calculators are removed without manual intervention after the retention window (PROJ-13) expires.
 
 ## Out of Scope
 
@@ -68,57 +68,57 @@ concerns belong to later features:
 
 ## Acceptance Criteria
 
-**Format:** Angenommen [Vorbedingung] / Wenn [Aktion] /
-Dann [Ergebnis]
+**Format:** Given [precondition] / When [action] /
+Then [result]
 
 ### Migration & schema
 
-- [ ] Angenommen ein frisches Supabase-Cloud-Projekt mit leerem `public`-Schema, wenn `supabase db push` die PROJ-1-Migration anwendet, dann existiert die Tabelle `profiles` mit allen spezifizierten Spalten (`id`, `name`, `email`, `role`, `status`, `pending_deletion_at`, `created_at`, `updated_at`), den CHECK-Constraints für `role` und `status`, den beiden Triggern (`handle_new_user` auf `auth.users` INSERT, E-Mail-Sync auf `auth.users` UPDATE) und der Helper-Funktion `is_sysadmin(uuid)`.
-- [ ] Angenommen die `profiles`-Tabelle existiert mit aktiviertem RLS, wenn ein authentifizierter Nutzer SELECT auf `profiles` ausführt, dann sieht er nur seine eigene Zeile; ein Sysadmin sieht alle Zeilen.
-- [ ] Angenommen ein Nutzer ist als `registered` mit Status `approved` eingeloggt, wenn er versucht, seine eigene `role`- oder `status`-Spalte per UPDATE zu ändern, dann scheitert das Update mit einem RLS-Fehler (Update-Policy erlaubt nur die übrigen Spalten).
-- [ ] Angenommen `is_sysadmin(uuid)` ist mit `SECURITY DEFINER` und einem festgesetzten `search_path` definiert (Supabase-Dokumentationspattern für sichere Funktionen), wenn die Funktion innerhalb einer RLS-Policy aufgerufen wird, dann liefert sie das korrekte Boolean-Ergebnis unabhängig vom `search_path` des aufrufenden Nutzers.
+- [ ] Given a fresh Supabase Cloud project with an empty `public` schema, when `supabase db push` applies the PROJ-1 migration, then the `profiles` table exists with all specified columns (`id`, `name`, `email`, `role`, `status`, `pending_deletion_at`, `created_at`, `updated_at`), the CHECK constraints for `role` and `status`, the two triggers (`handle_new_user` on `auth.users` INSERT, email-sync on `auth.users` UPDATE), and the helper function `is_sysadmin(uuid)`.
+- [ ] Given the `profiles` table exists with RLS enabled, when an authenticated user runs SELECT on `profiles`, then they see only their own row; a sysadmin sees all rows.
+- [ ] Given a user is logged in as `registered` with status `approved`, when they try to UPDATE their own `role` or `status` column, then the update fails with an RLS error (the update policy only permits the other columns).
+- [ ] Given `is_sysadmin(uuid)` is defined with `SECURITY DEFINER` and a pinned `search_path` (Supabase's documented pattern for secure functions), when the function is called from inside an RLS policy, then it returns the correct boolean result regardless of the calling user's `search_path`.
 
 ### SSR client factories
 
-- [ ] Angenommen `@supabase/ssr` ist installiert, wenn eine Client-Komponente `createClient` aus `@/lib/supabase/client` importiert, dann kompiliert das Projekt ohne `server-only`-Fehler und der zurückgegebene Client kann Supabase-Calls absetzen.
-- [ ] Angenommen `admin.ts` enthält `import 'server-only'` als allerersten Import, wenn eine Client-Komponente versucht, `createAdminClient` aus `@/lib/supabase/admin` zu importieren, dann scheitert der Next.js-Build mit einer expliziten Fehlermeldung.
-- [ ] Angenommen `SUPABASE_SECRET_KEY` ist zur Laufzeit nicht gesetzt, wenn `createAdminClient()` aufgerufen wird, dann wirft die Funktion einen Fehler mit aussagekräftiger Nachricht.
-- [ ] Angenommen die Datei `src/lib/supabase/types.ts` ist nach `npx supabase gen types typescript --linked > src/lib/supabase/types.ts` generiert worden, wenn der TypeScript-Compiler über `tsc --noEmit` läuft, dann enthält die Datei den exportierten `Database`-Typ inklusive `profiles`-Tabelle und der Compiler meldet keine Fehler.
+- [ ] Given `@supabase/ssr` is installed, when a client component imports `createClient` from `@/lib/supabase/client`, then the project compiles without `server-only` errors and the returned client can issue Supabase calls.
+- [ ] Given `admin.ts` has `import 'server-only'` as its very first import, when a client component tries to import `createAdminClient` from `@/lib/supabase/admin`, then the Next.js build fails with an explicit error message.
+- [ ] Given `SUPABASE_SECRET_KEY` is not set at runtime, when `createAdminClient()` is called, then the function throws an error with a meaningful message.
+- [ ] Given `src/lib/supabase/types.ts` has been generated via `npx supabase gen types typescript --linked > src/lib/supabase/types.ts`, when the TypeScript compiler runs via `tsc --noEmit`, then the file contains the exported `Database` type including the `profiles` table and the compiler reports no errors.
 
 ### Seed script
 
-- [ ] Angenommen `SYSADMIN_EMAIL`, `SYSADMIN_INITIAL_PASSWORD`, `NEXT_PUBLIC_SUPABASE_URL` und `SUPABASE_SECRET_KEY` sind gesetzt, wenn `npm run seed:sysadmin` gegen ein frisches Supabase-Projekt ausgeführt wird, dann zeigt das Supabase-Dashboard unter **Authentication → Users** einen Nutzer mit der gesetzten `SYSADMIN_EMAIL` und gesetztem `email_confirmed_at`, und unter **Table Editor → profiles** eine passende Zeile mit `role='sysadmin'` und `status='approved'`.
-- [ ] Angenommen ein Sysadmin existiert bereits mit `SYSADMIN_EMAIL`, wenn `npm run seed:sysadmin` erneut ausgeführt wird, dann läuft das Skript erfolgreich durch (Exit-Code 0), schreibt nichts Neues in die Datenbank und gibt eine Meldung wie `"sysadmin <email> already provisioned, no changes"` aus.
-- [ ] Angenommen ein als `registered` genehmigter Nutzer mit der E-Mail `bob@example.com` existiert, wenn `npm run seed:sysadmin -- --promote bob@example.com` ausgeführt wird, dann ist anschließend in der `profiles`-Zeile für diesen Nutzer `role='sysadmin'` gesetzt und der Name bleibt unverändert.
-- [ ] Angenommen ein Nutzer mit Status `declined` existiert, wenn `npm run seed:sysadmin -- --promote <email>` ausgeführt wird, dann ist anschließend `role='sysadmin'` und `status='approved'` gesetzt (Sysadmin-Pfad umgeht das Approval-Gate).
-- [ ] Angenommen kein Nutzer mit `dawn@example.com` existiert, wenn `npm run seed:sysadmin -- --promote dawn@example.com` ausgeführt wird, dann scheitert das Skript mit Exit-Code 1 und einer Fehlermeldung, die zur Eigenanmeldung des Nutzers vor erneutem `--promote` auffordert.
-- [ ] Angenommen `SYSADMIN_EMAIL` ist nicht gesetzt, wenn `npm run seed:sysadmin` ohne `--promote` ausgeführt wird, dann scheitert das Skript fail-fast mit Exit-Code 1 und der Zod-Validierungsmeldung `"SYSADMIN_EMAIL is required"`, bevor irgendeine Supabase-API aufgerufen wird.
-- [ ] Angenommen `SYSADMIN_EMAIL` enthält eine ungültige E-Mail-Format-Zeichenkette, wenn das Skript ausgeführt wird, dann scheitert es fail-fast mit Exit-Code 1 und einer Zod-Validierungsmeldung, die das ungültige Feld benennt.
+- [ ] Given `SYSADMIN_EMAIL`, `SYSADMIN_INITIAL_PASSWORD`, `NEXT_PUBLIC_SUPABASE_URL`, and `SUPABASE_SECRET_KEY` are set, when `npm run seed:sysadmin` runs against a fresh Supabase project, then the Supabase dashboard shows a user under **Authentication → Users** with the configured `SYSADMIN_EMAIL` and a set `email_confirmed_at`, and under **Table Editor → profiles** a matching row with `role='sysadmin'` and `status='approved'`.
+- [ ] Given a sysadmin already exists with `SYSADMIN_EMAIL`, when `npm run seed:sysadmin` is run again, then the script completes successfully (exit code 0), writes nothing new to the database, and emits a message like `"sysadmin <email> already provisioned, no changes"`.
+- [ ] Given an approved `registered` user with the email `bob@example.com` exists, when `npm run seed:sysadmin -- --promote bob@example.com` is run, then the user's `profiles` row has `role='sysadmin'` set afterwards and the name is unchanged.
+- [ ] Given a user with status `declined` exists, when `npm run seed:sysadmin -- --promote <email>` is run, then `role='sysadmin'` and `status='approved'` are set afterwards (the sysadmin path bypasses the approval gate).
+- [ ] Given no user with `dawn@example.com` exists, when `npm run seed:sysadmin -- --promote dawn@example.com` is run, then the script fails with exit code 1 and an error message instructing the user to sign up themselves before retrying `--promote`.
+- [ ] Given `SYSADMIN_EMAIL` is not set, when `npm run seed:sysadmin` is run without `--promote`, then the script fails fast with exit code 1 and the Zod validation message `"SYSADMIN_EMAIL is required"` before any Supabase API call.
+- [ ] Given `SYSADMIN_EMAIL` contains an invalid email-format string, when the script is run, then it fails fast with exit code 1 and a Zod validation message naming the invalid field.
 
 ### Cron stub endpoint
 
-- [ ] Angenommen die App läuft lokal mit gesetztem `CRON_SECRET`, wenn ein GET an `/api/cron/purge` mit korrektem `Authorization: Bearer <secret>`-Header gesendet wird, dann antwortet der Endpunkt mit Status 200 und JSON `{ "ok": true, "purged": 0, "retention_days": 30 }`.
-- [ ] Angenommen die App läuft lokal, wenn ein GET an `/api/cron/purge` ohne `Authorization`-Header gesendet wird, dann antwortet der Endpunkt mit Status 401, einem leeren Body und ohne Server-Log-Eintrag.
-- [ ] Angenommen die App läuft lokal, wenn ein GET an `/api/cron/purge` mit einem falschen Bearer-Token (passende Länge, andere Bytes) gesendet wird, dann antwortet der Endpunkt mit Status 401 und leerem Body.
-- [ ] Angenommen die App läuft lokal, wenn ein GET an `/api/cron/purge` mit einem Bearer-Token offensichtlich falscher Länge (z. B. `Bearer xx`) gesendet wird, dann antwortet der Endpunkt mit Status 401 und leerem Body (der `timingSafeEqual`-Längen-Short-Circuit greift, ohne den Vergleich auszuführen).
-- [ ] Angenommen `CRON_SECRET` ist nicht gesetzt, wenn ein GET an `/api/cron/purge` gesendet wird, dann antwortet der Endpunkt mit Status 500 und ein Error-Level-Log erscheint in Vercel- bzw. lokalen Logs.
-- [ ] Angenommen `RETENTION_PERIOD_DAYS=45` ist in der Umgebung gesetzt, wenn ein autorisierter GET an `/api/cron/purge` gesendet wird, dann enthält die JSON-Antwort `retention_days: 45`.
-- [ ] Angenommen `RETENTION_PERIOD_DAYS` ist nicht gesetzt, wenn ein autorisierter GET an `/api/cron/purge` gesendet wird, dann enthält die JSON-Antwort `retention_days: 30` (Default-Fallback).
+- [ ] Given the app runs locally with `CRON_SECRET` set, when a GET to `/api/cron/purge` is sent with the correct `Authorization: Bearer <secret>` header, then the endpoint responds with status 200 and JSON `{ "ok": true, "purged": 0, "retention_days": 30 }`.
+- [ ] Given the app runs locally, when a GET to `/api/cron/purge` is sent without an `Authorization` header, then the endpoint responds with status 401, an empty body, and no server log entry.
+- [ ] Given the app runs locally, when a GET to `/api/cron/purge` is sent with a wrong bearer token (matching length, different bytes), then the endpoint responds with status 401 and an empty body.
+- [ ] Given the app runs locally, when a GET to `/api/cron/purge` is sent with a bearer token of obviously wrong length (e.g. `Bearer xx`), then the endpoint responds with status 401 and an empty body (the `timingSafeEqual` length short-circuit fires without running the comparison).
+- [ ] Given `CRON_SECRET` is not set, when a GET to `/api/cron/purge` is sent, then the endpoint responds with status 500 and an error-level log appears in Vercel or local logs.
+- [ ] Given `RETENTION_PERIOD_DAYS=45` is set in the environment, when an authorized GET to `/api/cron/purge` is sent, then the JSON response contains `retention_days: 45`.
+- [ ] Given `RETENTION_PERIOD_DAYS` is not set, when an authorized GET to `/api/cron/purge` is sent, then the JSON response contains `retention_days: 30` (default fallback).
 
 ### Tests
 
-- [ ] Angenommen die Datei `src/app/api/cron/purge/route.test.ts` mit sieben Test-Cases existiert, wenn `npm test` ausgeführt wird, dann bestehen alle sieben Cases (kein Header, falscher Bearer gleicher Länge, falsche Länge, korrekter Bearer, fehlendes `CRON_SECRET`, Default-Retention, Custom-Retention).
-- [ ] Angenommen die Test-Suite verwendet `vi.stubEnv` zum Setzen von Umgebungsvariablen, wenn ein einzelner Test isoliert ausgeführt wird, dann setzt `afterEach(() => vi.unstubAllEnvs())` den Zustand vor dem nächsten Test zurück.
+- [ ] Given the file `src/app/api/cron/purge/route.test.ts` with seven test cases exists, when `npm test` is run, then all seven cases pass (no header, wrong same-length bearer, wrong length, correct bearer, missing `CRON_SECRET`, default retention, custom retention).
+- [ ] Given the test suite uses `vi.stubEnv` to set environment variables, when a single test runs in isolation, then `afterEach(() => vi.unstubAllEnvs())` resets state before the next test.
 
 ### Vercel cron registration
 
-- [ ] Angenommen `vercel.json` enthält den Cron-Eintrag für `/api/cron/purge` mit Schedule `0 4 * * *` (täglich, irgendwo zwischen 04:00 und 04:59 UTC), wenn das Projekt auf Vercel deployt wird, dann erscheint der Cron-Job im Vercel-Dashboard unter **Settings → Cron Jobs** und Vercel zeigt nach Ablauf des Triggerfensters eine Ausführung an.
+- [ ] Given `vercel.json` contains the cron entry for `/api/cron/purge` with schedule `0 4 * * *` (daily, anywhere between 04:00 and 04:59 UTC), when the project is deployed to Vercel, then the cron job appears in the Vercel dashboard under **Settings → Cron Jobs** and Vercel shows an execution after the trigger window has passed.
 
 ### Environment variables & documentation
 
-- [ ] Angenommen `.env.local.example` existiert, wenn die Datei inspiziert wird, dann enthält sie Dummy-Werte (keine echten Credentials) für alle PROJ-1-relevanten Variablen: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `SYSADMIN_EMAIL`, `SYSADMIN_INITIAL_PASSWORD`, `SYSADMIN_NOTIFICATION_EMAIL`, `RETENTION_PERIOD_DAYS`, `CRON_SECRET`, sowie die Cyon-SMTP-Platzhalter (`CYON_SMTP_HOST`, `CYON_SMTP_PORT`, `CYON_SMTP_USER`, `CYON_SMTP_PASS`).
-- [ ] Angenommen `README.md` enthält den Local-Setup-Abschnitt, wenn ein neuer Entwickler den Anweisungen folgt, dann kann er von einem frischen Clone bis zu `npm run dev` (mit funktionierendem Sysadmin-Account und laufendem Cron-Stub) ohne weitere Rückfrage gelangen.
-- [ ] Angenommen `CLAUDE.md` enthält die zwei neuen Konventionsregeln (Supabase-Client-Importpfade; CLI-basierte Migrations statt SQL-Editor), wenn ein zukünftiges Skill den Inhalt liest, dann sind beide Regeln eindeutig formuliert und unmissverständlich.
+- [ ] Given `.env.local.example` exists, when the file is inspected, then it contains dummy values (no real credentials) for all PROJ-1-relevant variables: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `SYSADMIN_EMAIL`, `SYSADMIN_INITIAL_PASSWORD`, `SYSADMIN_NOTIFICATION_EMAIL`, `RETENTION_PERIOD_DAYS`, `CRON_SECRET`, plus the Cyon SMTP placeholders (`CYON_SMTP_HOST`, `CYON_SMTP_PORT`, `CYON_SMTP_USER`, `CYON_SMTP_PASS`).
+- [ ] Given `README.md` contains the local-setup section, when a new developer follows the instructions, then they can go from a fresh clone to `npm run dev` (with a working sysadmin account and a running cron stub) without further questions.
+- [ ] Given `CLAUDE.md` contains the two new convention rules (Supabase client import paths; CLI-based migrations instead of the SQL Editor), when a future skill reads the content, then both rules are unambiguously stated and impossible to misread.
 
 ## Edge Cases
 
