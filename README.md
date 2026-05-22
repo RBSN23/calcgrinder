@@ -15,16 +15,60 @@ npm install
 npx playwright install chromium   # one-time: installs browser for E2E tests (~300MB)
 ```
 
-### 2. (Optional) Supabase Setup
+### 2. Supabase + Cron Setup (Calcgrinder)
 
-If you need a backend:
+Calcgrinder uses Supabase Cloud (PostgreSQL + Auth) and Vercel Cron Jobs.
+The setup is Cloud-only — no local Docker stack.
 
-1. Create Supabase Project: [supabase.com](https://supabase.com)
-2. Copy `.env.local.example` to `.env.local`
-3. Add your Supabase credentials
-4. Uncomment the Supabase client in `src/lib/supabase.ts`
+1. **Create a Supabase Cloud project** at [supabase.com](https://supabase.com).
+   Generate publishable + secret API keys (new `sb_publishable_…` /
+   `sb_secret_…` format, not the legacy anon / service_role keys).
+2. **Configure environment variables.**
+   ```bash
+   cp .env.local.example .env.local
+   ```
+   Fill in `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
+   `SUPABASE_SECRET_KEY`, `SYSADMIN_EMAIL`, `SYSADMIN_INITIAL_PASSWORD`,
+   `SYSADMIN_NOTIFICATION_EMAIL`, `RETENTION_PERIOD_DAYS`, `CRON_SECRET`,
+   and the Cyon SMTP variables. See `.env.local.example` for inline guidance.
+3. **Install the Supabase CLI** (no Docker):
+   ```bash
+   brew install supabase/tap/supabase   # macOS
+   ```
+4. **Link the project** to your Cloud reference:
+   ```bash
+   supabase link --project-ref <your-project-ref>
+   ```
+5. **Apply migrations to Cloud:**
+   ```bash
+   supabase db push
+   ```
+6. **Regenerate TypeScript types** from the Cloud schema (re-run after
+   every future migration):
+   ```bash
+   npx supabase gen types typescript --linked > src/lib/supabase/types.ts
+   ```
+7. **Seed the first sysadmin account** (idempotent — safe to re-run):
+   ```bash
+   npm run seed:sysadmin
+   ```
+   Promote an existing user to sysadmin later with:
+   ```bash
+   npm run seed:sysadmin -- --promote user@example.com
+   ```
+8. **Test the cron stub locally:**
+   ```bash
+   curl -H "Authorization: Bearer $CRON_SECRET" \
+        http://localhost:3000/api/cron/purge
+   ```
+   Expected response: `{ "ok": true, "purged": 0, "retention_days": 30 }`.
 
-Skip this step if you're building frontend-only (landing pages, portfolios, etc.)
+**Important workflow rules** (see `CLAUDE.md` for the full conventions):
+- Schema changes go through migrations only — never edit the schema
+  directly in the Supabase Dashboard SQL Editor.
+- Generate new migrations with `npx supabase migration new <name>`,
+  then `supabase db push`.
+- Don't use `supabase db pull` or `supabase db diff` (require Docker).
 
 ### 3. Start Development
 
@@ -305,13 +349,14 @@ Standalone guides in `docs/production/`:
 ## Scripts
 
 ```bash
-npm run dev          # Development server (localhost:3000)
-npm run build        # Production build
-npm run start        # Production server
-npm run lint         # ESLint
-npm test             # Vitest: integration tests for API routes
-npm run test:e2e     # Playwright: E2E tests for user flows
-npm run test:all     # Run both test suites
+npm run dev             # Development server (localhost:3000)
+npm run build           # Production build
+npm run start           # Production server
+npm run lint            # ESLint
+npm test                # Vitest: integration tests for API routes
+npm run test:e2e        # Playwright: E2E tests for user flows
+npm run test:all        # Run both test suites
+npm run seed:sysadmin   # Idempotent sysadmin bootstrap / promotion
 ```
 
 ---

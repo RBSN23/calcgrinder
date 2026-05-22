@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Calcgrinder — Account Dashboard (Print)</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  /* ── On-screen + print base ─────────────────────────────────────── */
+  html, body { margin:0; padding:0; background:#e8e6e0;
+    font-family: "Geist", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    color:#1C1917;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  * { box-sizing: border-box; }
+
+  /* Landscape so the 1280-wide desktop artboards have room. Mobile pages
+     still fit fine in landscape with the artboard centered in the page. */
+  @page { size: A4 landscape; margin: 8mm 10mm; }
+
+  .page {
+    width: 277mm;            /* A4 landscape inner width @ 10mm side margins */
+    min-height: 194mm;       /* A4 landscape inner height @ 8mm top/bottom   */
+    margin: 0 auto 18mm;
+    background: #fff;
+    border: 1px solid #E7E5E4;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(28,25,23,0.06);
+    padding: 14mm 12mm 12mm;
+    display: flex; flex-direction: column;
+    break-after: page;
+    page-break-after: always;
+    overflow: hidden;
+  }
+  .page:last-child { break-after: auto; page-break-after: auto; }
+
+  .page-head {
+    display:flex; align-items:baseline; gap:14px;
+    margin-bottom: 10mm; padding-bottom: 6mm;
+    border-bottom: 1px solid #E7E5E4;
+  }
+  .page-num {
+    font-family:"Geist Mono", monospace;
+    font-size:10pt; color:#A8A29E; font-weight:500; letter-spacing:0.5px;
+  }
+  .page-title {
+    font-size:14pt; font-weight:600; letter-spacing:-0.2px; color:#1C1917;
+  }
+  .page-section {
+    font-size:9.5pt; color:#78716C; font-weight:400; margin-left:auto;
+  }
+
+  /* The artboard frame fills the remaining space and renders the dashboard
+     at its native pixel size, scaled to fit via CSS transform. */
+  .frame-wrap {
+    flex:1; position:relative; min-height:0;
+    display:flex; align-items:flex-start; justify-content:center;
+  }
+  .frame {
+    position:relative; overflow:hidden;
+    border-radius:8px; border:1px solid #E7E5E4;
+    background:#FAFAF9;
+    transform-origin: top center;
+  }
+
+  /* Cover page */
+  .cover {
+    text-align:left; padding: 30mm 18mm; height: 100%;
+    display:flex; flex-direction:column; justify-content:space-between;
+  }
+  .cover-mark {
+    display:flex; align-items:center; gap:10px;
+  }
+  .cover-mark-badge {
+    width:30px; height:30px; border-radius:7px; background:#1C1917;
+    color:#FAFAF9;
+    display:inline-flex; align-items:center; justify-content:center;
+    font-family:"Geist Mono", monospace; font-size:18px; font-weight:600; letter-spacing:-0.5px;
+  }
+  .cover-mark-word {
+    font-size:18pt; font-weight:600; letter-spacing:-0.4px; color:#1C1917;
+  }
+  .cover-eyebrow {
+    font-family:"Geist Mono", monospace; font-size:10pt; letter-spacing:1px;
+    color:#78716C; text-transform:uppercase; margin-bottom:18mm;
+  }
+  .cover-title {
+    font-size:42pt; font-weight:600; letter-spacing:-1.4pt; line-height:1.05;
+    color:#1C1917; margin:0;
+  }
+  .cover-sub {
+    margin-top:8mm; font-size:12pt; color:#57534E; line-height:1.5;
+    max-width: 150mm;
+  }
+  .cover-meta {
+    margin-top: auto;
+    display:flex; gap:24mm; padding-top:18mm; border-top:1px solid #E7E5E4;
+    font-size:9pt; color:#78716C;
+  }
+  .cover-meta dt {
+    font-family:"Geist Mono", monospace; font-size:8pt;
+    letter-spacing:0.6px; text-transform:uppercase; color:#A8A29E; margin-bottom:4px;
+  }
+  .cover-meta dd { margin:0; color:#1C1917; font-weight:500; font-size:10pt; }
+  .cover-toc {
+    margin-top: 12mm;
+    border-top:1px solid #E7E5E4; padding-top:10mm;
+  }
+  .cover-toc h2 {
+    font-family:"Geist Mono", monospace; font-size:9pt; letter-spacing:0.6px;
+    text-transform:uppercase; color:#A8A29E; font-weight:600; margin:0 0 6mm;
+  }
+  .toc-list {
+    display:grid; grid-template-columns: 1fr 1fr; gap:5mm 12mm; padding:0; list-style:none; margin:0;
+  }
+  .toc-list li {
+    display:flex; align-items:baseline; gap:10px;
+    font-size:10.5pt; color:#1C1917;
+  }
+  .toc-list .toc-num {
+    font-family:"Geist Mono", monospace; font-size:9pt; color:#A8A29E; min-width:18px;
+  }
+  .toc-list .toc-dot {
+    flex:1; border-bottom:1px dotted #D6D3D1; margin:0 6px;
+    transform:translateY(-3px);
+  }
+  .toc-list .toc-page {
+    font-family:"Geist Mono", monospace; font-size:9.5pt; color:#78716C;
+  }
+
+  /* Screen-only helper: faint instructional banner that doesn't print */
+  .print-hint {
+    position: fixed; top: 12px; right: 12px; z-index: 99;
+    background:#1C1917; color:#FAFAF9;
+    padding: 8px 12px; border-radius: 6px; font-size: 11px;
+    font-family:"Geist Mono", monospace; opacity:0.85;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.20);
+  }
+  @media print {
+    body { background: #fff; }
+    .page { box-shadow:none; border:none; margin: 0 auto; padding:0;
+      border-radius:0; }
+    .page-head { padding-bottom: 4mm; margin-bottom: 4mm; }
+    .print-hint { display:none !important; }
+    .frame { border:1px solid #E7E5E4; }
+  }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div class="print-hint">Press ⌘P / Ctrl+P to save as PDF</div>
+<div id="root"></div>
+
+<script type="text/babel" src="chrome.jsx?v=1779392295038"></script>
+<script type="text/babel" src="dashboard.jsx?v=1779392295038"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useLayoutEffect } = React;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PrintFrame — renders the Dashboard at its native artboard pixel size, then
+// CSS-scales the whole frame to fit inside the available page area. The
+// outer .frame-wrap is the measurement target.
+// ─────────────────────────────────────────────────────────────────────────────
+const PrintFrame = ({ width, height, children }) => {
+  const wrapRef = useRef(null);
+  const [scale, setScale] = useState(1);
+
+  useLayoutEffect(() => {
+    const fit = () => {
+      const wrap = wrapRef.current;
+      if (!wrap) return;
+      const wW = wrap.clientWidth, wH = wrap.clientHeight;
+      if (!wW || !wH) return;
+      const s = Math.min(wW / width, wH / height, 1);
+      setScale(s);
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    // Re-run after fonts have settled
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(fit);
+    }
+    return () => window.removeEventListener('resize', fit);
+  }, [width, height]);
+
+  return (
+    <div ref={wrapRef} className="frame-wrap">
+      <div className="frame" style={{
+        width, height,
+        transform: `scale(${scale})`,
+      }}>
+        {children}
+      </div>
+    </div>
+  );
+};
+
+const Page = ({ num, total, title, section, children }) => (
+  <section className="page">
+    <div className="page-head">
+      <span className="page-num">{String(num).padStart(2,'0')} / {String(total).padStart(2,'0')}</span>
+      <span className="page-title">{title}</span>
+      <span className="page-section">{section}</span>
+    </div>
+    {children}
+  </section>
+);
+
+// All artboards from the original canvas, in order.
+const artboards = [
+  { id:'d-light',   w:1280, h:920,  title:'01 · Desktop · Light',
+    section:'Default state',          props:{ theme:'light' } },
+  { id:'d-dark',    w:1280, h:920,  title:'02 · Desktop · Dark',
+    section:'Default state',          props:{ theme:'dark'  } },
+  { id:'m-light',   w:390,  h:1100, title:'03 · Mobile · Light · 390w',
+    section:'Mobile',                 props:{ theme:'light', viewport:'mobile' } },
+  { id:'m-dark',    w:390,  h:1100, title:'03b · Mobile · Dark',
+    section:'Mobile',                 props:{ theme:'dark',  viewport:'mobile' } },
+  { id:'d-popover', w:1280, h:920,  title:'04 · Desktop · Light · popover open',
+    section:'Avatar popover',         props:{ theme:'light', popoverOpen:true } },
+  { id:'d-dual',    w:1280, h:1480, title:'05 · Desktop · Light · Calcs + Templates open',
+    section:'Two sections expanded',  props:{ theme:'light', sections:{calcs:true, templates:true, scenarios:false} } },
+  { id:'d-empty',   w:1280, h:840,  title:'06 · Desktop · Light · empty My Calculators',
+    section:'Edge states',            props:{ theme:'light', empty:true } },
+  { id:'d-all',     w:1280, h:1880, title:'07 · Desktop · Light · all sections open',
+    section:'Edge states',            props:{ theme:'light', sections:{calcs:true, templates:true, scenarios:true} } },
+];
+
+const totalPages = artboards.length + 1; // + cover
+
+const Cover = () => (
+  <section className="page">
+    <div className="cover">
+      <div>
+        <div className="cover-mark">
+          <span className="cover-mark-badge">c</span>
+          <span className="cover-mark-word">Calcgrinder</span>
+        </div>
+        <div style={{height: '14mm'}}/>
+        <div className="cover-eyebrow">Design · Account Dashboard</div>
+        <h1 className="cover-title">Account Dashboard</h1>
+        <p className="cover-sub">
+          The logged-in surface maintainers land on. App shell + first concrete
+          page across desktop and mobile, light and dark.
+        </p>
+
+        <div className="cover-toc">
+          <h2>Contents</h2>
+          <ol className="toc-list">
+            {artboards.map((a, i) => (
+              <li key={a.id}>
+                <span className="toc-num">{String(i+1).padStart(2,'0')}</span>
+                <span>{a.title.replace(/^\d+[a-z]?\s·\s/, '')}</span>
+                <span className="toc-dot"/>
+                <span className="toc-page">p. {i + 2}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </div>
+
+      <dl className="cover-meta">
+        <div>
+          <dt>Document</dt>
+          <dd>Account Dashboard</dd>
+        </div>
+        <div>
+          <dt>Surfaces</dt>
+          <dd>{artboards.length} artboards</dd>
+        </div>
+        <div>
+          <dt>Date</dt>
+          <dd>May 21, 2026</dd>
+        </div>
+      </dl>
+    </div>
+  </section>
+);
+
+const App = () => (
+  <React.Fragment>
+    <Cover/>
+    {artboards.map((a, i) => (
+      <Page key={a.id} num={i+2} total={totalPages} title={a.title} section={a.section}>
+        <PrintFrame width={a.w} height={a.h}>
+          <Dashboard {...a.props}/>
+        </PrintFrame>
+      </Page>
+    ))}
+  </React.Fragment>
+);
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Auto-print: wait for fonts and a settle delay so the React tree and the
+// transform-scale measurements are stable before the dialog opens.
+// ─────────────────────────────────────────────────────────────────────────────
+const triggerPrint = async () => {
+  if (document.fonts && document.fonts.ready) {
+    try { await document.fonts.ready; } catch (_) {}
+  }
+  // give React + scale layout effects two frames + 500ms
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  await new Promise(r => setTimeout(r, 500));
+  window.print();
+};
+window.addEventListener('load', triggerPrint);
+</script>
+</body>
+</html>

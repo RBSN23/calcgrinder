@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Calcgrinder — Admin moderation as Dashboard section</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  html, body { margin:0; padding:0; height:100%; background:#f0eee9;
+    font-family: "Geist", -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  #root { width:100%; height:100vh; }
+  .cg-frame { width:100%; height:100%; overflow:hidden; border-radius:8px;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.04); }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx?v=1779392295040"></script>
+<script type="text/babel" src="chrome.jsx?v=1779392295040"></script>
+<script type="text/babel" src="states.jsx?v=1779392295040"></script>
+<script type="text/babel" src="dashboard.jsx?v=1779392295040"></script>
+
+<script type="text/babel">
+const Frame = (props) => (
+  <div className="cg-frame">
+    <Dashboard {...props}/>
+  </div>
+);
+
+// One particular user calc that the sysadmin is mid-delete on. We reach
+// into the array exposed by dashboard.jsx so the sheet's title + owner
+// stay in lockstep with the card visible underneath.
+const deleteTarget = window.cgUserCalcs.find(c => c.id === 'u3');
+
+const App = () => (
+  <DesignCanvas
+    docTitle="Calcgrinder — Admin moderation as Dashboard section"
+    docSubtitle="Sysadmin User Calculators block + section max-height + destructive confirm. Light theme; dark adapts via tokens."
+  >
+    <DCSection
+      id="baseline"
+      title="Baseline · registered user"
+      subtitle="No sysadmin context. Three sections; My Calculators expanded."
+    >
+      <DCArtboard
+        id="f1-default"
+        label="01 · Registered user · default state"
+        width={1280}
+        height={880}
+      >
+        <Frame
+          theme="light"
+          isSysadmin={false}
+          sections={{ calcs:true, templates:false, scenarios:false, userCalcs:false }}
+        />
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="scroll"
+      title="Section max height + internal scroll"
+      subtitle="Applies to every section. Once content exceeds ~2 card-rows the inner area scrolls; the section itself stops growing. Demonstrated on My Calculators with a padded data set."
+    >
+      <DCArtboard
+        id="f2-scroll"
+        label="02 · Registered user · My Calculators at max height (scrolls internally)"
+        width={1280}
+        height={880}
+      >
+        <Frame
+          theme="light"
+          isSysadmin={false}
+          manyCalcs={true}
+          sections={{ calcs:true, templates:false, scenarios:false, userCalcs:false }}
+        />
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="sysadmin-default"
+      title="Sysadmin · default"
+      subtitle="Fourth section, red-tint container, all sections collapsed. The wash is the only signal — no left border, no SYSADMIN pill on the header."
+    >
+      <DCArtboard
+        id="f3-sysadmin-collapsed"
+        label="03 · Sysadmin · all four sections collapsed"
+        width={1280}
+        height={620}
+      >
+        <Frame
+          theme="light"
+          isSysadmin={true}
+          sections={{ calcs:false, templates:false, scenarios:false, userCalcs:false }}
+        />
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="sysadmin-confirm"
+      title="Sysadmin · destructive confirm"
+      subtitle="User Calculators expanded. Bottom sheet over the dashboard names the owner explicitly so a sysadmin can't misclick across two users with similarly-titled calculators."
+    >
+      <DCArtboard
+        id="f4-sysadmin-delete"
+        label="04 · Sysadmin · User Calculators expanded · delete confirm sheet"
+        width={1280}
+        height={1020}
+      >
+        <Frame
+          theme="light"
+          isSysadmin={true}
+          sections={{ calcs:false, templates:false, scenarios:false, userCalcs:true }}
+          kebabOpenUserCalcId={null}
+          deleteSheetTarget={deleteTarget}
+        />
+      </DCArtboard>
+    </DCSection>
+  </DesignCanvas>
+);
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

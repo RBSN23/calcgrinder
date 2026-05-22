@@ -51,6 +51,8 @@ All features tracked in `features/INDEX.md`. Every skill reads it at start and u
 - **shadcn/ui first:** NEVER create custom versions of installed shadcn components
 - **Human-in-the-loop:** All workflows have user approval checkpoints
 - **Tests:** Unit tests co-located next to source files (`useHook.test.ts` next to `useHook.ts`). E2E tests in `tests/`.
+- **Supabase clients:** All Supabase client instantiation lives under `src/lib/supabase/`. Import `createClient` from `@/lib/supabase/client` in client components, from `@/lib/supabase/server` in server components / route handlers / server actions, or `createAdminClient` from `@/lib/supabase/admin` for privileged server-only code. NEVER import from `@/lib/supabase/admin` outside `src/app/api/**` or `scripts/**` — the `server-only` guard turns that into a build error, but the rule keeps reviewers honest.
+- **Database schema changes:** Use Supabase CLI migrations under `supabase/migrations/`. Generate a new migration with `npx supabase migration new <name>` and deploy with `supabase db push` to the linked Cloud project. NEVER write SQL directly in the Supabase Dashboard SQL Editor — this deviates from the template's backend-skill default but keeps schema in version control. After every migration, regenerate types: `npx supabase gen types typescript --linked > src/lib/supabase/types.ts`. No local Docker stack — Cloud-only workflow; do not use `supabase db pull` or `supabase db diff`.
 
 ## Build & Test Commands
 

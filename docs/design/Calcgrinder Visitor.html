@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Calcgrinder — Public Visitor View</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  html, body { margin:0; padding:0; height:100%; background:#f0eee9;
+    font-family: "Geist", -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  #root { width:100%; height:100vh; }
+  .cg-frame { width:100%; height:100%; overflow:hidden; border-radius:8px;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.04); }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx?v=1779392295038"></script>
+<script type="text/babel" src="chrome.jsx?v=1779392295038"></script>
+<script type="text/babel" src="editor-grid.jsx?v=1779392295038"></script>
+<script type="text/babel" src="editor-builder.jsx?v=1779392295038"></script>
+<script type="text/babel" src="visitor-view.jsx?v=1779392295038"></script>
+<script type="text/babel" src="visitor-3col.jsx?v=1779392295038"></script>
+<script type="text/babel" src="themes.jsx?v=1779392295038"></script>
+<script type="text/babel" src="cafe-margin.jsx?v=1779392295038"></script>
+<script type="text/babel" src="charts.jsx?v=1779392295038"></script>
+
+<script type="text/babel">
+const Frame = (props) => (
+  <div className="cg-frame"><VisitorView {...props}/></div>
+);
+
+const App = () => (
+  <DesignCanvas
+    docTitle="Calcgrinder — Public Visitor View"
+    docSubtitle="Editorial · Cream theme · what end-users see at the calculator's public URL"
+  >
+    <DCSection
+      id="anon"
+      title="Anonymous visitor"
+      subtitle="No account. Save icon + Log in + Sign up CTA. The Save action prompts sign-up on click."
+    >
+      <DCArtboard id="vis-anon" label="01 · Desktop · Anonymous · Editorial · Cream"
+        width={1280} height={1320}>
+        <Frame user="anonymous"/>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="reg"
+      title="Registered user"
+      subtitle="Save + Clone + profile chip. Clone forks this calculator into the user's own dashboard."
+    >
+      <DCArtboard id="vis-reg" label="02 · Desktop · Registered · Editorial · Cream"
+        width={1280} height={1320}>
+        <Frame user="registered"/>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="mobile"
+      title="Mobile"
+      subtitle="Same surface, single column, compact header."
+    >
+      <DCArtboard id="vis-anon-m" label="03a · Mobile · Anonymous" width={390} height={1380}>
+        <Frame user="anonymous" viewport="mobile"/>
+      </DCArtboard>
+      <DCArtboard id="vis-reg-m" label="03b · Mobile · Registered" width={390} height={1380}>
+        <Frame user="registered" viewport="mobile"/>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="three-col"
+      title="3-column layout"
+      subtitle="Inputs · Results · Chart. Side-by-side rhythm — same theme, denser, dashboard-ish."
+    >
+      <DCArtboard id="vis-3col-reg" label="04 · Desktop · Registered · 3-column · Editorial · Cream"
+        width={1280} height={920}>
+        <div className="cg-frame"><VisitorView3Col user="registered"/></div>
+      </DCArtboard>
+      <DCArtboard id="vis-3col-anon" label="05 · Desktop · Anonymous · 3-column · Editorial · Cream"
+        width={1280} height={920}>
+        <div className="cg-frame"><VisitorView3Col user="anonymous"/></div>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="charts"
+      title="Charts"
+      subtitle="11 chart types · pure SVG · visitor renders · rendered in three theme variants"
+    >
+      <DCArtboard id="charts-cg-light" label="07a · Charts · Calcgrinder · Light"
+        width={1400} height={2120}>
+        <div className="cg-frame"><ChartsGallery themeKey="cgLight"/></div>
+      </DCArtboard>
+      <DCArtboard id="charts-cg-dark" label="07b · Charts · Calcgrinder · Dark"
+        width={1400} height={2120}>
+        <div className="cg-frame"><ChartsGallery themeKey="cgDark"/></div>
+      </DCArtboard>
+      <DCArtboard id="charts-glow" label="07c · Charts · Vessel · Glow"
+        width={1400} height={2120}>
+        <div className="cg-frame"><ChartsGallery themeKey="vesselGlow"/></div>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="cafe-margin"
+      title="Café Margin Studio"
+      subtitle="Elaborate visitor calculator · 11 sections · inputs + KPIs + waterfall + bullets + heatmap + amortisation"
+    >
+      <DCArtboard id="vis-cafe" label="06 · Desktop · Café Margin Studio · Editorial · Cream"
+        width={1280} height={4300}>
+        <div className="cg-frame"><CafeMarginCalculator user="registered"/></div>
+      </DCArtboard>
+    </DCSection>
+  </DesignCanvas>
+);
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

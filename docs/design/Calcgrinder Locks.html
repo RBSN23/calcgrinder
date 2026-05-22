@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Calcgrinder — Visitor View · Locks &amp; Scenarios</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  html, body { margin:0; padding:0; height:100%; background:#f0eee9;
+    font-family: "Geist", -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  #root { width:100%; height:100vh; }
+  .cg-frame { width:100%; height:100%; overflow:hidden; border-radius:8px;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.04); position:relative; }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx?v=2"></script>
+<script type="text/babel" src="chrome.jsx?v=2"></script>
+<script type="text/babel" src="editor-grid.jsx?v=2"></script>
+<script type="text/babel" src="editor-builder.jsx?v=2"></script>
+<script type="text/babel" src="visitor-view.jsx?v=2"></script>
+<script type="text/babel" src="visitor-locks.jsx?v=2"></script>
+
+<script type="text/babel">
+// ─────────────────────────────────────────────────────────────────────────────
+// Fixture data
+// ─────────────────────────────────────────────────────────────────────────────
+
+// The scenario URL that frames 3 & 4 are loaded from. Its baseline values
+// differ from the calculator's defaults — that's the whole point of a
+// scenario.
+const scenario = {
+  id: 'sc_stretch',
+  title: 'Stretch budget · single income',
+  description: 'What the numbers look like if we push to a $550K target on a 25% down payment plan.',
+  author: 'ada.thornton',
+  savedAt: 'Mar 12, 2026',
+  values: {
+    purchase_price:    '$550,000',
+    down_payment_pct:  '25%',
+    interest_rate:     '5.85%',
+    term_years:        '30',
+  },
+};
+
+// Frame 4: the user has unlocked two inputs and changed them. The "current
+// state" is mostly scenario values, but with two overrides.
+const modifiedValues = {
+  ...scenario.values,
+  purchase_price:   '$600,000',
+  down_payment_pct: '30%',
+};
+
+// The existing-scenarios list shown in the Save sheet.
+const existingScenarios = [
+  { id: 'sc_conservative', title: 'Conservative · 30% down',          savedAt: 'Feb 02, 2026' },
+  { id: 'sc_stretch',      title: 'Stretch budget · single income',   savedAt: 'Mar 12, 2026' },
+  { id: 'sc_arm',          title: '5/1 ARM — first 5 years cheap',    savedAt: 'Mar 18, 2026' },
+];
+
+// Locked-id helpers
+const allInputIds   = ['purchase_price','down_payment_pct','interest_rate','term_years'];
+const lockedAll     = new Set(allInputIds);
+const lockedNone    = new Set();
+const lockedTwo     = new Set(['down_payment_pct', 'interest_rate']); // frame 2
+// Frame 4: user unlocked purchase_price + down_payment_pct, others still locked.
+const lockedFrame4  = new Set(['interest_rate', 'term_years']);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Frame wrappers
+// ─────────────────────────────────────────────────────────────────────────────
+
+const Frame1 = () => (
+  <div className="cg-frame">
+    <LockableVisitorView
+      user="registered"
+      lockedIds={lockedNone}
+    />
+  </div>
+);
+
+const Frame2 = () => (
+  <div className="cg-frame">
+    <LockableVisitorView
+      user="registered"
+      lockedIds={lockedTwo}
+    />
+  </div>
+);
+
+const Frame3 = () => (
+  <div className="cg-frame">
+    <LockableVisitorView
+      user="registered"
+      lockedIds={lockedAll}
+      valueOverrides={scenario.values}
+      scenario={scenario}
+      modified={false}
+      showReset={false}
+    />
+  </div>
+);
+
+const Frame4 = () => (
+  <div className="cg-frame">
+    <LockableVisitorView
+      user="registered"
+      lockedIds={lockedFrame4}
+      valueOverrides={modifiedValues}
+      scenario={scenario}
+      modified={true}
+      showReset={true}
+    />
+  </div>
+);
+
+// Frames 5 & 6 — visitor view + Save Scenario sheet overlay. Mobile width
+// keeps the sheet readable; the visitor view scrolls behind it.
+const Frame5 = () => (
+  <div className="cg-frame">
+    <LockableVisitorView
+      user="registered"
+      viewport="mobile"
+      lockedIds={lockedNone}
+    />
+    <SaveScenarioSheet
+      viewport="mobile"
+      mode="new"
+      scenarios={existingScenarios}
+      currentScenarioId={null}
+      name=""
+      description=""
+    />
+  </div>
+);
+
+const Frame6 = () => (
+  <div className="cg-frame">
+    <LockableVisitorView
+      user="registered"
+      viewport="mobile"
+      lockedIds={lockedAll}
+      valueOverrides={scenario.values}
+      scenario={scenario}
+      modified={false}
+      showReset={false}
+    />
+    <SaveScenarioSheet
+      viewport="mobile"
+      mode="overwrite"
+      scenarios={existingScenarios}
+      currentScenarioId="sc_stretch"
+      name={scenario.title}
+      description={scenario.description}
+    />
+  </div>
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Canvas
+// ─────────────────────────────────────────────────────────────────────────────
+
+const App = () => (
+  <DesignCanvas
+    docTitle="Calcgrinder — Visitor View · Locks &amp; Scenarios"
+    docSubtitle="Per-field lock mechanism · shared-scenario state · save-scenario sheet extensions"
+  >
+    <DCSection
+      id="locks-baseline"
+      title="Per-field lock mechanism"
+      subtitle="A lock toggle in the top-right of every editable input card. Outline padlock = unlocked, filled accent padlock = locked."
+    >
+      <DCArtboard id="vis-locks-1" label="01 · Normal URL · all inputs unlocked"
+        width={1280} height={1420}>
+        <Frame1/>
+      </DCArtboard>
+      <DCArtboard id="vis-locks-2" label="02 · Normal URL · two inputs manually locked (slider + rate)"
+        width={1280} height={1420}>
+        <Frame2/>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="scenario-state"
+      title="Shared-scenario state"
+      subtitle="Calculator opened via a scenario URL. Scenario header block. All inputs locked by default. Reset returns to the loaded scenario values."
+    >
+      <DCArtboard id="vis-scen-3" label="03 · Scenario URL · initial loaded state"
+        width={1280} height={1440}>
+        <Frame3/>
+      </DCArtboard>
+      <DCArtboard id="vis-scen-4" label="04 · Scenario URL · two inputs unlocked + changed · Reset visible"
+        width={1280} height={1440}>
+        <Frame4/>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="save-sheet"
+      title="Save-scenario bottom sheet"
+      subtitle="Extends the existing Save Scenario sheet with a Description field and current-scenario pre-selection."
+    >
+      <DCArtboard id="vis-save-5" label="05 · Save sheet · new scenario (no current pre-selected)"
+        width={520} height={900}>
+        <Frame5/>
+      </DCArtboard>
+      <DCArtboard id="vis-save-6" label="06 · Save sheet · current scenario pre-selected · Overwrite"
+        width={520} height={900}>
+        <Frame6/>
+      </DCArtboard>
+    </DCSection>
+  </DesignCanvas>
+);
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

@@ -31,6 +31,13 @@ yarn-error.log*
 # vercel
 .vercel
 
+# supabase CLI local state (linked project metadata, tokens)
+supabase/.temp/
+
+# playwright test artifacts
+/playwright-report/
+/test-results/
+
 # claude code personal settings
 .claude/settings.local.json
 

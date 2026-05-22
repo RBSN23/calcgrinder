@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Calcgrinder — Calculator Editor</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  html, body { margin:0; padding:0; height:100%; background:#f0eee9;
+    font-family: "Geist", -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  #root { width:100%; height:100vh; }
+  .cg-frame { width:100%; height:100%; overflow:hidden; border-radius:8px;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.04); }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx?v=1779396755144"></script>
+<script type="text/babel" src="chrome.jsx?v=1779396755144"></script>
+<script type="text/babel" src="charts.jsx?v=1779396755144"></script>
+<script type="text/babel" src="editor-grid.jsx?v=1779396755144"></script>
+<script type="text/babel" src="editor-builder.jsx?v=1779396755144"></script>
+<script type="text/babel" src="editor.jsx?v=1779396755144"></script>
+<script type="text/babel" src="editor-elements.jsx?v=1779396755144"></script>
+<script type="text/babel" src="chart-settings.jsx?v=1779396755144"></script>
+
+<script type="text/babel">
+const Frame = (props) => (
+  <div className="cg-frame"><Editor {...props}/></div>
+);
+
+const App = () => (
+  <DesignCanvas
+    docTitle="Calcgrinder — Calculator Editor"
+    docSubtitle="Maintainer view · grid above, builder below · pixel-identical to visitor view"
+  >
+    <DCSection
+      id="default"
+      title="Default editor view"
+      subtitle="Grid (top) shows ~8 cells visible. Builder (bottom) renders the live mortgage calculator."
+    >
+      <DCArtboard id="ed-light" label="01 · Desktop · Light" width={1440} height={1280}>
+        <Frame theme="light"/>
+      </DCArtboard>
+      <DCArtboard id="ed-dark" label="02 · Desktop · Dark" width={1440} height={1280}>
+        <Frame theme="dark"/>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="cell-expanded"
+      title="Cell settings expanded · in the builder"
+      subtitle="Click any card → inline-expanding settings panel opens in place. Card stays at its visitor position; only its height grows."
+    >
+      <DCArtboard id="ed-cell" label="03 · monthly_payment selected · inline settings open" width={1440} height={1420}>
+        <Frame theme="light" selectedCell="monthly_payment"/>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="col-expanded"
+      title="Column settings expanded · in the grid"
+      subtitle="Kebab on the header → settings drop down inline (all columns gain matching height to keep the data row aligned)."
+    >
+      <DCArtboard id="ed-col" label="04 · monthly_payment column · kebab expanded" width={1440} height={1280}>
+        <Frame theme="light" expandedCol="monthly_payment"/>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="chart-expanded"
+      title="Chart settings expanded"
+      subtitle="Chart type (6 options), series picker references grid columns, axis + colour controls."
+    >
+      <DCArtboard id="ed-chart" label="05 · chart selected · inline settings open" width={1440} height={1660}>
+        <Frame theme="light" expandChart={true}/>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="hidden-popover"
+      title="Hidden-cells popover"
+      subtitle="Toolbar pill → anchored popover lists hidden cells; click one to scroll & open."
+    >
+      <DCArtboard id="ed-hidden" label="06 · hidden cells popover open" width={1440} height={1280}>
+        <Frame theme="light" hiddenPopover={true}/>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="import"
+      title="Import cells from code · paste → preview → apply"
+      subtitle="Same popover/sheet shell across all states. Step 1 paste (reference). Step 2 paste with inline errors + disabled primary. Step 3 diff preview with sticky header/footer and internal scroll. New NEW / REPLACED / UNCHANGED pill kinds added to the Pill component."
+    >
+      <DCArtboard id="ed-import" label="08a · Desktop · State 1 · Paste (reference)" width={1440} height={1080}>
+        <Frame theme="light" importOpen={true}/>
+      </DCArtboard>
+
+      <DCArtboard id="ed-import-errors" label="08b · Desktop · State 2 · Paste with inline errors · primary disabled" width={1440} height={1080}>
+        <Frame theme="light" importOpen={true} importStep="errors"/>
+      </DCArtboard>
+
+      <DCArtboard id="ed-import-preview" label="08c · Desktop · State 3 · Preview · 2 new · 2 replaced · 3 unchanged" width={1440} height={1080}>
+        <Frame theme="light" importOpen={true} importStep="preview"/>
+      </DCArtboard>
+
+      <DCArtboard id="ed-import-preview-scrolled" label="08d · Desktop · State 3 · Preview · scrolled mid-state (sticky header + footer)" width={1440} height={1080}>
+        <Frame theme="light" importOpen={true} importStep="preview" importPreviewScroll={96}/>
+      </DCArtboard>
+
+      <DCArtboard id="ed-import-mob-errors" label="08e · Mobile · State 2 · Paste with inline errors · bottom sheet" width={390} height={1000}>
+        <Frame theme="light" viewport="mobile" mobileGridOpen={true} importSheetOpen={true} importStep="errors"/>
+      </DCArtboard>
+
+      <DCArtboard id="ed-import-mob-preview" label="08f · Mobile · State 3 · Preview · bottom sheet" width={390} height={1000}>
+        <Frame theme="light" viewport="mobile" mobileGridOpen={true} importSheetOpen={true} importStep="preview"/>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="mobile"
+      title="Mobile editor — bottom-docked Grid drawer"
+      subtitle="Builder fills the canvas. Grid is a bottom-docked vertical drawer (~30% default, capped at 50% when a row's settings expand). Footer nav has magic-code import · Grid toggle · hidden pill + Add cell."
+    >
+      <DCArtboard id="ed-mob-1-light" label="07a · Mobile · Light · Builder only (Grid OFF)" width={390} height={1000}>
+        <Frame theme="light" viewport="mobile"/>
+      </DCArtboard>
+      <DCArtboard id="ed-mob-1-dark" label="07a · Mobile · Dark · Builder only (Grid OFF)" width={390} height={1000}>
+        <Frame theme="dark" viewport="mobile"/>
+      </DCArtboard>
+
+      <DCArtboard id="ed-mob-2-light" label="07b · Mobile · Light · Grid ON · default 30% drawer" width={390} height={1000}>
+        <Frame theme="light" viewport="mobile" mobileGridOpen={true}/>
+      </DCArtboard>
+      <DCArtboard id="ed-mob-2-dark" label="07b · Mobile · Dark · Grid ON · default 30% drawer" width={390} height={1000}>
+        <Frame theme="dark" viewport="mobile" mobileGridOpen={true}/>
+      </DCArtboard>
+
+      <DCArtboard id="ed-mob-3-light" label="07c · Mobile · Light · Grid ON · scrolled to + add cell row" width={390} height={1000}>
+        <Frame theme="light" viewport="mobile" mobileGridOpen={true} drawerScrollOffset={300}/>
+      </DCArtboard>
+      <DCArtboard id="ed-mob-3-dark" label="07c · Mobile · Dark · Grid ON · scrolled to + add cell row" width={390} height={1000}>
+        <Frame theme="dark" viewport="mobile" mobileGridOpen={true} drawerScrollOffset={300}/>
+      </DCArtboard>
+
+      <DCArtboard id="ed-mob-4-light" label="07d · Mobile · Light · Grid ON · row inline-edit active" width={390} height={1000}>
+        <Frame theme="light" viewport="mobile" mobileGridOpen={true} editingRowId="interest_rate"/>
+      </DCArtboard>
+      <DCArtboard id="ed-mob-4-dark" label="07d · Mobile · Dark · Grid ON · row inline-edit active" width={390} height={1000}>
+        <Frame theme="dark" viewport="mobile" mobileGridOpen={true} editingRowId="interest_rate"/>
+      </DCArtboard>
+
+      <DCArtboard id="ed-mob-5a-light" label="07e · Mobile · Light · Grid ON · focused expand · typical card" width={390} height={1000}>
+        <Frame theme="light" viewport="mobile" mobileGridOpen={true} expandedRowId="interest_rate"/>
+      </DCArtboard>
+      <DCArtboard id="ed-mob-5a-dark" label="07e · Mobile · Dark · Grid ON · focused expand · typical card" width={390} height={1000}>
+        <Frame theme="dark" viewport="mobile" mobileGridOpen={true} expandedRowId="interest_rate"/>
+      </DCArtboard>
+
+      <DCArtboard id="ed-mob-5b-light" label="07f · Mobile · Light · Grid ON · focused expand · 70% cap, internal scroll" width={390} height={1000}>
+        <Frame theme="light" viewport="mobile" mobileGridOpen={true} expandedRowId="monthly_payment" drawerHeight="70%"/>
+      </DCArtboard>
+      <DCArtboard id="ed-mob-5b-dark" label="07f · Mobile · Dark · Grid ON · focused expand · 70% cap, internal scroll" width={390} height={1000}>
+        <Frame theme="dark" viewport="mobile" mobileGridOpen={true} expandedRowId="monthly_payment" drawerHeight="70%"/>
+      </DCArtboard>
+
+      <DCArtboard id="ed-mob-6-light" label="07f · Mobile · Light · Grid ON + Import sheet open from footer" width={390} height={1000}>
+        <Frame theme="light" viewport="mobile" mobileGridOpen={true} importSheetOpen={true}/>
+      </DCArtboard>
+      <DCArtboard id="ed-mob-6-dark" label="07f · Mobile · Dark · Grid ON + Import sheet open from footer" width={390} height={1000}>
+        <Frame theme="dark" viewport="mobile" mobileGridOpen={true} importSheetOpen={true}/>
+      </DCArtboard>
+
+      <DCArtboard id="ed-hover-add" label="08 · Desktop · Light · between-cards hover-add affordance visible" width={1440} height={1380}>
+        <Frame theme="light" showHoverAdd={true}/>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="add-picker"
+      title="Add-element picker"
+      subtitle="Single + Add affordance, three options: Cell · Chart · Text. Desktop = anchored popover, mobile = bottom sheet."
+    >
+      <DCArtboard id="add-pick-grid-light" label="09a · Desktop · Light · picker open from grid panel '+'" width={1440} height={520}>
+        <div className="cg-frame"><EditorExt theme="light" pickerOpen="gridEdge"/></div>
+      </DCArtboard>
+      <DCArtboard id="add-pick-tool-dark" label="09b · Desktop · Dark · picker open from builder toolbar '+'" width={1440} height={520}>
+        <div className="cg-frame"><EditorExt theme="dark" pickerOpen="builderToolbar"/></div>
+      </DCArtboard>
+      <DCArtboard id="add-pick-mob-light" label="09c · Mobile · Light · bottom-sheet picker open from footer '+'" width={390} height={780}>
+        <div className="cg-frame"><EditorExt theme="light" viewport="mobile" pickerOpen="footer"/></div>
+      </DCArtboard>
+      <DCArtboard id="add-pick-mob-dark" label="09d · Mobile · Dark · bottom-sheet picker open from footer '+'" width={390} height={780}>
+        <div className="cg-frame"><EditorExt theme="dark" viewport="mobile" pickerOpen="footer"/></div>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="grid-mixed"
+      title="Grid with mixed element types"
+      subtitle="Cells, Chart and Text-block sharing the same grid row vocabulary. Each kind has its own pill colour."
+    >
+      <DCArtboard id="grid-mix-light" label="10a · Desktop · Light · mixed elements, collapsed" width={1440} height={420}>
+        <div className="cg-frame"><EditorExt theme="light"/></div>
+      </DCArtboard>
+      <DCArtboard id="grid-mix-dark" label="10b · Desktop · Dark · mixed elements, collapsed" width={1440} height={420}>
+        <div className="cg-frame"><EditorExt theme="dark"/></div>
+      </DCArtboard>
+      <DCArtboard id="drawer-mix-light" label="10c · Mobile · Light · drawer with mixed elements" width={390} height={780}>
+        <div className="cg-frame"><EditorExt theme="light" viewport="mobile"/></div>
+      </DCArtboard>
+      <DCArtboard id="drawer-mix-dark" label="10d · Mobile · Dark · drawer with mixed elements" width={390} height={780}>
+        <div className="cg-frame"><EditorExt theme="dark" viewport="mobile"/></div>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="grid-collapse"
+      title="Grid collapse"
+      subtitle="Chevron-up control in the grid header collapses the grid to a thin strip, giving the builder full vertical space. Chart/Text columns are narrower than Cell columns now."
+    >
+      <DCArtboard id="gc-expanded" label="11a · Desktop · Light · Grid expanded · Chart card collapsed in builder" width={1440} height={1080}>
+        <div className="cg-frame"><EditorExt theme="light"/></div>
+      </DCArtboard>
+      <DCArtboard id="gc-collapsed" label="11b · Desktop · Light · Grid collapsed to strip · Builder reclaims space" width={1440} height={1080}>
+        <div className="cg-frame"><EditorExt theme="light" collapsed={true}/></div>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="chart-configurator"
+      title="Chart configurator · in the builder"
+      subtitle="Three tabs (Type · Data · Style) live inside the expanded chart card. Live preview above updates as settings change. No save/cancel buttons — incremental. Three chart types (Line, Pie, Bullet) shown to demonstrate label-switching."
+    >
+      <DCArtboard id="cc-line-data" label="12a · Desktop · Light · Line · Data tab · X-axis + Lines + grip-handles" width={1440} height={1500}>
+        <div className="cg-frame"><EditorExt theme="light" collapsed={true} expandChart={true} chartType="line" chartTab="data"/></div>
+      </DCArtboard>
+      <DCArtboard id="cc-pie-data" label="12b · Desktop · Light · Pie · Data tab · Slice labels + Slice sizes" width={1440} height={1500}>
+        <div className="cg-frame"><EditorExt theme="light" collapsed={true} expandChart={true} chartType="pie" chartTab="data"/></div>
+      </DCArtboard>
+      <DCArtboard id="cc-pie-type-warn" label="12c · Desktop · Light · Pie · Type tab · smart-defaults warning banner" width={1440} height={1500}>
+        <div className="cg-frame"><EditorExt theme="light" collapsed={true} expandChart={true} chartType="pie" chartTab="type" chartShowWarning="Pie shows one set of values. Switching keeps 'Revenue' and removes 'Cost', 'Profit'."/></div>
+      </DCArtboard>
+      <DCArtboard id="cc-bullet-data" label="12d · Desktop · Light · Bullet · Data tab · Actual / Target / Performance bands" width={1440} height={1500}>
+        <div className="cg-frame"><EditorExt theme="light" collapsed={true} expandChart={true} chartType="bullet" chartTab="data"/></div>
+      </DCArtboard>
+      <DCArtboard id="cc-cbar-data" label="12d′ · Desktop · Light · Comparison Bar · Data tab · X-axis + Labels + Series A/B (v1: two cell-arrays)" width={1440} height={1500}>
+        <div className="cg-frame"><EditorExt theme="light" collapsed={true} expandChart={true} chartType="comparisonBar" chartTab="data"/></div>
+      </DCArtboard>
+      <DCArtboard id="cc-line-style-light" label="12e · Desktop · Light · Line · Style tab · Title/legend/axes + card-style block" width={1440} height={1500}>
+        <div className="cg-frame"><EditorExt theme="light" collapsed={true} expandChart={true} chartType="line" chartTab="style"/></div>
+      </DCArtboard>
+      <DCArtboard id="cc-line-style-dark" label="12f · Desktop · Dark · Line · Style tab · same content, dark theme" width={1440} height={1500}>
+        <div className="cg-frame"><EditorExt theme="dark" collapsed={true} expandChart={true} chartType="line" chartTab="style"/></div>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="cross-surface"
+      title="Cross-surface jump"
+      subtitle="Grid kebab on a Chart column jumps the user to the builder where editing happens. A ~600ms pulse highlights the grid column so the visual link is clear."
+    >
+      <DCArtboard id="cs-jump" label="13 · Desktop · Light · Pulse highlight on chart column · Data tab open below" width={1440} height={1400}>
+        <div className="cg-frame"><EditorExt theme="light" pulseChartId="revenue_trend" expandChart={true} chartType="line" chartTab="data"/></div>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="chart-mobile"
+      title="Chart configurator · mobile"
+      subtitle="Focused-expand state inside the drawer at the 70% cap. Small live preview at top (~120px), tabbed settings below scroll internally. Same content as desktop, compact density."
+    >
+      <DCArtboard id="cm-data" label="14a · Mobile · Light · Data tab · three Lines compactly stacked" width={390} height={780}>
+        <div className="cg-frame"><EditorExt theme="light" viewport="mobile" mobileExpandChart={true} chartType="line" chartTab="data" drawerHeight="70%"/></div>
+      </DCArtboard>
+      <DCArtboard id="cm-type-dark" label="14b · Mobile · Dark · Type tab · 4×3 grid scaled down" width={390} height={780}>
+        <div className="cg-frame"><EditorExt theme="dark" viewport="mobile" mobileExpandChart={true} chartType="line" chartTab="type" drawerHeight="70%"/></div>
+      </DCArtboard>
+    </DCSection>
+  </DesignCanvas>
+);
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

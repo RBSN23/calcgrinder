@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Calcgrinder — Auth flows</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  html, body { margin:0; padding:0; height:100%; background:#f0eee9;
+    font-family: "Geist", -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  #root { width:100%; height:100vh; }
+  .cg-frame { width:100%; height:100%; overflow:hidden; border-radius:8px;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.04); }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx?v=1"></script>
+<script type="text/babel" src="chrome.jsx?v=1"></script>
+<script type="text/babel" src="auth.jsx?v=1"></script>
+
+<script type="text/babel">
+// Frame helpers — Screen is the component, props the state. Always render
+// the pair {Desktop light, Desktop dark, Mobile light, Mobile dark}.
+const F = ({ Screen, theme, viewport, ...rest }) => (
+  <div className="cg-frame"><Screen theme={theme} viewport={viewport} {...rest}/></div>
+);
+
+// Desktop frame size — ~520w gives a sense of how the column sits inside a
+// browser tab without filling it. 700h fits the tallest form (request access
+// with help text) with breathing room.
+const DW = 520, DH = 700;
+// Mobile — iPhone-ish 380w. Same height for the canvas row.
+const MW = 380, MH = 700;
+
+// NOTE: must be a plain function (not a React component), so the returned
+// DCArtboard elements land directly in DCSection's children tree where
+// dcFlatten can find them. A component wrapper would hide them.
+const fourUp = ({ idPrefix, Screen, extraProps }) => (
+  <React.Fragment>
+    <DCArtboard id={`${idPrefix}-d-light`}  label="Desktop · Light"
+      width={DW} height={DH}>
+      <F Screen={Screen} theme="light" viewport="desktop" {...extraProps}/>
+    </DCArtboard>
+    <DCArtboard id={`${idPrefix}-d-dark`}   label="Desktop · Dark"
+      width={DW} height={DH}>
+      <F Screen={Screen} theme="dark"  viewport="desktop" {...extraProps}/>
+    </DCArtboard>
+    <DCArtboard id={`${idPrefix}-m-light`}  label="Mobile · Light"
+      width={MW} height={MH}>
+      <F Screen={Screen} theme="light" viewport="mobile" {...extraProps}/>
+    </DCArtboard>
+    <DCArtboard id={`${idPrefix}-m-dark`}   label="Mobile · Dark"
+      width={MW} height={MH}>
+      <F Screen={Screen} theme="dark"  viewport="mobile" {...extraProps}/>
+    </DCArtboard>
+  </React.Fragment>
+);
+
+const App = () => (
+  <DesignCanvas
+    docTitle="Calcgrinder — Auth flows"
+    docSubtitle="Eight pre-auth screens. Light + dark App theme; desktop + mobile per screen."
+  >
+    <DCSection
+      id="login"
+      title="01 · Login"
+      subtitle="Email + password. Forgot-password link below the button. Divider + sign-up link at the bottom."
+    >
+      {fourUp({idPrefix: "login", Screen: LoginScreen})}
+    </DCSection>
+
+    <DCSection
+      id="login-err"
+      title="01a · Login — error state"
+      subtitle="Same screen with an inline error banner above the form. Wording is deliberately ambiguous (email vs password)."
+    >
+      {fourUp({idPrefix: "login-err", Screen: LoginScreen, extraProps: {error: true}})}
+    </DCSection>
+
+    <DCSection
+      id="request"
+      title="02 · Request access (signup)"
+      subtitle='Name · email · password. Button reads "Request access" — not "Sign up" — because the admin still has to approve.'
+    >
+      {fourUp({idPrefix: "request", Screen: RequestAccessScreen})}
+    </DCSection>
+
+    <DCSection
+      id="waiting"
+      title="03 · Waiting for approval"
+      subtitle="Shown after a successful request-access submission AND when a pending OR denied account tries to log in. The two cases are indistinguishable to the user."
+    >
+      {fourUp({idPrefix: "waiting", Screen: WaitingApprovalScreen})}
+    </DCSection>
+
+    <DCSection
+      id="forgot"
+      title="04 · Forgot password"
+      subtitle="Email-only form. Submission always shows screen 05, regardless of whether the email is registered."
+    >
+      {fourUp({idPrefix: "forgot", Screen: ForgotPasswordScreen})}
+    </DCSection>
+
+    <DCSection
+      id="forgot-sent"
+      title="05 · Reset email sent"
+      subtitle="Confirmation. Wording carefully avoids confirming whether the email is registered."
+    >
+      {fourUp({idPrefix: "forgot-sent", Screen: ForgotPasswordSentScreen})}
+    </DCSection>
+
+    <DCSection
+      id="reset"
+      title="06 · Reset password"
+      subtitle="Reached via the link in the reset email. New password + confirm new password."
+    >
+      {fourUp({idPrefix: "reset", Screen: ResetPasswordScreen})}
+    </DCSection>
+
+    <DCSection
+      id="reset-err"
+      title="06a · Reset password — passwords don't match"
+      subtitle="Both fields outlined in red; inline error banner above the form."
+    >
+      {fourUp({idPrefix: "reset-err", Screen: ResetPasswordScreen, extraProps: {error: true}})}
+    </DCSection>
+
+    <DCSection
+      id="reset-success"
+      title="07 · Reset success"
+      subtitle="Checkmark glyph in the accent color, then a full-width Sign in CTA."
+    >
+      {fourUp({idPrefix: "reset-success", Screen: ResetSuccessScreen})}
+    </DCSection>
+
+    <DCSection
+      id="admin-approved"
+      title="08a · Admin approval landing — approved"
+      subtitle="Shown when the sysadmin clicks the Approve link in the notification email. Internal page, no further actions."
+    >
+      {fourUp({idPrefix: "admin-approved", Screen: AdminLandingScreen, extraProps: {outcome: 'approved'}})}
+    </DCSection>
+
+    <DCSection
+      id="admin-declined"
+      title="08b · Admin approval landing — declined"
+      subtitle='Same as 08a but for the Reject link. Note: "will not be notified" — denied users land back on screen 03 instead.'
+    >
+      {fourUp({idPrefix: "admin-declined", Screen: AdminLandingScreen, extraProps: {outcome: 'declined'}})}
+    </DCSection>
+  </DesignCanvas>
+);
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

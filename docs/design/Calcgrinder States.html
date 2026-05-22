@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Calcgrinder — Empty & Error States</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  html, body { margin:0; padding:0; height:100%; background:#f0eee9;
+    font-family: "Geist", -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  #root { width:100%; height:100vh; }
+  .cg-frame { width:100%; height:100%; overflow:hidden; border-radius:8px;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.04); }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx?v=2"></script>
+<script type="text/babel" src="chrome.jsx?v=2"></script>
+<script type="text/babel" src="dashboard.jsx?v=2"></script>
+<script type="text/babel" src="states.jsx?v=2"></script>
+
+<script type="text/babel">
+const Frame = (props) => (
+  <div className="cg-frame"><Dashboard {...props}/></div>
+);
+const FrameOrphan = (props) => (
+  <div className="cg-frame"><OrphanPage {...props}/></div>
+);
+const FramePublic = (props) => (
+  <div className="cg-frame"><PublicErrorPage {...props}/></div>
+);
+
+// ─────────────────────────────────────────────────────────────
+// Copy-table card — renders alongside each frame so the variant copy
+// is legible and easy to compare. Light styling, no app chrome.
+// ─────────────────────────────────────────────────────────────
+const CopyTable = ({ title, columns, rows, note }) => {
+  const t = cgTokens.light;
+  return (
+    <div style={{
+      width:'100%', height:'100%', overflow:'auto',
+      padding:'28px 32px', background:t.surface,
+      fontFamily:'"Geist", -apple-system, system-ui, sans-serif',
+      color:t.text, fontSize:13, letterSpacing:-0.05,
+    }}>
+      <div style={{
+        fontSize:11, fontWeight:600, color:t.textSubtle,
+        textTransform:'uppercase', letterSpacing:1, marginBottom:6,
+      }}>Copy table</div>
+      <div style={{fontSize:18, fontWeight:600, letterSpacing:-0.3, marginBottom:18}}>{title}</div>
+
+      <div style={{
+        border:`1px solid ${t.border}`, borderRadius:10, overflow:'hidden',
+        background:t.surface,
+      }}>
+        <table style={{width:'100%', borderCollapse:'collapse', tableLayout:'fixed'}}>
+          <colgroup>
+            {columns.map((c,i) => <col key={i} style={{width: c.width || 'auto'}}/>)}
+          </colgroup>
+          <thead>
+            <tr style={{background:t.surface2}}>
+              {columns.map((c,i) => (
+                <th key={i} style={{
+                  textAlign:'left', padding:'10px 14px',
+                  fontSize:11, fontWeight:600, color:t.textMuted,
+                  textTransform:'uppercase', letterSpacing:0.6,
+                  borderBottom:`1px solid ${t.border}`,
+                  borderRight: i < columns.length-1 ? `1px solid ${t.border}` : 'none',
+                }}>{c.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row,ri) => (
+              <tr key={ri}>
+                {columns.map((c,ci) => {
+                  const cell = row[c.key];
+                  const isFirst = ci === 0;
+                  return (
+                    <td key={ci} style={{
+                      padding:'12px 14px', verticalAlign:'top',
+                      borderTop: ri > 0 ? `1px solid ${t.border}` : 'none',
+                      borderRight: ci < columns.length-1 ? `1px solid ${t.border}` : 'none',
+                      fontSize: isFirst ? 12.5 : 12.5,
+                      fontWeight: isFirst ? 600 : 400,
+                      color: isFirst ? t.text : t.textMuted,
+                      lineHeight: 1.5,
+                    }}>{cell || <span style={{color:t.textSubtle}}>—</span>}</td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {note && (
+        <div style={{
+          marginTop:14, fontSize:12, color:t.textSubtle, lineHeight:1.5,
+        }}>{note}</div>
+      )}
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────
+// Copy data
+// ─────────────────────────────────────────────────────────────
+const G1_COLS = [
+  {key:'section', label:'Section',         width:'17%'},
+  {key:'icon',    label:'Icon',            width:'13%'},
+  {key:'title',   label:'Title',           width:'24%'},
+  {key:'body',    label:'Body',            width:'30%'},
+  {key:'primary', label:'Primary action',  width:'16%'},
+];
+const G1_ROWS = [
+  {section:'My Calculators', icon:'Calc · grid',     title:'No calculators yet',     body:'Build your first calculator to see it here.',                              primary:'+ Build a new calculator'},
+  {section:'Templates',      icon:'LayoutGrid · stack', title:'No templates available', body:'Templates appear here when sysadmins publish calculators.',              primary:''},
+  {section:'My Scenarios',   icon:'Bookmark',        title:'No saved scenarios',     body:'Save a scenario from any calculator to find it here.',                    primary:''},
+];
+
+const G2_COLS = [
+  {key:'state',     label:'State',         width:'15%'},
+  {key:'title',     label:'Title',         width:'22%'},
+  {key:'body',      label:'Body',          width:'28%'},
+  {key:'primary',   label:'Primary',       width:'13%'},
+  {key:'secondary', label:'Secondary',     width:'12%'},
+  {key:'footer',    label:'Footer note',   width:'10%'},
+];
+const G2_ROWS = [
+  {state:'Recoverable', title:'Calculator no longer available', body:'The calculator «‹name›» was deleted by its owner. You can clone it to keep using your scenarios while it\u2019s still recoverable.', primary:'Clone calculator', secondary:'Discard scenario', footer:'N other + Delete all'},
+  {state:'Final',       title:'Calculator no longer exists',    body:'The calculator «‹name›» has been permanently removed. Your scenarios for it can no longer be used.',                                  primary:'Delete this scenario', secondary:'View other scenarios', footer:'Same, if N > 0'},
+];
+
+const G3_COLS = [
+  {key:'state',   label:'State',          width:'17%'},
+  {key:'status',  label:'Status',         width:'9%'},
+  {key:'icon',    label:'Icon',           width:'13%'},
+  {key:'title',   label:'Title',          width:'21%'},
+  {key:'body',    label:'Body',           width:'24%'},
+  {key:'primary', label:'Primary',        width:'10%'},
+  {key:'footer',  label:'Footer',         width:'10%'},
+];
+const G3_ROWS = [
+  {state:'Invalid / revoked', status:'404', icon:'NotFound',  title:'Calculator not found',         body:"This calculator doesn\u2019t exist or the link has been revoked. Check the URL and try again.",       primary:'',                              footer:'Visit Calcgrinder'},
+  {state:'Unpublished',       status:'404', icon:'NotFound',  title:'Calculator not available',     body:'This calculator is private. The owner may publish it later, or you can check the URL.',                primary:'',                              footer:'Visit Calcgrinder'},
+  {state:'Soft-deleted',      status:'410', icon:'Hourglass', title:'Calculator no longer available', body:'The owner has deleted this calculator. If you saved scenarios, you can find them in your account.', primary:'Sign in to see your scenarios', footer:''},
+];
+
+// ─────────────────────────────────────────────────────────────
+// App
+// ─────────────────────────────────────────────────────────────
+const App = () => (
+  <DesignCanvas
+    docTitle="Calcgrinder — Empty & Error States"
+    docSubtitle="One reusable component (EmptyOrErrorState), three usage contexts."
+  >
+    <DCSection
+      id="g1-empty"
+      title="Group 1 · Dashboard empty states"
+      subtitle="variant='empty' — dashed border, surface2 bg. Renders inside a section, replacing its content."
+    >
+      <DCArtboard id="g1-frame" label="01 · My Calculators empty · Light" width={1280} height={920}>
+        <Frame theme="light" empty={true}/>
+      </DCArtboard>
+      <DCArtboard id="g1-copy" label="01b · Copy table" width={920} height={400}>
+        <CopyTable
+          title="variant='empty' — by section"
+          columns={G1_COLS}
+          rows={G1_ROWS}
+          note="Identical visual treatment across all three sections; only icon + copy + primary action change. The other two sections (Templates, My Scenarios) re-use this frame style with their own copy."
+        />
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="g2-orphan"
+      title="Group 2 · Orphan scenario screens"
+      subtitle="variant='error' — solid 1px border, surface bg, framed card. Renders inside the dashboard area but full-area, not embedded in a section."
+    >
+      <DCArtboard id="g2-frame" label="02 · Recoverable orphan · «Mortgage v3» · Light" width={1280} height={920}>
+        <FrameOrphan theme="light" calcName="Mortgage v3" mode="recoverable" otherCount={3}/>
+      </DCArtboard>
+      <DCArtboard id="g2-copy" label="02b · Copy table" width={920} height={400}>
+        <CopyTable
+          title="variant='error' — orphan scenarios"
+          columns={G2_COLS}
+          rows={G2_ROWS}
+          note={'Footer note pattern: "You have ‹N› other scenarios for this calculator." + Delete all link (suppressed when N=0). Icon is the Calc glyph in both states — the body copy carries the «name» of the deleted calculator.'}
+        />
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="g3-public"
+      title="Group 3 · Public-URL error screens"
+      subtitle="variant='error', framed={false} — no card. Wordmark centred at top, content centred below. No app chrome (visitor isn't necessarily signed in)."
+    >
+      <DCArtboard id="g3-frame" label="03 · 404 invalid token · Light" width={1280} height={920}>
+        <FramePublic theme="light" mode="invalid"/>
+      </DCArtboard>
+      <DCArtboard id="g3-copy" label="03b · Copy table" width={1080} height={460}>
+        <CopyTable
+          title="variant='error' + framed={false} — public URL"
+          columns={G3_COLS}
+          rows={G3_ROWS}
+          note="The status code (404 / 410) appears as a small monospaced eyebrow above the title — it's diagnostic, not the headline. Only the 410 case offers a primary action, because only that case implies a signed-in scenarios outcome."
+        />
+      </DCArtboard>
+    </DCSection>
+  </DesignCanvas>
+);
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Calcgrinder — Settings</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  html, body { margin:0; padding:0; height:100%; background:#f0eee9;
+    font-family: "Geist", -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  #root { width:100%; height:100vh; }
+  .cg-frame { width:100%; height:100%; overflow:hidden; border-radius:8px;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.04); }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx?v=1"></script>
+<script type="text/babel" src="chrome.jsx?v=2"></script>
+<script type="text/babel" src="states.jsx?v=1"></script>
+<script type="text/babel" src="dashboard.jsx?v=2"></script>
+<script type="text/babel" src="settings.jsx?v=1"></script>
+
+<script type="text/babel">
+const F = ({ children }) => <div className="cg-frame">{children}</div>;
+
+// Dashboard excerpt — same Dashboard component but rendered into a short
+// artboard so only the top section (top bar + welcome line + hero) is in view.
+const DashboardExcerpt = () => (
+  <F><Dashboard theme="light" isSysadmin={true}/></F>
+);
+
+const App = () => (
+  <DesignCanvas
+    docTitle="Calcgrinder — Settings"
+    docSubtitle="Profile · Security · Preferences · Danger zone. Plus the sysadmin pill on the dashboard welcome line."
+  >
+    <DCSection
+      id="settings-default"
+      title="01 · Settings · default state"
+      subtitle="No pending changes. Sysadmin role pill visible in Profile. Light theme."
+    >
+      <DCArtboard id="s-default" label="Desktop · Light" width={1280} height={1320}>
+        <F><SettingsPage theme="light" state="default" isSysadmin={true}/></F>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="settings-pending"
+      title="02 · Settings · pending email + pending deletion"
+      subtitle="Email change submitted but not yet verified (pending pill + new address + resend/cancel below). Account deletion is also in flight, surfaced as the inline info row at the top of the Danger zone."
+    >
+      <DCArtboard id="s-pending" label="Desktop · Light · both pending" width={1280} height={1400}>
+        <F><SettingsPage theme="light" state="pending" isSysadmin={true}/></F>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="settings-confirm"
+      title="03 · Settings · destructive confirm bottom-sheet"
+      subtitle="Delete-account sheet open over the Settings page. Dim overlay, top corners rounded, drag handle, primary destructive button + ghost Cancel. Lifts later into a shared component."
+    >
+      <DCArtboard id="s-confirm" label="Desktop · Light · sheet open" width={1280} height={1320}>
+        <F><SettingsPage theme="light" state="default" isSysadmin={true} showSheet={true}/></F>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="landing-email"
+      title="04 · Email change confirmation landing"
+      subtitle="Reached via the verification link in the new-address email. No app chrome, wordmark centred top. Matches auth-screens framing. Copy is placeholder."
+    >
+      <DCArtboard id="l-email" label="Desktop · Light · L1" width={1280} height={720}>
+        <F><ConfirmationLanding theme="light" kind="email-changed"/></F>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="dash-pill"
+      title="05 · Dashboard welcome line · sysadmin pill"
+      subtitle="Small frame showing only the top portion of the dashboard. Same red pill as the Settings → Profile → Role row. Visible to sysadmin users only."
+    >
+      <DCArtboard id="d-pill" label="Desktop · Light · top of dashboard" width={1280} height={320}>
+        <DashboardExcerpt/>
+      </DCArtboard>
+    </DCSection>
+  </DesignCanvas>
+);
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

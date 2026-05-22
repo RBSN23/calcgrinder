@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Calcgrinder — Account Dashboard</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  html, body { margin:0; padding:0; height:100%; background:#f0eee9;
+    font-family: "Geist", -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  #root { width:100%; height:100vh; }
+  /* Each artboard wraps the Dashboard; clip so internal scroll doesn't bleed */
+  .cg-frame { width:100%; height:100%; overflow:hidden; border-radius:8px;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.04); }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx?v=1779392295038"></script>
+<script type="text/babel" src="chrome.jsx?v=1779392295038"></script>
+<script type="text/babel" src="dashboard.jsx?v=1779392295038"></script>
+
+<script type="text/babel">
+const { useState } = React;
+
+// Frame helper — wraps a Dashboard render in a clipped, rounded box that fills
+// the artboard.
+const Frame = (props) => (
+  <div className="cg-frame">
+    <Dashboard {...props}/>
+  </div>
+);
+
+const App = () => (
+  <DesignCanvas
+    docTitle="Calcgrinder — Account Dashboard"
+    docSubtitle="App shell + first concrete page · maintainer view"
+  >
+    <DCSection
+      id="states"
+      title="Desktop · default state"
+      subtitle="My Calculators expanded, Templates & Scenarios collapsed. Light + dark."
+    >
+      <DCArtboard id="d-light" label="01 · Desktop · Light" width={1280} height={920}>
+        <Frame theme="light"/>
+      </DCArtboard>
+      <DCArtboard id="d-dark" label="02 · Desktop · Dark" width={1280} height={920}>
+        <Frame theme="dark"/>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="mobile"
+      title="Mobile"
+      subtitle="Single column. Hamburger replaces tabs; avatar popover still anchored top-right."
+    >
+      <DCArtboard id="m-light" label="03 · Mobile · Light · 390w" width={390} height={1100}>
+        <Frame theme="light" viewport="mobile"/>
+      </DCArtboard>
+      <DCArtboard id="m-dark" label="03b · Mobile · Dark" width={390} height={1100}>
+        <Frame theme="dark" viewport="mobile"/>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="popover"
+      title="Avatar popover"
+      subtitle="The one allowed popover — anchored, not blocking. Theme picker + admin/settings/sign-out."
+    >
+      <DCArtboard id="d-popover" label="04 · Desktop · Light · popover open" width={1280} height={920}>
+        <Frame theme="light" popoverOpen={true}/>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="dual"
+      title="Two sections expanded"
+      subtitle="How stacked-open sections breathe. Templates' card treatment is intentionally distinct."
+    >
+      <DCArtboard id="d-dual" label="05 · Desktop · Light · Calcs + Templates open" width={1280} height={1480}>
+        <Frame theme="light" sections={{calcs:true, templates:true, scenarios:false}}/>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection
+      id="alt"
+      title="Edge states"
+      subtitle="Empty My Calculators; and all three sections open showing Scenarios row treatment."
+    >
+      <DCArtboard id="d-empty" label="06 · Desktop · Light · empty My Calculators" width={1280} height={840}>
+        <Frame theme="light" empty={true}/>
+      </DCArtboard>
+      <DCArtboard id="d-all" label="07 · Desktop · Light · all sections open" width={1280} height={1880}>
+        <Frame theme="light" sections={{calcs:true, templates:true, scenarios:true}}/>
+      </DCArtboard>
+    </DCSection>
+  </DesignCanvas>
+);
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
