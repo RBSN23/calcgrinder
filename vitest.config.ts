@@ -17,6 +17,11 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, './src'),
+      // Next.js provides `server-only` at runtime via its webpack
+      // resolver. Vitest doesn't, so the import fails. Map it to an
+      // empty stub for test runs — the production-side guard remains
+      // active through Next's bundler.
+      'server-only': resolve(__dirname, './src/test/server-only-stub.ts'),
     },
   },
 })

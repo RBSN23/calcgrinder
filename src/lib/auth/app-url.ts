@@ -6,32 +6,53 @@ import { z } from 'zod';
  * PROJ-3 — Single source of truth for the public-facing app origin.
  *
  * `APP_URL` is consumed exclusively server-side (email URL builders,
- * server-action redirects, route-handler origin check). Outside
- * `NODE_ENV=development` the protocol MUST be `https:`; this is the
- * single enforcement point for PROJ-2 finding L2 ("caller must produce
- * https: URLs only") — every outgoing-mail URL in PROJ-3 is derived
- * from this base, so one check at the boundary covers them all.
+ * server-action redirects, route-handler origin check).
+ *
+ * Validation policy:
+ *   - Required, valid absolute URL, no trailing slash.
+ *   - Localhost origins (`http://localhost(:port)?`) are always
+ *     accepted — they cover both local dev (`next dev`) and `next
+ *     build` runs on the dev machine where NODE_ENV is `production`
+ *     but TLS isn't terminated.
+ *   - Any other origin MUST use `https:`. This is the single
+ *     enforcement point for PROJ-2 finding L2 ("caller must produce
+ *     https: URLs only") — every outgoing-mail URL in PROJ-3 is
+ *     derived from this base, so one check at the boundary covers
+ *     them all.
  *
  * No other module is permitted to read `process.env.APP_URL`. Import
- * `APP_URL` (the validated string) or `appUrl()` (the URL builder) from
- * this module instead.
+ * `APP_URL` (the validated string) or `appUrl()` (the URL builder)
+ * from this module instead.
  */
 
-const isDev = process.env.NODE_ENV === 'development';
+function isLocalhost(raw: string): boolean {
+  try {
+    const u = new URL(raw);
+    return (
+      (u.hostname === 'localhost' || u.hostname === '127.0.0.1') &&
+      u.protocol === 'http:'
+    );
+  } catch {
+    return false;
+  }
+}
 
 const schema = z
   .string({ message: 'APP_URL is required' })
   .url('APP_URL must be a valid absolute URL')
   .refine(
     (raw) => {
-      const u = new URL(raw);
-      if (isDev) return u.protocol === 'http:' || u.protocol === 'https:';
-      return u.protocol === 'https:';
+      try {
+        const u = new URL(raw);
+        if (u.protocol === 'https:') return true;
+        return isLocalhost(raw);
+      } catch {
+        return false;
+      }
     },
     {
-      message: isDev
-        ? 'APP_URL must use http:// or https:// (development)'
-        : 'APP_URL must use https:// outside development',
+      message:
+        'APP_URL must use https:// (only http://localhost is allowed for local dev / builds)',
     },
   )
   .refine((raw) => !raw.endsWith('/'), {

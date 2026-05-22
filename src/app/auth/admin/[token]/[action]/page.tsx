@@ -1,3 +1,5 @@
+export const runtime = 'nodejs';
+
 import { notFound } from 'next/navigation';
 
 import {
@@ -7,28 +9,31 @@ import {
   AuthMessage,
   AuthShell,
 } from '@/components/auth';
+import { appUrl } from '@/lib/auth/app-url';
+import { sendMail } from '@/lib/email/send';
+import { approvalConfirmation } from '@/lib/email/templates';
+import { createAdminClient } from '@/lib/supabase/admin';
 
-type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+import { processApproval } from './process';
 
-type Result =
-  | 'approved'
-  | 'declined'
-  | 'already-approved'
-  | 'already-declined'
-  | 'invalid';
-
-const RESULT_SET: ReadonlySet<Result> = new Set([
-  'approved',
-  'declined',
-  'already-approved',
-  'already-declined',
-  'invalid',
-]);
-
-function asResult(raw: string | string[] | undefined): Result | null {
-  if (typeof raw !== 'string') return null;
-  return RESULT_SET.has(raw as Result) ? (raw as Result) : null;
-}
+/**
+ * PROJ-3 admin landing.
+ *
+ * Server Component that performs the DB transaction (consume token,
+ * update profile status, send confirmation mail) and renders the
+ * result. Architecture per Tech Design § F: the route's `page.tsx`
+ * owns both the DB work and the UI. Next.js's "page can't share path
+ * with route handler" rule forced this design — performing the DB
+ * write directly in the page is cleaner than a self-redirect dance
+ * across two distinct URL paths.
+ *
+ * Idempotency is enforced at the DB level (`WHERE consumed_at IS
+ * NULL`), so refreshes / re-clicks render the "Already …" variant
+ * without re-writing.
+ *
+ * The page itself is unauthenticated (the matrix routes /auth/admin/*
+ * as public). Knowledge of the token IS the auth credential.
+ */
 
 function isValidAction(action: string): action is 'approve' | 'decline' {
   return action === 'approve' || action === 'decline';
@@ -49,33 +54,30 @@ export const metadata = {
   title: 'Calcgrinder admin',
 };
 
-/**
- * PROJ-3 admin landing.
- *
- * The route handler at `route.ts` performs the DB transaction (consume
- * token, update profile status, send confirmation mail). It then
- * redirects here with `?result=…` encoding the outcome. The page is a
- * pure renderer keyed by that query param plus the optional `name`,
- * `email`, `date`, `mailError` flags.
- */
 export default async function AdminLandingPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ token: string; action: string }>;
-  searchParams: SearchParams;
 }) {
-  const { action } = await params;
+  const { token, action } = await params;
   if (!isValidAction(action)) notFound();
 
-  const sp = await searchParams;
-  const result = asResult(sp.result) ?? 'invalid';
-  const name = typeof sp.name === 'string' ? sp.name : '';
-  const email = typeof sp.email === 'string' ? sp.email : '';
-  const date = typeof sp.date === 'string' ? formatDate(sp.date) : '';
-  const mailError = sp.mailError === '1';
+  const outcome = await processApproval({
+    token,
+    action,
+    deps: {
+      admin: createAdminClient(),
+      sendApprovalEmail: async ({ recipientName, recipientEmail }) => {
+        const { subject, text } = approvalConfirmation({
+          recipientName,
+          loginUrl: appUrl('/auth/login'),
+        });
+        await sendMail({ to: recipientEmail, subject, text });
+      },
+    },
+  });
 
-  if (result === 'invalid') {
+  if (outcome.result === 'invalid') {
     return (
       <AuthShell>
         <AuthGlyph icon={AuthIcons.X} variant="muted" />
@@ -86,6 +88,8 @@ export default async function AdminLandingPage({
       </AuthShell>
     );
   }
+
+  const { result, name, email, date, mailError } = outcome;
 
   if (result === 'approved') {
     return (
@@ -136,6 +140,7 @@ export default async function AdminLandingPage({
 
   // already-approved | already-declined
   const wasApproved = result === 'already-approved';
+  const dateLabel = formatDate(date);
   return (
     <AuthShell>
       <AuthGlyph
@@ -156,7 +161,7 @@ export default async function AdminLandingPage({
           </>
         )}
         was {wasApproved ? 'approved' : 'declined'}
-        {date ? ` on ${date}` : ''}.
+        {dateLabel ? ` on ${dateLabel}` : ''}.
       </AuthMessage>
     </AuthShell>
   );

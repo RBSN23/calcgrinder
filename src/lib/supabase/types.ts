@@ -39,36 +39,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      // PROJ-3 manual stub — /backend will regenerate this file once
-      // the signup_approvals migration is applied and `supabase gen
-      // types typescript --linked` is run.
-      signup_approvals: {
-        Row: {
-          consumed_at: string | null
-          created_at: string
-          id: string
-          outcome: string | null
-          token: string
-          user_id: string
-        }
-        Insert: {
-          consumed_at?: string | null
-          created_at?: string
-          id?: string
-          outcome?: string | null
-          token: string
-          user_id: string
-        }
-        Update: {
-          consumed_at?: string | null
-          created_at?: string
-          id?: string
-          outcome?: string | null
-          token?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           created_at: string
@@ -99,6 +69,33 @@ export type Database = {
           role?: string
           status?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      signup_approvals: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          id: string
+          outcome: string | null
+          token: string
+          user_id: string
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          id?: string
+          outcome?: string | null
+          token: string
+          user_id: string
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          id?: string
+          outcome?: string | null
+          token?: string
+          user_id?: string
         }
         Relationships: []
       }

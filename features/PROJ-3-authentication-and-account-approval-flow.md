@@ -962,6 +962,105 @@ middleware extension) is handed off to `/backend`.
   and `/auth/waiting-for-approval` correctly 307 anonymous
   visitors to `/auth/login`.
 
+## Implementation Notes — Backend (2026-05-23)
+
+`/backend` completed the remaining server-side surface deferred by
+`/frontend`. The full PROJ-3 stack is now in place; ready for `/qa`.
+
+### Shipped
+
+- **DB migration.** `supabase/migrations/20260522221232_signup_approvals.sql`
+  creates `public.signup_approvals` with the columns + UNIQUE
+  constraints documented in Tech Design § C. RLS is **enabled with
+  zero policies** (service-role-only posture) and a `COMMENT ON TABLE`
+  call-out so future reviewers don't misread the empty policy list.
+  Pushed to the linked Cloud project with `supabase db push`; types
+  regenerated via `supabase gen types typescript --linked`.
+- **Route gate.** `src/lib/auth/route-gate.ts` — pure decision
+  function with the public-path / auth-surface / private-path lattice.
+  `src/lib/auth/route-gate.test.ts` covers the 15-case acceptance
+  matrix plus extra public-path bypasses (20 tests, all passing).
+- **Middleware.** Moved from repo-root `middleware.ts` to
+  `src/middleware.ts` so Next 16 (which only auto-discovers
+  middleware inside `src/` when a `src/app` directory is present)
+  registers it. Extended `src/lib/supabase/middleware.ts` to consult
+  the route gate after `auth.getUser()` — anonymous requests on
+  private paths get 307 to `/auth/login?next=<pathname>`. The status-
+  based redirects (cases 8–14) stay in the `(app)` / `(auth)` route-
+  group layouts as designed. Next 16 emits a deprecation warning
+  pointing to `proxy.ts`; the migration is out of PROJ-3 scope.
+- **`/auth/sign-out` POST handler.** `src/app/auth/sign-out/route.ts`
+  — calls `supabase.auth.signOut()`, responds with 303 + `Location:
+  /auth/login`. Origin check rejects cross-site posts against
+  `APP_URL`. Idempotent: anonymous post still 303s.
+- **`/auth/confirm` GET handler.** `src/app/auth/confirm/route.ts` —
+  dispatches on `?type=` (signup → /auth/waiting-for-approval,
+  recovery → /auth/reset-password, email_change → /dashboard as a
+  PROJ-14 hook). `?next=` is honoured when present, with an open-
+  redirect guard (must start with `/`, must not start with `//`).
+  Failure modes converge on `/auth/login?error=link_invalid`. Tests
+  in `route.test.ts` cover 7 branches.
+- **Admin approve/decline.**
+  - `src/app/auth/admin/[token]/[action]/process.ts` — pure(-ish)
+    business logic decoupled from Next so the test suite can wire in
+    mocked admin client + mailer.
+  - Originally planned as a sibling `route.ts` + `page.tsx`, but Next
+    rejects route-and-page at the same path. The handler logic now
+    lives **directly inside the page** (Server Component performs
+    the DB transaction, then renders the result variant). Cleaner
+    than the self-redirect-with-`?result=` dance the Tech Design
+    sketched, and equally idempotent under refresh because the
+    `WHERE consumed_at IS NULL` guard returns 0 rows on a re-click,
+    surfacing the "Already …" landing instead of re-writing.
+  - `process.test.ts` covers 7 branches: fresh approve, fresh
+    decline, already-approved-then-approve, declined-then-approve,
+    unknown token, mail throws on approve, concurrent click loses
+    the race.
+- **Signup action tests.** `src/app/(auth)/auth/signup/actions.test.ts`
+  — happy path, existing-email conflict, validation failure (empty +
+  invalid email), notification mail throw (signup preserved), and
+  PROJ-2-L1 control-character stripping.
+- **`server-only` test alias.** Added a Vitest resolve-alias from
+  `server-only` to `src/test/server-only-stub.ts` so any module that
+  imports the marker can run inside Vitest's Node context. Next's
+  build-time enforcement remains intact because it doesn't use
+  Vitest's resolver.
+- **`APP_URL` validation widened.** The original boundary check
+  rejected `http://` outside `NODE_ENV=development`, which broke
+  `next build` on the dev machine (build runs as production).
+  Updated `src/lib/auth/app-url.ts` to always accept
+  `http://localhost(:port)?` and require `https://` for everything
+  else. Documented in the module header.
+- **`docs/production/auth.md`** — deployer guide: Supabase Auth
+  settings + password-policy recommendation, `APP_URL` per
+  environment, email-infra cross-link, sysadmin seed step, manual
+  un-decline SQL snippet (interim until PROJ-19), troubleshooting.
+- **E2E test.** `tests/PROJ-3-auth-flow.spec.ts` — bootstraps a
+  pending user directly via the admin client (`email_confirm=true`),
+  then exercises the dev server through Playwright: anonymous
+  `/dashboard` → `/auth/login?next=…`, all 6 public auth pages
+  return 200, login → /auth/waiting-for-approval → /auth/sign-out
+  (303) → approve via direct token URL → re-click is idempotent
+  ("Already approved") → decline is sticky → re-login lands on
+  /dashboard. Invalid token → "Link not valid". Unknown action →
+  404. Cleans up via `admin.auth.deleteUser` in `finally`. Chromium
+  green.
+
+### Deferred to `/frontend` follow-up (none — backend feature-complete)
+
+All Tech Design surfaces are in place. The Next 16 `middleware → proxy`
+deprecation is documented but not migrated — out of PROJ-3 scope.
+
+### Build & lint status
+
+- `supabase db push` → migration applied; types regenerated.
+- `npm test` → 54 passed (9 files).
+- `npm run test:e2e --project=chromium tests/PROJ-3-auth-flow.spec.ts`
+  → 5 passed.
+- `npm run lint` → no errors, no warnings.
+- `npm run build` → 16 routes (all auth surfaces, admin landing,
+  `/auth/confirm`, `/auth/sign-out`, app stubs).
+
 ## QA Test Results
 _To be added by /qa_
 
