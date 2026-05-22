@@ -17,16 +17,22 @@ import { loginAction } from './actions';
 
 type Props = {
   nextPath: string;
+  initialError?: string | null;
 };
 
-export function LoginForm({ nextPath }: Props) {
+export function LoginForm({ nextPath, initialError }: Props) {
   const [state, formAction] = useActionState(loginAction, initialFormState);
+
+  // Once the user submits the form, suppress the URL-derived banner so the
+  // server-action's response wins (the initial error is only meaningful on
+  // first render; the form-action result is canonical thereafter).
+  const showInitialError = initialError && state === initialFormState;
 
   return (
     <form action={formAction} className="flex flex-col gap-5" noValidate>
       <input type="hidden" name="next" value={nextPath} />
 
-      {state.error && (
+      {state.error ? (
         <AuthErrorBanner>
           {state.error}
           {state.errorLink && (
@@ -38,7 +44,9 @@ export function LoginForm({ nextPath }: Props) {
             </>
           )}
         </AuthErrorBanner>
-      )}
+      ) : showInitialError ? (
+        <AuthErrorBanner>{initialError}</AuthErrorBanner>
+      ) : null}
 
       <AuthField label="Email" htmlFor="login-email" hint={state.fieldErrors?.email}>
         <AuthInput

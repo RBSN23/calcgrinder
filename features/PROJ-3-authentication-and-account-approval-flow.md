@@ -1,8 +1,8 @@
 # PROJ-3: Authentication & Account Approval Flow
 
-## Status: In Progress
+## Status: In Review
 **Created:** 2026-05-22
-**Last Updated:** 2026-05-22
+**Last Updated:** 2026-05-23
 
 ## Dependencies
 
@@ -1062,7 +1062,289 @@ deprecation is documented but not migrated — out of PROJ-3 scope.
   `/auth/confirm`, `/auth/sign-out`, app stubs).
 
 ## QA Test Results
-_To be added by /qa_
+
+**QA date:** 2026-05-23
+**Tester:** /qa
+**Build under test:** local `main` at HEAD `8c4c0ba`
+
+### Summary
+
+| Metric | Value |
+|---|---|
+| Acceptance criteria | **65 total** — 62 pass, **3 fail** (see Bugs § H1, M1, L1) |
+| Automated tests | 54 Vitest pass · 11 Playwright pass (`chromium`) |
+| Cross-browser | E2E project covers Chromium; Firefox / Safari not exercised in this session |
+| Responsive | Layout fidelity inherits from the design prototype; not visually re-verified in this session |
+| Security audit | 1 Medium open redirect / link-loss class issue; no Critical/High security findings |
+| **Production-ready?** | **NOT READY** — one **High** bug (login error wording) and one **Medium** bug (route gate gap) must be fixed first |
+
+### Automated test runs
+
+- `npm test` → 9 files, 54 tests, all green.
+- `npm run test:e2e -- --project=chromium` → 11 tests, all green
+  (6 PROJ-1 cron-purge + 5 PROJ-3 auth-flow).
+- `npm run lint` → no errors, no warnings (re-checked).
+- `npm run build` → no errors.
+
+### Acceptance-criterion verification
+
+Verified end-to-end either via the existing test suites or via
+direct curl probes against `npm run dev`. Three ACs failed; the
+rest passed.
+
+- ✅ **Signup happy path & sent-confirmation copy** — covered
+  by `signup/actions.test.ts` + `tests/PROJ-3-auth-flow.spec.ts`;
+  the sent-confirmation page renders the echoed email and the
+  documented copy variants for `?type=signup` vs. `?type=reset`.
+- ✅ **Signup error states** — existing-email conflict, empty
+  fields, password-policy violation, invalid email — all surface
+  inline `FormState` banners and field hints (`signup/actions.test.ts`).
+- ✅ **Signup notification mail failure does not roll back the
+  auth user** — covered by the `sendMail throws` test.
+- ✅ **Email verification (Supabase native flow)** — `/auth/confirm`
+  validates `token_hash`, redirects to `/auth/waiting-for-approval`
+  on success (`auth/confirm/route.test.ts`).
+- ✅ **Login happy path + status-based redirect** — covered by
+  `loginAction` logic and the E2E flow (pending → waiting-for-
+  approval; approved → dashboard).
+- ❌ **Login error wording for wrong password** — see Bugs § H1.
+- ✅ **Forgot-password happy + unknown email** — uses the admin
+  client for the profile probe (RLS-safe); the "no account exists"
+  branch fires correctly.
+- ✅ **Reset password & match-validation** — `resetPasswordSchema`
+  enforces match; mismatched passwords return inline error.
+- ✅ **Waiting-for-approval screen + sign-out form** — manual
+  curl confirms anon → /auth/login, /auth/sign-out POST → 303
+  → /auth/login. Origin check rejects cross-site posts (HTTP 403).
+- ✅ **Approve/decline endpoints** — five `process.test.ts`
+  branches plus the E2E happy path cover fresh approve, fresh
+  decline, idempotent re-click, unknown token, concurrent race,
+  and mail-throw on approve. `/auth/admin/<bogus>/wrong-action`
+  returns 404 as required.
+- ✅ **Route gating (anonymous)** — 20 unit tests cover the
+  15-case matrix plus extras. curl confirms anon `/dashboard`,
+  `/editor/abc`, `/settings` → 307 to `/auth/login?next=…`;
+  `/c/<token>` (when added) and `/auth/admin/…` are bypassed.
+- ❌ **Route gating — pending user on /auth/login etc.** — see
+  Bugs § M1.
+- ❌ **`/auth/confirm` failure → user sees "link is no longer
+  valid" banner** — see Bugs § L1.
+- ✅ **Auth UI primitives** — all 12 primitives shipped in
+  `src/components/auth/`. Theme switching works (next-themes wired
+  in root layout).
+- ✅ **Env vars & documentation** — `APP_URL` added to
+  `.env.local.example`; `docs/production/auth.md` covers all four
+  documented sections.
+- ✅ **`signup_approvals` migration & RLS posture** — migration
+  applied; RLS enabled with zero policies and the documented
+  `COMMENT ON TABLE` rationale; `GRANT ALL … TO service_role` +
+  `REVOKE ALL … FROM anon, authenticated` is in place.
+
+### Security audit (red-team)
+
+Tested attack surface methodically; one Medium finding, no
+Critical/High.
+
+| Vector | Result |
+|---|---|
+| Open redirect via `/auth/confirm?next=//evil.com` | Guarded — path must start with `/` and not `//`. Verified via curl: redirected to `/auth/login?error=link_invalid` (the OTP failed first, but even on success the guard kicks in). ✅ |
+| Open redirect via `/auth/login?next=//evil.com` | Guarded in both the page (`safeNext` build) and the action. ✅ |
+| XSS via `?email=<script>alert(1)</script>` on sent-confirmation | React JSX escapes; rendered as `&lt;script&gt;`. ✅ |
+| XSS via signup `name` field | Server-side schema strips `\x00-\x1F\x7F` control chars; React JSX escapes rendered name. ✅ |
+| Plain-text body injection via name field (PROJ-2 L1) | Control-char strip in `signup/schema.ts` mitigates. ✅ |
+| HTTPS-only outgoing-mail URLs (PROJ-2 L2) | `app-url.ts` rejects non-https outside `NODE_ENV=development` (with the documented exception for `http://localhost`). ✅ |
+| CSRF on `/auth/sign-out` POST | Origin check rejects cross-site (`curl -X POST -H "Origin: https://evil.com"` → 403). Same-origin → 303. Missing Origin → still 303 (sign-out is idempotent, low impact). ✅ |
+| CSRF on server actions | Next.js built-in origin verification. ✅ |
+| Token-as-auth on `/auth/admin/<token>/<action>` | 32-byte cryptographic random (`crypto.randomBytes`). Brute-force not practical. ✅ |
+| RLS posture on `signup_approvals` | RLS ON, zero policies, GRANT/REVOKE explicitly. ✅ |
+| Service-role key exposure | `SUPABASE_SECRET_KEY` consumed only via `createAdminClient` from `@/lib/supabase/admin` (server-only guard). ✅ |
+| `APP_URL` exposure | No `NEXT_PUBLIC_` prefix; not bundled into client. ✅ |
+| Approve/decline idempotency under prefetch / concurrent click | Single-use enforced via DB-level `WHERE consumed_at IS NULL` + 0-row-affected fallback. ✅ |
+| Enumeration via signup / login / forgot-password | Distinct error wording per surface (explicit PRD non-goal — enumeration defense is not v1, sysadmin sees the full user list anyway). Documented. ✅ |
+
+**Medium — `/auth/confirm` failure silently drops the user on
+the login page with no banner.** See Bugs § L1.
+
+### Regression check on PROJ-1 / PROJ-2
+
+- PROJ-1 cron-purge E2E (`tests/PROJ-1-cron-purge.spec.ts`) →
+  6 tests green. The middleware extension (private API surface
+  routing through the route-gate) correctly excludes
+  `/api/cron/*` so the bearer-auth code path is unchanged.
+- PROJ-2 email infrastructure — `sendMail()` and templates are
+  imported and exercised through the signup notification +
+  approval confirmation paths. No regression to the standalone
+  PROJ-2 tests (`src/lib/email/**`).
+- Existing `profiles` RLS policies, `handle_new_user` trigger,
+  `is_sysadmin` helper, and the seed script are untouched. The
+  new `signup_approvals` table sits beside `profiles` without
+  cross-table FK churn.
+
+### Bugs
+
+#### H1 (High) — Login error wording for "Wrong password" is unreachable
+
+**Severity:** High — explicit acceptance-criterion failure with
+real UX impact (every wrong-password attempt is mis-labelled as
+"No account exists").
+
+**Where:** `src/app/(auth)/auth/login/actions.ts` lines 61-79.
+
+**What the spec says:**
+> Given a user submits an existing email with a wrong password,
+> when the server action processes the Supabase Auth error, then
+> an `AuthErrorBanner` appears with the wording "Wrong password."
+> plus an inline "Forgot password?" link to `/auth/forgot-password`.
+
+**What actually happens:** the action uses the SSR / anon
+Supabase client (`createClient`, not `createAdminClient`) to probe
+`profiles` after Supabase Auth returns `invalid_credentials`. The
+`profiles` SELECT RLS policy (PROJ-1 `profiles_select_own_or_sysadmin`)
+denies anon reads, so the probe always returns `null`, and every
+wrong-password attempt falls into the "No account exists with
+this email" branch. The "Wrong password" branch is dead code.
+
+**Reproduction:**
+1. Seed a user with `npm run seed:sysadmin` (or any other path).
+2. Visit `/auth/login`, enter the real email with a wrong
+   password.
+3. Observed: banner reads *"No account exists with this email.
+   Sign up"*.
+4. Expected: banner reads *"Wrong password. Forgot password?"*.
+
+**Suggested fix:** swap the probe to `createAdminClient()` (the
+same pattern `forgotPasswordAction` already uses successfully in
+`src/app/(auth)/auth/forgot-password/actions.ts`). Add a regression
+test in `login/actions.test.ts` (currently absent — login actions
+are not unit-tested at all, only the signup action is).
+
+**Notes:** the existing E2E flow exercises only the approved-user
+sign-in branch, so this regression slipped through.
+
+#### M1 (Medium) — `(auth)` layout does not redirect pending / declined users away from `/auth/login`, `/auth/signup`, etc.
+
+**Severity:** Medium — spec deviation against AC case #10 of the
+route-gate matrix. Functionally a signed-in pending user can
+still navigate, but the screen they see (a login form) is
+nonsensical for their state.
+
+**Where:** `src/app/(auth)/layout.tsx` lines 11-14.
+
+**What the spec says (Acceptance — Route gating, item #10):**
+> (10) `pending` × `/auth/login` → 302 `/auth/waiting-for-approval`
+> (a signed-in pending user has no business on the login screen)
+
+The pure `routeGate` function in `src/lib/auth/route-gate.ts`
+returns the correct decision for this case (and the 15-case
+matrix tests pass), but the integration code in the layout
+implements only half of it — it redirects approved users to
+`/dashboard` but does not redirect pending/declined users to
+`/auth/waiting-for-approval`. The same gap exists for
+`/auth/signup`, `/auth/forgot-password`, `/auth/reset-password`,
+`/auth/reset-success`, and `/auth/sent-confirmation`.
+
+**Reproduction:**
+1. Sign in as a pending user (any account whose
+   `profiles.status='pending'`).
+2. Open `/auth/login` (or `/auth/signup`, `/auth/forgot-password`,
+   etc.) directly in the address bar.
+3. Observed: the login form renders. No redirect.
+4. Expected: 307 to `/auth/waiting-for-approval`.
+
+**Suggested fix:** in `(auth)/layout.tsx`, when a user is signed
+in and not approved, redirect to `/auth/waiting-for-approval`
+*unless* the pathname is already `/auth/waiting-for-approval`.
+The `routeGate()` helper already encodes this — call it from the
+layout to keep one source of truth.
+
+#### L1 (Low) — `/auth/login?error=link_invalid` does not surface a "This link is no longer valid" banner
+
+**Severity:** Low — spec deviation; the user is on the right
+page (login) but receives no explanation for why they ended up
+there after clicking an expired or already-consumed Supabase
+auth-callback link.
+
+**Where:** `src/app/(auth)/auth/login/page.tsx` +
+`src/app/(auth)/auth/login/login-form.tsx`.
+
+**What the spec says (Acceptance — Email verification):**
+> on token failure the user is redirected to a generic "This link
+> is no longer valid" error variant.
+
+`/auth/confirm` correctly redirects on any failure to
+`/auth/login?error=link_invalid`, but neither the page nor the
+form reads the `?error` query parameter, so the banner never
+renders.
+
+**Reproduction:**
+1. `curl -i "http://localhost:3000/auth/confirm?type=signup&token_hash=junk"`
+   → 307 to `/auth/login?error=link_invalid`.
+2. Follow the redirect in a browser.
+3. Observed: bare login form with no banner.
+4. Expected: a red `AuthErrorBanner` reading
+   "This link is no longer valid." (or similar wording).
+
+**Suggested fix:** in `LoginPage`, read `searchParams.error`,
+pass it into `LoginForm` as `initialError`, and have the form
+render an `AuthErrorBanner` for the initial render in addition
+to the `state.error` from the form action. Alternative: pass a
+prefilled `FormState` into `useActionState`'s initial value.
+
+#### L2 (Low — informational) — `runtime = 'nodejs'` pin moved from `actions.ts` to `page.tsx`
+
+**Severity:** Low — documentation drift, not a functional bug.
+Server actions inherit the runtime of the calling page, so the
+behaviour is identical, but the spec text reads as if the pin
+must live on `actions.ts`.
+
+**Where:** `src/app/(auth)/auth/signup/page.tsx` (has the pin)
+vs. `actions.ts` (does not). PROJ-3 tech-design § "Runtime pin"
+specifies `actions.ts`.
+
+**Suggested fix:** either (a) leave as-is and update the spec /
+forward-constraint matrix in PROJ-3 § M to reflect the page-level
+pin, or (b) duplicate the pin on `actions.ts` as well. No
+functional impact — `npm run build` and the E2E suite confirm
+the signup action runs on Node and the SMTP send succeeds.
+
+### Production-ready decision
+
+**NOT READY** — H1 (wrong-password wording) and M1 (route-gate
+layout gap) are explicit AC failures and must be fixed before
+deploy. L1 is a polish miss but should be fixed in the same
+batch since it's one line of work. L2 is a documentation
+choice.
+
+After fixes, re-run `npm test` and `npm run test:e2e` and verify
+the three branches manually:
+1. Login with valid email + wrong password → "Wrong password."
+2. Signed-in pending user opens `/auth/login` directly → 307
+   to `/auth/waiting-for-approval`.
+3. `/auth/confirm?type=signup&token_hash=junk` → land on
+   `/auth/login` with the "link not valid" banner visible.
+
+### Resolutions — 2026-05-23 (post-QA fix pass)
+
+All four findings addressed in a single fix pass. Pending
+re-run of `/qa` to confirm before `/deploy`.
+
+| ID | Resolution |
+|----|------------|
+| **H1** | `loginAction` (`src/app/(auth)/auth/login/actions.ts`) now uses `createAdminClient()` for the post-`invalid_credentials` profile probe, matching the pattern `forgotPasswordAction` already uses. The "Wrong password" / "No account exists" branches are now both reachable. Added `src/app/(auth)/auth/login/actions.test.ts` with 10 tests covering: approved redirect, safe `next`, open-redirect fallback, pending + declined → waiting screen, **the H1 regression itself (known email + wrong password → "Wrong password.")**, unknown-email branch, email_not_confirmed, Zod validation, and unexpected Supabase errors. |
+| **M1** | `(auth)/layout.tsx` now consults `routeGate()` instead of hard-coding only the approved-user case. Pending/declined users on `/auth/login`, `/auth/signup`, `/auth/forgot-password`, etc. now 307 to `/auth/waiting-for-approval`; approved users on any /auth/* surface still 307 to `/dashboard`. The pathname is propagated from the Supabase middleware via a new `x-pathname` request header (the standard App Router workaround since Next.js doesn't expose pathname to server components). The 20 route-gate unit tests continue to pass unchanged because the integration just calls the same pure function. |
+| **L1** | `LoginPage` now reads `searchParams.error`; when value is `link_invalid`, it passes `initialError="This link is no longer valid."` into `LoginForm`, which renders an `AuthErrorBanner` on first render. The initial banner is suppressed once the form action runs (so server-action errors don't get double-banner'd). Verified end-to-end via curl: `/auth/confirm?type=signup&token_hash=junk` → 307 → `/auth/login?error=link_invalid` → banner text "This link is no longer valid" is present in the rendered HTML. |
+| **L2** | **Cannot be honoured as written** — Next.js forbids non-async exports from a `'use server'` file ("the module has no exports at all" build error confirmed by `npm run build`). `export const runtime` must live on a route-segment file (page / layout / route). The pin therefore stays on `signup/page.tsx`, with an inline comment documenting the Next.js structural constraint and pointing back to PROJ-3 § M. Behaviour is identical because server actions inherit the runtime of their calling page. The spec text in § M is aspirational; the Next.js constraint wins. |
+
+**Verification after fixes:**
+- `npm run lint` → no errors, no warnings.
+- `npm test` → 10 files, **64 tests pass** (+10 from the new
+  login suite, up from 54).
+- `npm run test:e2e -- --project=chromium` → 11 tests pass
+  (6 PROJ-1 cron-purge + 5 PROJ-3 auth-flow).
+- `npm run build` → 16 routes generated, no errors.
+- Manual smoke: `/auth/login?error=link_invalid` shows the
+  banner; bare `/auth/login` does not. `/auth/confirm` →
+  banner flow works end-to-end.
 
 ## Deployment
 _To be added by /deploy_

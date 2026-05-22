@@ -2,8 +2,10 @@
 
 import { redirect } from 'next/navigation';
 
-import { createClient } from '@/lib/supabase/server';
 import { type FormState } from '@/lib/auth/form-state';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient } from '@/lib/supabase/server';
+
 import { loginSchema } from './schema';
 
 /**
@@ -58,7 +60,12 @@ export async function loginAction(
       code === 'invalid_credentials' ||
       /invalid login credentials/i.test(message)
     ) {
-      const { data: probe } = await supabase
+      // RLS denies anon SELECT on profiles, so a same-client probe would
+      // always return null and mis-label every wrong-password attempt as
+      // "no account exists". Use the admin client (same pattern as
+      // forgotPasswordAction). QA H1 — 2026-05-23.
+      const admin = createAdminClient();
+      const { data: probe } = await admin
         .from('profiles')
         .select('id')
         .eq('email', parsed.data.email)

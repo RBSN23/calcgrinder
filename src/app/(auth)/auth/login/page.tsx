@@ -16,5 +16,15 @@ export default async function LoginPage({
   const next = typeof rawNext === 'string' ? rawNext : '/dashboard';
   const safeNext =
     next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard';
-  return <LoginForm nextPath={safeNext} />;
+
+  // /auth/confirm redirects expired or already-consumed Supabase-auth-
+  // callback links to /auth/login?error=link_invalid. Surface that as an
+  // initial banner so the user understands why they were sent back.
+  const rawError = params.error;
+  const initialError =
+    typeof rawError === 'string' && rawError === 'link_invalid'
+      ? 'This link is no longer valid.'
+      : null;
+
+  return <LoginForm nextPath={safeNext} initialError={initialError} />;
 }
