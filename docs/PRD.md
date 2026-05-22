@@ -43,7 +43,7 @@ and cloning.
 |----------|------------------------------------------------------|----------|
 | P0 (MVP) | Supabase Infrastructure Setup                        | Deployed    |
 | P0 (MVP) | Email Infrastructure (SMTP + transactional)          | Deployed |
-| P0 (MVP) | Authentication & Account Approval Flow               | Roadmap  |
+| P0 (MVP) | Authentication & Account Approval Flow               | Planned  |
 | P0 (MVP) | App Shell, Routing & Top-Level Navigation            | Roadmap  |
 | P0 (MVP) | Account Dashboard                                    | Roadmap  |
 | P0 (MVP) | Calculator Theme System (8 themes as runtime tokens) | Roadmap  |
