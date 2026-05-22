@@ -171,20 +171,20 @@ Then [result]
 
 ## Edge Cases
 
-- **Cyon temporär nicht erreichbar während eines `sendMail()`-Calls.** `sendMail()` rejected, Aufrufer entscheidet. Per-Flow-Recovery: Signup-Notification-Loss → Sysadmin sieht den User auf nächstem Dashboard-Login (PROJ-5); Approval-Confirmation-Loss → User entdeckt approval bei Login-Versuch oder Sysadmin sieht inaktiven Approved-User; Deletion-Confirmation-Loss → fail-safe (kein Klick = keine Löschung), User retried.
-- **Ungültige Empfänger-Adresse** (Tippfehler beim Signup). Cyon liefert 5xx bei `RCPT TO`, `sendMail()` rejected. PROJ-3 entscheidet, ob die DB-Transaktion (User-Anlage) trotzdem durchgeht — explizit PROJ-3's Entscheidung, nicht PROJ-2's.
-- **Send schlägt fehl, NACHDEM die DB-Statusänderung schon commit ist** (z. B. Approval committed, Approval-Mail kann nicht raus). Kein PROJ-2-seitiger Rollback. Logged-Error im Vercel-Log reicht; Sysadmin kann Status pending→approved erneut togglen, um die Mail neu zu triggern.
-- **Long body / Non-ASCII Inhalte** (Umlaute in User-Namen, lange Calculator-Title-Quotes). nodemailer setzt UTF-8 + Quoted-Printable automatisch; Templates emittieren as-is, keine eigene Escape-Logik.
-- **Spam-Filter-Klassifizierung wegen fehlendem SPF/DKIM.** Deployer-Verantwortung per PRD; `docs/production/email.md` liefert konkrete Record-Beispiele.
-- **Cyon-Rate-Limit erreicht.** v1-Volumen (tens of users) bleibt weit darunter; bei Erreichen liefert Cyon einen SMTP-Error und `sendMail()` rejected.
-- **`EMAIL_FROM` Display-Name enthält ungeschickte Zeichen** (Komma, Bracket). Zod-Validierung im `sendMail()`-Modul prüft RFC-5322-Display-Name + Address; ungültige Formate werfen beim ersten `sendMail()`-Call.
-- **Approve/Decline-URL ist NULL oder leer** (PROJ-3 mit defektem Caller). Template-Zod-Schema prüft URL-Format und wirft fail-fast — bessere Fehler-DX als eine Mail mit "click here: undefined".
-- **Empfänger ist die `EMAIL_FROM`-Adresse selbst** (z. B. Deployer registriert sich versehentlich mit `noreply@…`). Kein PROJ-2-Sonderfall; Cyon's eigene Self-Send-Policy entscheidet.
-- **Smoke CLI mit falschem `--template`-Namen.** Zod-Validierung listet die drei erlaubten Werte in der Fehlermeldung — kein silent-fallback.
+- **Cyon temporarily unreachable during a `sendMail()` call.** `sendMail()` rejects; the caller decides. Per-flow recovery: signup-notification loss → sysadmin sees the user on next dashboard login (PROJ-5); approval-confirmation loss → user discovers approval on a login attempt or sysadmin notices an inactive approved user; deletion-confirmation loss → fail-safe (no click = no deletion), user retries.
+- **Invalid recipient address** (typo at signup). Cyon returns 5xx on `RCPT TO`, `sendMail()` rejects. PROJ-3 decides whether the DB transaction (user creation) still goes through — explicitly PROJ-3's decision, not PROJ-2's.
+- **Send fails AFTER the DB status change has already committed** (e.g. approval committed, approval email can't go out). No PROJ-2-side rollback. A logged error in the Vercel log is enough; the sysadmin can toggle status pending → approved again to re-trigger the mail.
+- **Long body / non-ASCII content** (umlauts in user names, long calculator-title quotes). nodemailer sets UTF-8 + quoted-printable automatically; templates emit as-is, no custom escape logic.
+- **Spam-filter classification due to missing SPF/DKIM.** Deployer's responsibility per PRD; `docs/production/email.md` provides concrete record examples.
+- **Cyon rate limit reached.** v1 volume (tens of users) stays well below it; when hit, Cyon returns an SMTP error and `sendMail()` rejects.
+- **`EMAIL_FROM` display name contains awkward characters** (comma, bracket). Zod validation in the `sendMail()` module checks the RFC-5322 display name + address; invalid formats throw on the first `sendMail()` call.
+- **Approve/decline URL is NULL or empty** (PROJ-3 with a broken caller). The template Zod schema checks the URL format and throws fail-fast — better error DX than a mail saying "click here: undefined".
+- **Recipient is the `EMAIL_FROM` address itself** (e.g. deployer accidentally signs up with `noreply@…`). No PROJ-2 special case; Cyon's own self-send policy decides.
+- **Smoke CLI with a wrong `--template` name.** Zod validation lists the three allowed values in the error message — no silent fallback.
 
 ## Technical Requirements
 
-- **Runtime dependency:** `nodemailer` (latest stable major, currently v7). De-facto Standard-SMTP-Library für Node; zero-config für den common case. **Bundles its own TypeScript types** — no separate `@types/nodemailer` devDep needed (that was a 6.x-era convention).
+- **Runtime dependency:** `nodemailer` (latest stable major, currently v7). De-facto standard SMTP library for Node; zero-config for the common case. **Bundles its own TypeScript types** — no separate `@types/nodemailer` devDep needed (that was a 6.x-era convention).
 - **New env vars:** exactly one new entry — `EMAIL_FROM` — added to `.env.local.example`. The four Cyon-SMTP vars were placeholders shipped in PROJ-1.
 - **File layout:**
   - `src/lib/email/send.ts` — `sendMail()` utility, `import 'server-only'`, Zod env-validation.
