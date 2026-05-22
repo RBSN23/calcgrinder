@@ -1,6 +1,6 @@
 # PROJ-3: Authentication & Account Approval Flow
 
-## Status: In Review
+## Status: Deployed
 **Created:** 2026-05-22
 **Last Updated:** 2026-05-23
 
@@ -1346,5 +1346,145 @@ re-run of `/qa` to confirm before `/deploy`.
   banner; bare `/auth/login` does not. `/auth/confirm` →
   banner flow works end-to-end.
 
+## QA Test Results — Round 2 (post-fix re-test)
+
+**QA date:** 2026-05-23
+**Tester:** /qa
+**Build under test:** local `main` at HEAD `9af27ae`
+
+### Summary
+
+| Metric | Value |
+|---|---|
+| Acceptance criteria | **65 total — 65 pass · 0 fail** (H1, M1, L1, L2 from Round 1 verified resolved) |
+| Automated tests | 10 Vitest files / 64 tests pass · 8 Playwright tests/project pass on Chromium **and** Mobile Safari (16 runs total) |
+| Cross-browser | Chromium + Webkit (Mobile Safari, 375px iPhone 13 profile) — both green. Firefox not exercised; Webkit and Chromium between them cover the rendering-engine matrix that matters for the auth surface |
+| Responsive | Mobile Safari profile = 390 × 844 device viewport. The Mobile Safari run exercises every auth surface at that viewport. No layout overflow, banner truncation, or interactive-target sizing issues observed |
+| Security audit | Re-verified — 0 Critical, 0 High, 0 Medium, 0 Low. The Round-1 Medium (L1 missing banner) is resolved |
+| **Production-ready?** | **READY** — no open Critical/High/Medium bugs |
+
+### Regression coverage added
+
+The Round-1 findings were resolved by commit `9af27ae` but only
+covered by the new `login/actions.test.ts` unit suite at that
+point. Round 2 adds three Playwright E2E regression tests
+into `tests/PROJ-3-auth-flow.spec.ts` so the fixes can never
+silently regress at the integration layer:
+
+- **H1 regression — wrong password on existing email surfaces
+  "Wrong password." banner + scoped "Forgot password?" link.**
+  Bootstraps a pending user, posts the form with a wrong
+  password, asserts the alert banner contains the right text
+  and the link nested inside the banner is present.
+- **M1 regression — signed-in pending user on `/auth/login`,
+  `/auth/signup`, `/auth/forgot-password` is 307'd to
+  `/auth/waiting-for-approval`.** Bootstraps + signs in a
+  pending user, then navigates each pre-auth surface and
+  asserts the URL redirects.
+- **L1 regression — `/auth/confirm?type=signup&token_hash=junk`
+  lands on `/auth/login?error=link_invalid` with the "This
+  link is no longer valid" banner visible.**
+
+### Re-verification of Round-1 findings
+
+| ID | Status | Evidence |
+|----|--------|----------|
+| **H1** | ✅ Resolved | `loginAction` now uses `createAdminClient()` for the post-`invalid_credentials` probe (see `src/app/(auth)/auth/login/actions.ts` lines 65-72). Unit test `login/actions.test.ts` "known email + wrong password" passes. New Playwright H1 regression passes on Chromium **and** Mobile Safari. The "Wrong password." + Forgot-password-link branch is now reachable end-to-end |
+| **M1** | ✅ Resolved | `(auth)/layout.tsx` consults `routeGate()` using a pathname propagated via the `x-pathname` header set by `src/lib/supabase/middleware.ts`. Pending/declined users on every pre-auth surface get 307'd to /auth/waiting-for-approval. The 20 route-gate unit tests still cover the pure decision; the new Playwright M1 regression covers the layout-integration plumbing |
+| **L1** | ✅ Resolved | `LoginPage` (`src/app/(auth)/auth/login/page.tsx` lines 23-27) reads `searchParams.error`, derives `initialError="This link is no longer valid."` when value is `link_invalid`, and passes it into `LoginForm`. The form renders an `AuthErrorBanner` until the user submits the form (`showInitialError` gate at line 29 suppresses double-banner). The new Playwright L1 regression confirms end-to-end behaviour |
+| **L2** | ✅ Documented | The Next.js structural constraint (server-action files cannot export `runtime`) is documented inline in `src/app/(auth)/auth/signup/page.tsx` and via the Round-1 resolution note in this file. No code change needed. The runtime pin behaves identically because server actions inherit their calling page's runtime |
+
+### Final test runs
+
+```text
+$ npm run lint        → no errors, no warnings
+$ npm test            → 10 files · 64 tests passed
+$ npm run test:e2e
+  Chromium      → 14 passed (6 PROJ-1 + 8 PROJ-3 incl. 3 new regressions)
+  Mobile Safari →  8 passed (PROJ-3 only; PROJ-1 cron suite is Chromium-only)
+  Total: 22 passed across both projects
+$ npm run build       → 16 routes generated, no errors
+```
+
+### Security audit (re-checked)
+
+The Round-1 finding (L1 banner missing) is resolved; the same
+14-vector matrix from Round 1 re-runs clean. Highlights:
+
+- Open redirects via `next` or callback params — guarded
+- XSS via `?email=…` and signup name field — React-escaped + control-char strip
+- CSRF on `/auth/sign-out` — origin check returns 403 cross-site (verified: `curl -X POST -H "Origin: https://evil.com" /auth/sign-out` → 403; same-origin/no-origin → 303)
+- Token brute-force resistance — 32-byte cryptographic random
+- RLS posture on `signup_approvals` — RLS on, zero policies, service-role-only
+- `APP_URL` HTTPS-only outside development (with localhost exemption documented)
+
+### Production-ready decision
+
+**READY.** All Round-1 findings are resolved with regression
+coverage in place. The status flips to **Approved** in
+`features/INDEX.md` and the spec header.
+
+### Handoff
+
+> All tests passed! Status updated to **Approved**. Next step:
+> Run `/deploy` to deploy this feature to production.
+
 ## Deployment
-_To be added by /deploy_
+
+**Deployed:** 2026-05-23
+**Production URL:** https://calcgrinder.vercel.app
+**Deployed commit:** `9af27ae fix(PROJ-3): Address QA findings H1, M1, L1, L2`
+**Git tag:** `v1.0.0-PROJ-3`
+
+### What shipped to production
+
+- The eight auth surfaces (`/auth/login`, `/auth/signup`,
+  `/auth/forgot-password`, `/auth/reset-password`,
+  `/auth/reset-success`, `/auth/sent-confirmation`,
+  `/auth/waiting-for-approval`, plus the admin landing at
+  `/auth/admin/[token]/[action]`).
+- The Supabase Auth callback `/auth/confirm` and the no-JS
+  POST `/auth/sign-out` endpoint.
+- `signup_approvals` table + RLS posture (zero policies,
+  service-role-only).
+- Hybrid route-gating (middleware + route-group layouts) with
+  full coverage of the 15-case matrix.
+- Both QA rounds verified clean; H1, M1, L1, L2 resolutions
+  are live.
+
+### Environment variables added in Vercel
+
+- `APP_URL=https://calcgrinder.vercel.app` (Production + Preview
+  scopes). The signup form throws at module load if missing —
+  the protocol check in `src/lib/auth/app-url.ts` rejects
+  non-`https://` outside `NODE_ENV=development` (with a
+  documented localhost exemption).
+
+### Vercel build notes
+
+- Auto-deploy from `main` on push (GitHub integration).
+- Next 16 Turbopack build emits the documented
+  `middleware → proxy` deprecation warning. Migration is
+  intentionally out of PROJ-3 scope (tracked separately).
+- 16 routes generated; cron `/api/cron/purge` schedule from
+  PROJ-1 unchanged.
+
+### Production verification (post-deploy smoke)
+
+| Surface | Status |
+|---|---|
+| `/` (anon) | 307 → `/auth/login` |
+| `/auth/login` | 200 |
+| `/auth/signup` | 200 |
+| `/dashboard` (anon) | 307 → `/auth/login?next=%2Fdashboard` |
+| `/auth/confirm?type=signup&token_hash=junk` | 307 → `/auth/login?error=link_invalid` |
+| `/auth/login?error=link_invalid` | Renders the "This link is no longer valid." banner (L1 regression verified live) |
+| `/auth/admin/bogus/wrong-action` | 404 |
+
+### Post-deploy hand-off
+
+PROJ-3 is live. Next dependent work per `features/INDEX.md`
+is **PROJ-4 — App Shell, Routing & Top-Level Navigation**,
+which will replace the placeholder `(app)/layout` stub and
+wire the avatar popover's sign-out trigger to the
+already-shipped `/auth/sign-out` endpoint.

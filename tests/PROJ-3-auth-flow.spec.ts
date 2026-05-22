@@ -181,4 +181,55 @@ test.describe('PROJ-3 — full happy path', () => {
     const res = await request.get('/auth/admin/anytoken/bogus');
     expect(res.status()).toBe(404);
   });
+
+  test('H1 regression — wrong password on existing email surfaces "Wrong password." + Forgot password link', async ({ page }) => {
+    const boot = await bootstrapPendingUser();
+    try {
+      await page.goto('/auth/login');
+      await page.fill('input[name="email"]', boot.email);
+      await page.fill('input[name="password"]', 'definitely-not-the-real-password');
+      await page.click('button[type="submit"]');
+      const banner = page.getByRole('alert').filter({ hasText: 'Wrong password.' });
+      await expect(banner).toBeVisible();
+      await expect(banner.getByRole('link', { name: /Forgot password\?/i })).toBeVisible();
+    } finally {
+      await teardown(boot.userId);
+    }
+  });
+
+  test('M1 regression — signed-in pending user on /auth/login is redirected to /auth/waiting-for-approval', async ({ page, context }) => {
+    const boot = await bootstrapPendingUser();
+    try {
+      await page.goto('/auth/login');
+      await page.fill('input[name="email"]', boot.email);
+      await page.fill('input[name="password"]', boot.password);
+      await Promise.all([
+        page.waitForURL(/\/auth\/waiting-for-approval$/),
+        page.click('button[type="submit"]'),
+      ]);
+
+      // Now signed in as a pending user. Direct navigation to /auth/login
+      // (and signup, forgot-password, etc.) must redirect back to
+      // /auth/waiting-for-approval — they have no business on the login
+      // screen.
+      for (const path of [
+        '/auth/login',
+        '/auth/signup',
+        '/auth/forgot-password',
+      ]) {
+        await page.goto(path);
+        await expect(page).toHaveURL(/\/auth\/waiting-for-approval$/);
+      }
+
+      await context.clearCookies();
+    } finally {
+      await teardown(boot.userId);
+    }
+  });
+
+  test('L1 regression — /auth/confirm with bogus token lands on /auth/login with "link no longer valid" banner', async ({ page }) => {
+    await page.goto('/auth/confirm?type=signup&token_hash=junk');
+    await expect(page).toHaveURL(/\/auth\/login\?error=link_invalid$/);
+    await expect(page.getByText(/This link is no longer valid/i)).toBeVisible();
+  });
 });
