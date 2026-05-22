@@ -1,8 +1,9 @@
 # PROJ-2: Email Infrastructure (SMTP + transactional)
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-22
 **Last Updated:** 2026-05-22
+**Deployed:** 2026-05-22 to https://calcgrinder.vercel.app
 
 ## Dependencies
 
@@ -1013,4 +1014,123 @@ PROJ-14 and as optional small follow-up PRs against PROJ-2.
   fields in the three templates (finding L5).
 
 ## Deployment
-_To be added by /deploy_
+
+**Date:** 2026-05-22
+**Production URL:** https://calcgrinder.vercel.app
+**Git tag:** `v1.0.0-PROJ-2` against commit `788f703`
+**Deploy commit:** `feat(PROJ-2): Implement Email Infrastructure
+(SMTP + transactional)` (`788f703`)
+
+### Deployer-applied production configuration
+
+Performed by the deployer between QA approval and the
+deploy commit (see deployer confirmation log on 2026-05-22):
+
+- **DNS records** on `voidforge.cc` via Cloudflare:
+  - SPF: `v=spf1 include:spf.protection.cyon.net ~all`
+    (note: the initial draft of `docs/production/email.md`
+    listed `include:cyon.ch` from generic guidance — the
+    canonical Cyon hostname is `spf.protection.cyon.net`;
+    the docs were corrected at deploy time).
+  - DKIM and DMARC pre-existing on the domain, verified.
+- **Cyon mail account** `noreply@voidforge.cc` verified
+  (pre-existing).
+- **`.env.local`** populated with real Cyon credentials +
+  `EMAIL_FROM=Calcgrinder <noreply@voidforge.cc>`.
+- **Live SMTP** verified end-to-end via the smoke CLI
+  against `mail.cyon.ch:465`:
+  - `npm run email:smoke --template signup-notification` —
+    delivered, body rendered correctly.
+  - `npm run email:smoke --template approval-confirmation` —
+    delivered, body rendered correctly.
+  - `npm run email:smoke --template account-deletion-confirmation` —
+    delivered, body rendered correctly with "scheduled for
+    deletion in 30 days" wording.
+- **Supabase Cloud Dashboard — Custom SMTP** enabled,
+  pointing to `mail.cyon.ch:465` with `noreply@voidforge.cc`
+  authentication.
+- **Supabase Auth email templates** in the Cloud Dashboard:
+  - Confirm signup — customised per
+    `docs/production/email.md` §5.
+  - Reset password — customised per
+    `docs/production/email.md` §5.
+  - Change email address — customised per
+    `docs/production/email.md` §5.
+  - Magic Link, Invite User, and Reauthentication — left
+    at Supabase defaults (canary rationale per the spec's
+    Product Decision log).
+  - Security-section notification toggles left OFF (no v1
+    spec requirement).
+
+### Vercel Production environment variables added
+
+- `EMAIL_FROM`
+- `CYON_SMTP_HOST`
+- `CYON_SMTP_PORT`
+- `CYON_SMTP_USER`
+- `CYON_SMTP_PASS`
+- `SYSADMIN_NOTIFICATION_EMAIL` (already a PROJ-1 env-var
+  placeholder; populated at PROJ-2 deploy time)
+
+The PROJ-2 Vercel build does not consume these at build
+time (the transport module uses lazy env-validation —
+nothing reads `process.env` at module load). The env vars
+are required at runtime starting from the first PROJ-3 or
+PROJ-14 deploy that actually calls `sendMail()`.
+
+### Production smoke-test in this deploy
+
+**None.** Per the spec's Test Scope decision 9b, no
+automated live-SMTP CI test was added. The deployer's
+manual smoke-CLI runs against real Cyon (executed locally
+against the same Cloud Supabase project that production
+points to) serve as the live acceptance — same production
+code path, exercised before this deploy.
+
+### Production-Polish skipped
+
+Same rationale as PROJ-1's deploy: PROJ-2 ships **no UI
+surface and no new API routes**. Lighthouse, security
+headers, Sentry / error-tracking, performance budgets all
+target HTTP / browser-rendered surfaces that don't exist
+in PROJ-2's diff. **PROJ-4** (App Shell, Routing & Top-
+Level Navigation) owns `next.config.ts` and the root
+layout and will revisit security headers + the
+production-polish checklist when the first UI ships.
+
+### Post-deploy verification
+
+- `npm run lint` — clean.
+- `npm run build` — succeeds, route table unchanged from
+  PROJ-1 (PROJ-2 adds no routes).
+- `npm test` — 14 / 14 Vitest tests pass.
+- `npm run test:e2e` — 12 / 12 Playwright tests pass.
+- Vercel auto-deploy on push to `main` — green
+  (deployer-confirmed).
+- `https://calcgrinder.vercel.app` loads (no PROJ-2
+  surface to visit; the existing PROJ-1 landing page +
+  cron stub are unchanged).
+
+### Forward constraints carried into downstream features
+
+These were established in the QA audit and are recorded
+here at deploy-time for visibility:
+
+1. **PROJ-3** must Zod-validate the signup form's `name`
+   field to strip `\r\n` / control characters before
+   passing to `signupNotification()`.
+2. **PROJ-3** URL builders must produce only `https:`
+   URLs for `approveUrl`, `declineUrl`, `loginUrl`.
+3. **PROJ-14** URL builder must produce only `https:`
+   URLs for `confirmDeletionUrl` and Zod-validate
+   `recipientName` the same way as PROJ-3.
+4. **Any API route handler calling `sendMail()`** must
+   declare `export const runtime = 'nodejs'`.
+
+### Docs follow-up applied at deploy time
+
+- `docs/production/email.md` §1 SPF guidance corrected
+  from generic `include:cyon.ch` to the canonical
+  `include:spf.protection.cyon.net`. Deployer's own DNS
+  was already correct via Cloudflare; the docs fix is for
+  any future deployer using the guide.
