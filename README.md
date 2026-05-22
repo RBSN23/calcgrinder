@@ -70,6 +70,10 @@ The setup is Cloud-only — no local Docker stack.
   then `supabase db push`.
 - Don't use `supabase db pull` or `supabase db diff` (require Docker).
 
+**Outbound email (PROJ-2):** see `docs/production/email.md` for the
+full Cyon SMTP / Supabase Auth template setup. Verify with
+`npm run email:smoke -- --to <addr> --template <name>`.
+
 ### 3. Start Development
 
 ```bash

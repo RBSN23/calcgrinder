@@ -16,7 +16,7 @@
 | ID      | Feature                                              | Priority | Dependencies                          | Status  | Spec | Created    |
 |---------|------------------------------------------------------|----------|---------------------------------------|---------|------|------------|
 | PROJ-1  | Supabase Infrastructure Setup                        | P0       | None                                  | Deployed    | [PROJ-1](PROJ-1-supabase-infrastructure-setup.md) | 2026-05-22 |
-| PROJ-2  | Email Infrastructure (SMTP + transactional)          | P0       | PROJ-1                                | Roadmap | —    | 2026-05-22 |
+| PROJ-2  | Email Infrastructure (SMTP + transactional)          | P0       | PROJ-1                                | Approved | [PROJ-2](PROJ-2-email-infrastructure.md) | 2026-05-22 |
 | PROJ-3  | Authentication & Account Approval Flow               | P0       | PROJ-1, PROJ-2                        | Roadmap | —    | 2026-05-22 |
 | PROJ-4  | App Shell, Routing & Top-Level Navigation            | P0       | PROJ-3                                | Roadmap | —    | 2026-05-22 |
 | PROJ-5  | Account Dashboard                                    | P0       | PROJ-4                                | Roadmap | —    | 2026-05-22 |

@@ -42,7 +42,7 @@ and cloning.
 | Priority | Feature                                              | Status   |
 |----------|------------------------------------------------------|----------|
 | P0 (MVP) | Supabase Infrastructure Setup                        | Deployed    |
-| P0 (MVP) | Email Infrastructure (SMTP + transactional)          | Roadmap  |
+| P0 (MVP) | Email Infrastructure (SMTP + transactional)          | Planned  |
 | P0 (MVP) | Authentication & Account Approval Flow               | Roadmap  |
 | P0 (MVP) | App Shell, Routing & Top-Level Navigation            | Roadmap  |
 | P0 (MVP) | Account Dashboard                                    | Roadmap  |
