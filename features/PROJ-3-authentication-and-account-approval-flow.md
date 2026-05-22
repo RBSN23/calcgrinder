@@ -1,6 +1,6 @@
 # PROJ-3: Authentication & Account Approval Flow
 
-## Status: Planned
+## Status: Architected
 **Created:** 2026-05-22
 **Last Updated:** 2026-05-22
 
@@ -208,8 +208,8 @@ Then [result]
 
 ### Env vars & documentation
 
-- [ ] Given `.env.local.example` is inspected, when the diff against PROJ-2 is viewed, then exactly one new entry has been added: `NEXT_PUBLIC_APP_URL="http://localhost:3000"` with an inline comment "Used as base URL for absolute links in transactional emails. In production: https://<your-domain>."
-- [ ] Given `docs/production/auth.md` exists, when the deployer follows the file, then they find, in this order: (1) Supabase Auth settings (keep email confirmation enabled, password-policy recommendation "≥ 8 characters recommended", leave rate-limit defaults as-is), (2) the `NEXT_PUBLIC_APP_URL` env var setup per environment, (3) a pointer to `docs/production/email.md` (PROJ-2) for SMTP and Auth template configuration, (4) a "What to do if you decline a user by mistake" section with a Supabase Dashboard SQL snippet as the interim recovery path until PROJ-19.
+- [ ] Given `.env.local.example` is inspected, when the diff against PROJ-2 is viewed, then exactly one new entry has been added: `APP_URL="http://localhost:3000"` with an inline comment "Used as base URL for absolute links in transactional emails and server-action redirects. Server-side only — no `NEXT_PUBLIC_` prefix. In production: https://<your-domain>."
+- [ ] Given `docs/production/auth.md` exists, when the deployer follows the file, then they find, in this order: (1) Supabase Auth settings (keep email confirmation enabled, password-policy recommendation "≥ 8 characters recommended", leave rate-limit defaults as-is), (2) the `APP_URL` env var setup per environment, (3) a pointer to `docs/production/email.md` (PROJ-2) for SMTP and Auth template configuration, (4) a "What to do if you decline a user by mistake" section with a Supabase Dashboard SQL snippet as the interim recovery path until PROJ-19.
 
 ### Tests
 
@@ -261,7 +261,7 @@ Then [result]
   Supabase Auth permits this; the user's email is
   effectively verified by completing the reset flow. Status
   (pending/declined/approved) is independent.
-- **`NEXT_PUBLIC_APP_URL` misconfigured (e.g. trailing
+- **`APP_URL` misconfigured (e.g. trailing
   slash, missing scheme).** Server-side validation at the
   point of signup-notification mail rendering: throw a
   clear error if `APP_URL` isn't a valid absolute origin.
@@ -318,9 +318,49 @@ Then [result]
   Acceptance Criteria; regenerate `src/lib/supabase/types.ts`
   via `npx supabase gen types typescript --linked` after
   push (per CLAUDE.md convention).
-- **New env var:** `NEXT_PUBLIC_APP_URL` (used for absolute
-  URLs in transactional emails). Existing
+- **New env var:** `APP_URL` (used for absolute
+  URLs in transactional emails and for the route-handler
+  origin check). **No `NEXT_PUBLIC_` prefix** — the value
+  is consumed exclusively server-side (email builders,
+  server-action redirects, origin verification). Existing
   `SYSADMIN_NOTIFICATION_EMAIL` is consumed.
+- **Runtime pin:** every route handler and server action
+  that calls `sendMail()` declares `export const runtime =
+  'nodejs'` at the module top. Mandatory per PROJ-2's
+  forward constraint (nodemailer is Node-only; Edge runtime
+  would break the send). Affected modules in PROJ-3:
+  `src/app/auth/admin/[token]/[action]/route.ts`,
+  `src/app/(auth)/auth/signup/actions.ts`. (The forgot-
+  password server action does NOT call `sendMail()` — it
+  delegates to Supabase Auth's native flow — so no pin is
+  required.)
+- **HTTPS-only URL policy for outgoing mail:** `APP_URL` is
+  validated at module-load with a Zod schema that requires
+  `protocol === 'https:'` in any non-development
+  environment (`NODE_ENV !== 'development'`). Local dev
+  permits `http://localhost:*` so the signup flow works
+  without TLS termination on the dev machine. This is the
+  single enforcement point for PROJ-2 finding L2 (caller
+  must produce `https:` URLs only for `approveUrl`,
+  `declineUrl`, `loginUrl`); since every URL passed to a
+  PROJ-2 template in PROJ-3 is constructed from `APP_URL`,
+  the protocol check on the base URL covers all three.
+- **Signup-form name sanitisation (PROJ-2 finding L1
+  mitigation):** the `/auth/signup` Zod schema rejects
+  `\r`, `\n`, and other ASCII control characters in the
+  `name` field and `.trim()`s leading/trailing whitespace
+  before passing to `signupNotification()`. Enforced
+  server-side as the source of truth; client-side hint
+  text shown on rejection.
+- **Caller-side Zod validation of template inputs:** PROJ-2's
+  templates already `.parse()` their input schemas
+  internally, but PROJ-3 still re-validates every value
+  passed to them at the caller boundary (form-input Zod
+  schema for user-supplied fields; URL Zod schema for
+  generated URLs). Belt-and-braces: the template's parse is
+  the last line of defence; PROJ-3's caller-side check
+  produces user-actionable error messages instead of an
+  uncaught template throw.
 - **Email integration:** import `signupNotification`,
   `approvalConfirmation` from `@/lib/email/templates` and
   call `sendMail()` from `@/lib/email/send` — both shipped
@@ -366,7 +406,7 @@ Then [result]
   - CSRF: Next.js server actions ship CSRF protection
     built-in via origin checks. Route handlers
     (`/auth/sign-out`, `/auth/confirm`) verify the request
-    origin matches `NEXT_PUBLIC_APP_URL`.
+    origin matches `APP_URL`.
   - Approve/decline endpoints are GET to make sysadmin's
     email-client click work without form submission — this
     is a deliberate spec deviation from "POST for state-
@@ -374,28 +414,32 @@ Then [result]
     (b) idempotent re-click is part of the design, (c) every
     mainstream sysadmin-approval-via-link service does the
     same. Documented in Product Decisions.
-  - `NEXT_PUBLIC_APP_URL` validated at signup-handler
+  - `APP_URL` validated at signup-handler
     boundary (Zod URL parse) to prevent open-redirect or
     malformed URLs in outgoing mail.
 
 ## Open Questions
 
-- [ ] /architecture: split between middleware-level and
-      layout-level route gating (single DB query per
-      request budget). Recommendation will likely be
-      "middleware checks session + user.id; layout group
-      `(app)` checks status; layout group `(auth)` checks
-      approved-redirects-out".
-- [ ] /architecture: where to put the AuthShell + primitives
-      — `src/components/auth/` is the working assumption;
-      may be revised if it clashes with shadcn-ui patterns
-      established in PROJ-4.
-- [ ] /architecture: server actions vs route handlers per
-      endpoint. PROJ-3 spec assumes server actions for
-      most form posts; final decision in /architecture.
-- [ ] /architecture: caching strategy for the per-request
-      `profiles.status` lookup (React `cache()` vs request
-      header propagation vs explicit per-route reads).
+- [x] /architecture: split between middleware-level and
+      layout-level route gating. **Resolved** — hybrid:
+      middleware handles session refresh + public-path
+      bypass + "no-user → /auth/login" redirects for
+      private paths; `(app)` and `(auth)` route-group
+      layouts handle status-based redirects. See Tech
+      Design § Route gating.
+- [x] /architecture: where to put the AuthShell + primitives.
+      **Resolved** — `src/components/auth/`. Keeps
+      `src/components/ui/` reserved for the official
+      shadcn copy-paste set.
+- [x] /architecture: server actions vs route handlers per
+      endpoint. **Resolved** — actions for form posts;
+      route handlers for GET callbacks (`/auth/confirm`,
+      `/auth/admin/[token]/[action]`) and the no-JS
+      `/auth/sign-out` POST.
+- [x] /architecture: caching strategy for per-request
+      `profiles.status`. **Resolved** — React `cache()`-
+      wrapped helper `getCurrentProfile()` at
+      `src/lib/auth/`.
 
 ## Decision Log
 
@@ -414,20 +458,382 @@ Then [result]
 | Approve/decline endpoints are GET (token in URL) rather than POST | Standard pattern for click-from-email; token-knowledge IS the auth; idempotent re-click is part of the design; every mainstream tool does this. CSRF irrelevant when there's no session-based action | 2026-05-22 |
 | Admin landing does not require a sysadmin session — token is the only credential | Sysadmin clicks link in their mail client without logging into the app first; adding session-required would force a roundabout login flow before approving | 2026-05-22 |
 | Sign-out endpoint shipped by PROJ-3 even though the UI trigger lives in PROJ-4 | Waiting-for-approval needs sign-out (per design); shipping just the endpoint here lets PROJ-4 wire the avatar popover to it later without an interim placeholder | 2026-05-22 |
-| New env var `NEXT_PUBLIC_APP_URL` for absolute URLs in outgoing mail | Mail bodies need full URLs; reading from request headers in a server action is brittle and breaks for cron-triggered or background sends; one env var per deploy environment is the standard pattern | 2026-05-22 |
+| New env var `APP_URL` for absolute URLs in outgoing mail | Mail bodies need full URLs; reading from request headers in a server action is brittle and breaks for cron-triggered or background sends; one env var per deploy environment is the standard pattern | 2026-05-22 |
 | Single `/auth/confirm` callback for all Supabase Auth email actions (signup, recovery, email-change) | Supabase's documented App Router pattern; one handler handles all `verifyOtp` types via the `type` query param | 2026-05-22 |
 
 ### Technical Decisions
 <!-- Added by /architecture -->
 | Decision | Rationale | Date |
 |----------|-----------|------|
-| _To be added by /architecture_ | | |
+| Hybrid route gating: middleware enforces session presence + public-path bypass; `(app)` and `(auth)` route-group layouts enforce status-based redirects | Extends PROJ-1's existing `updateSession` middleware naturally; keeps approval-state logic colocated with the areas it gates; lets public paths (`/c/*`, `/auth/admin/*`, `/auth/confirm`) skip the per-request `profiles` lookup entirely | 2026-05-22 |
+| `getCurrentProfile()` helper at `src/lib/auth/`, wrapped in React `cache()` for per-request memoisation | One DB roundtrip per request even if middleware + layout + page all need the profile; standard Next.js App Router pattern; parallel to `src/lib/supabase/` and `src/lib/email/` folder convention | 2026-05-22 |
+| Auth UI primitives live in `src/components/auth/`, separate from `src/components/ui/` (shadcn) | Keeps the shadcn copy-paste set untouched and regenerable via the shadcn CLI; auth primitives are bespoke ports of `docs/design/auth.jsx`, not shadcn components | 2026-05-22 |
+| Server actions for form posts; route handlers for GET callbacks and the no-JS sign-out POST | Server actions ship CSRF protection and integrate with `useActionState` for error reporting; route handlers cover the GET callbacks Supabase Auth dictates (`/auth/confirm`) and the sysadmin click-from-email (`/auth/admin/[token]/[action]`); `/auth/sign-out` is a POST route handler so a plain `<form>` works without JS on the waiting screen | 2026-05-22 |
+| Two route groups under `src/app/`: `(app)` for protected app surfaces, `(auth)` for pre-auth screens; admin landing pages live outside both groups under `src/app/auth/admin/` | Route groups let each layout enforce its own redirect rule once, instead of every page repeating the check; admin landings need neither rule (token = auth) so they sit outside the groups | 2026-05-22 |
+| Single `signup_approvals` row keyed by `user_id`; both approve and decline paths consume the same row | Matches the product decision "one token, two URL paths"; race-safe via `UPDATE … WHERE consumed_at IS NULL` returning row count for idempotency | 2026-05-22 |
+| Token generation centralised in a tiny `src/lib/auth/token.ts` module (`crypto.randomBytes(32).toString('base64url')`) | One canonical implementation; future tokens (scenario share tokens, calculator publish tokens) can reuse the same primitive | 2026-05-22 |
+| Origin check on route handlers compares `request.headers.get('origin')` against `APP_URL`; server actions inherit Next.js's built-in origin check | Defence-in-depth for the POST handlers without re-implementing CSRF; URL is already required for outgoing mail so no additional config surface | 2026-05-22 |
+| The `/auth/confirm` route handler dispatches on `type` query param to the right post-callback page; unknown `type` and missing `token_hash` fall through to a single generic "link no longer valid" error landing | One handler for all Supabase Auth callbacks (signup, recovery, future email-change); failure modes converge to one user-facing screen | 2026-05-22 |
+| Form-validation Zod schemas live next to each server action (`src/app/auth/signup/schema.ts` etc.), not in a shared `src/lib/validation/` barrel | Schemas are owned by a single feature surface; co-location keeps them discoverable and avoids a shared-types module that grows unmaintained | 2026-05-22 |
+| `APP_URL` env var has no `NEXT_PUBLIC_` prefix (downgraded from the spec's working name `NEXT_PUBLIC_APP_URL`) | Value is consumed exclusively server-side (email URL builders, server-action redirects, route-handler origin check); shipping it in the client bundle would violate the project convention "anything `NEXT_PUBLIC_` ships to the browser, so don't prefix what doesn't need to" and would needlessly expose the deployment hostname in client JS | 2026-05-22 |
+| `signup_approvals` ships with RLS enabled and zero policies (intentional service-role-only posture) | Token-knowledge is the authentication model — an end-user RLS path can't make a correct decision. Migration carries a SQL comment calling this out so it doesn't get misread as a missing policy in future reviews. Mirrors the pattern PROJ-1 uses for server-managed tables | 2026-05-22 |
+| Runtime pin `export const runtime = 'nodejs'` on every PROJ-3 module that calls `sendMail()` (signup server action + admin GET handler) | Forward constraint from PROJ-2 (nodemailer is Node-only); pin prevents an accidental Edge migration from silently breaking transactional email | 2026-05-22 |
+| HTTPS-only enforcement for outgoing-mail URLs done once at the `APP_URL` Zod boundary, not at each call site | `APP_URL` is the sole base for `approveUrl` / `declineUrl` / `loginUrl` in PROJ-3, so one protocol check on the base value covers PROJ-2 finding L2 for all three. Localhost http allowed in `NODE_ENV=development` only | 2026-05-22 |
+| Signup-form `name` field Zod schema strips control characters (`\r`, `\n`, etc.) and trims whitespace before any template call | Mitigates PROJ-2 finding L1 (plain-text body injection via name); server-side enforcement is authoritative, client hint is cosmetic | 2026-05-22 |
+| Caller-side Zod validation of template inputs is standing practice across PROJ-3, even though PROJ-2 templates re-`.parse()` internally | Belt-and-braces: caller-side check produces user-actionable error messages and surfaces bad data at the form-handling boundary; template-side parse remains the last line of defence | 2026-05-22 |
 
 ---
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### A. Routes and pages — the full surface
+
+Two route groups under `src/app/`:
+
+```
+src/app/
+├── (auth)/                    ← layout enforces: approved users → /dashboard
+│   ├── layout.tsx             ← AuthShell wrapper + redirect-if-approved
+│   └── auth/
+│       ├── login/             ← server action: signInWithPassword
+│       ├── signup/            ← server action: signUp + insert signup_approvals + sendMail
+│       ├── forgot-password/   ← server action: resetPasswordForEmail
+│       ├── reset-password/    ← server action: updateUser({ password })
+│       ├── reset-success/     ← static confirmation page
+│       ├── sent-confirmation/ ← static confirmation page (?type=signup|reset)
+│       └── waiting-for-approval/  ← shown to pending + declined users
+├── (app)/                     ← layout enforces: only approved users; else redirect
+│   ├── layout.tsx             ← AppShell stub (real shell ships in PROJ-4)
+│   ├── dashboard/             ← placeholder until PROJ-5
+│   ├── editor/                ← placeholder until PROJ-8
+│   └── settings/              ← placeholder until PROJ-14
+└── auth/                      ← outside both groups; no status gating
+    ├── confirm/               ← route handler: dispatches all Supabase OTP callbacks
+    ├── sign-out/              ← POST route handler
+    └── admin/
+        └── [token]/
+            └── [action]/      ← GET route handler + landing page (approve | decline)
+```
+
+The `/c/<token>` visitor surface (PROJ-11) lives elsewhere and
+is bypassed by middleware entirely.
+
+### B. Component tree — auth pages
+
+```
+AuthShell (full-bleed, theme-aware, wordmark header)
+└── single column, max-width 360 desktop / 100% mobile
+    ├── (optional) AuthErrorBanner — server-action errors
+    ├── AuthMessage — title + body (confirmation/waiting screens)
+    ├── AuthGlyph — Clock | Mail | Check | X (icon-in-circle)
+    ├── form
+    │   ├── AuthField (label + AuthInput)
+    │   └── AuthSubmit
+    ├── AuthHelpText / AuthDivider / AuthFootLine
+    └── AuthLink — navigation between auth surfaces
+```
+
+These primitives are ports of `docs/design/auth.jsx` into
+shadcn-style Tailwind components. They live in
+`src/components/auth/`. The eight page-level components
+(`LoginScreen`, `RequestAccessScreen`, etc.) become the
+default exports of `src/app/(auth)/auth/<slug>/page.tsx`.
+
+### C. Data model — `signup_approvals`
+
+One row per signup, owned by the server.
+
+```
+signup_approvals
+├── id            UUID PK (default gen_random_uuid)
+├── user_id       UUID FK → auth.users.id, ON DELETE CASCADE, UNIQUE
+├── token         TEXT NOT NULL UNIQUE (43-char base64url, 32 random bytes)
+├── created_at    TIMESTAMPTZ DEFAULT NOW()
+├── consumed_at   TIMESTAMPTZ NULL  (set on first click)
+└── outcome       TEXT NULL CHECK (outcome IN ('approved','declined'))
+```
+
+`UNIQUE(user_id)` enforces "one approval row per user" — a
+repeat signup attempt would have already been rejected by
+Supabase Auth's duplicate-email constraint, but the unique
+index is a defence-in-depth backstop.
+
+RLS is **enabled and intentionally policy-free** for the
+`authenticated` and `anon` roles. This is not a
+misconfiguration — it is the explicit posture for a
+service-role-only table whose authentication model is
+"knowledge of the token = right to consume the row". No
+end-user RLS path can produce a correct authorisation
+decision here (the token-as-credential model collapses if
+queried from a logged-in user context), so we deny all
+direct access and route every read/write through the
+server's admin client. The table is touched only by:
+
+1. The signup server action (service-role insert).
+2. The `/auth/admin/[token]/[action]` route handler (service-
+   role lookup + update, gated by token-knowledge as
+   authentication).
+
+Both run on the server with the `SUPABASE_SECRET_KEY` client
+(PROJ-1's `createAdminClient`) so they bypass RLS. End-users
+never read or write this table. The migration includes a
+SQL comment on the table calling out this posture so a
+future reviewer doesn't misread the empty policy list as a
+gap.
+
+Idempotent consume is enforced at the DB level: the UPDATE
+filters `WHERE consumed_at IS NULL`. If the row count returned
+is zero, the handler renders the "Already …" landing instead
+of writing again.
+
+### D. Route gating — three-layer hybrid
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Layer 1: middleware.ts                                       │
+│   • Refreshes Supabase session (existing PROJ-1 behaviour)   │
+│   • Public paths bypass: /c/*, /auth/admin/*, /auth/confirm, │
+│     /auth/sign-out (POST), _next/*, static assets            │
+│   • If path is private AND no user: 302 /auth/login?next=…   │
+│   • No DB lookup beyond the session refresh                  │
+└─────────────────────────────────────────────────────────────┘
+                            │
+            ┌───────────────┴───────────────┐
+            ▼                               ▼
+┌──────────────────────────┐   ┌──────────────────────────┐
+│ Layer 2a: (app)/layout   │   │ Layer 2b: (auth)/layout  │
+│   • getCurrentProfile()  │   │   • getCurrentProfile()  │
+│   • If status≠approved:  │   │   • If status=approved:  │
+│       302 /auth/         │   │       302 /dashboard     │
+│       waiting-for-       │   │   • Else render <Auth-   │
+│       approval           │   │       Shell> wrapper     │
+│   • Else render children │   │                          │
+└──────────────────────────┘   └──────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│ Layer 3: page-level — pages don't gate; they trust layout   │
+│   (Except /auth/waiting-for-approval which has its own       │
+│    pending-or-declined check since it must accept that       │
+│    state instead of redirecting away from it.)               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+The `getCurrentProfile()` helper is wrapped in React's
+`cache()` — calling it from middleware, layout, and a page
+within the same request only triggers one DB query.
+
+The 15-case route-gate test matrix in Acceptance Criteria
+maps directly onto this three-layer architecture: middleware
+covers cases 1–7 (anonymous redirects + public bypasses);
+`(app)/layout` covers cases 8–9 + 15 (status-based blocks);
+`(auth)/layout` covers cases 10, 12–14 (status-based
+redirects-out); the waiting page covers case 11.
+
+### E. Server-side endpoints — actions vs handlers
+
+| Endpoint                          | Type           | Reason |
+|-----------------------------------|----------------|--------|
+| `/auth/signup` (POST)             | Server action  | Form post, useActionState for inline errors, built-in CSRF |
+| `/auth/login` (POST)              | Server action  | Same |
+| `/auth/forgot-password` (POST)    | Server action  | Same |
+| `/auth/reset-password` (POST)     | Server action  | Same |
+| `/auth/sign-out` (POST)           | Route handler  | No-JS `<form action="/auth/sign-out">` on waiting screen needs a public POST endpoint |
+| `/auth/confirm` (GET)             | Route handler  | Supabase OTP callback link clicked from email; dispatches on `?type=…` |
+| `/auth/admin/[token]/[action]` (GET) | Route handler | Sysadmin clicks link from email client; GET-as-state-change is intentional (idempotent, token-authed) |
+
+All server-side modules import from `@/lib/supabase/server`
+(SSR client) or `@/lib/supabase/admin` (service-role client).
+The admin client is used only inside the signup action's
+notification path and the approve/decline handler.
+
+### F. Library code
+
+```
+src/lib/auth/
+├── getCurrentProfile.ts   ← React-cached helper returning { user, profile } | null
+├── route-gate.ts          ← Pure function: (path, user, status) → redirect | pass
+├── route-gate.test.ts     ← The 15-case matrix from Acceptance Criteria
+└── token.ts               ← randomToken() = base64url(32 random bytes)
+
+src/components/auth/
+├── auth-shell.tsx
+├── auth-field.tsx
+├── auth-input.tsx
+├── auth-submit.tsx
+├── auth-error-banner.tsx
+├── auth-glyph.tsx
+├── auth-icons.tsx         ← Clock | Mail | Check | X (inline SVG)
+├── auth-message.tsx
+├── auth-link.tsx
+├── auth-divider.tsx
+├── auth-foot-line.tsx
+└── auth-help-text.tsx
+
+src/app/auth/admin/[token]/[action]/
+├── route.ts               ← GET handler: lookup, consume, redirect to landing
+├── page.tsx               ← Landing UI (approved | declined | already-… | invalid)
+└── process.test.ts        ← All five branches from Acceptance Criteria
+
+src/app/auth/confirm/
+├── route.ts
+└── route.test.ts
+```
+
+The route handler at `route.ts` performs the DB transaction
+then **renders** the landing by setting a flash cookie or
+short-lived signed cookie that the `page.tsx` reads on next
+GET — alternatively, the handler can render the page directly
+with the result encoded in a redirect to a query-string
+variant (`?result=approved|declined|already-approved|invalid`).
+The `/backend` skill picks the concrete shape; both satisfy
+the AC. (The query-string variant is simpler and is the
+working preference.)
+
+### G. Middleware extension — concrete behaviour
+
+Middleware (`middleware.ts` at repo root) keeps PROJ-1's
+`updateSession` call and adds, after the session refresh:
+
+1. If `pathname` starts with any of: `/c/`, `/auth/admin/`,
+   `/auth/confirm`, `/auth/sign-out`, `/api/cron/`, or
+   matches the existing static-asset exclusions → return
+   unchanged.
+2. If `pathname` starts with `/auth/` (any non-public auth
+   path) → return unchanged (the `(auth)` layout handles
+   redirects).
+3. Otherwise (private path: `/dashboard`, `/editor/*`,
+   `/settings`, `/api/*` not under `/api/cron/`):
+   - If user is null → 302 `/auth/login?next=<pathname>`.
+   - Else → return unchanged; `(app)` layout will run the
+     status check next.
+
+The middleware never reads `profiles` — it only inspects the
+Supabase user from `getUser()`. This keeps the public-path
+hot paths (visitor URLs, admin clicks) free of database
+roundtrips.
+
+### H. Email integration
+
+The signup action calls `sendMail()` with the
+`signupNotification` template (PROJ-2). It uses
+`APP_URL` to construct two absolute URLs:
+`${APP_URL}/auth/admin/${token}/approve` and
+`.../decline`. URL validity is enforced via a Zod URL parse
+at the boundary — a malformed `APP_URL` throws a clear
+deployer-config error at the first signup attempt rather
+than producing broken links silently.
+
+The approve handler calls `sendMail()` with the
+`approvalConfirmation` template after the DB transaction
+commits. The mail send is wrapped in `try/catch`; failure
+logs `console.error` and the landing page surfaces a warning
+banner ("approved but email failed"). The decline path sends
+no mail (silent rejection per Product Decisions).
+
+### I. Migration
+
+One new migration: `supabase/migrations/<ts>_signup_approvals.sql`.
+
+After `supabase db push`, regenerate types per CLAUDE.md
+convention:
+
+```
+npx supabase gen types typescript --linked > src/lib/supabase/types.ts
+```
+
+### J. New dependencies
+
+None expected. The stack already includes:
+- `@supabase/ssr` + `@supabase/supabase-js` (PROJ-1)
+- `react-hook-form` + `@hookform/resolvers` + `zod` (template)
+- Node's built-in `crypto` for token generation
+
+If `react-hook-form` is not yet installed in the template,
+the `/frontend` skill installs it before building the forms.
+
+### K. Environment variables
+
+One new entry in `.env.local.example`:
+
+```
+APP_URL="http://localhost:3000"
+# Used as base URL for absolute links in transactional emails.
+# In production: https://<your-domain>.
+```
+
+`docs/production/auth.md` documents the per-environment
+setup, the password-policy recommendation (≥ 8 chars in
+Supabase Dashboard), and the "I declined someone by mistake"
+recovery SQL snippet.
+
+### L. Tech decisions justified for PM (plain language)
+
+- **Why a separate `signup_approvals` table** instead of
+  columns on `profiles`? Approval is a one-time, single-
+  use event with its own token; mixing it into `profiles`
+  would couple two unrelated lifecycles (the user's permanent
+  account and the one-time approval click). Separate table
+  makes the "consumed yet?" check trivially safe under
+  concurrent clicks and lets the row be deleted later
+  without disturbing `profiles`.
+
+- **Why hybrid middleware + layout gating** instead of one
+  or the other? Middleware sees every request and is the
+  cheapest place to redirect anonymous users away from
+  protected paths. But middleware shouldn't read `profiles`
+  on every request — that would hit the DB on public URLs
+  like `/c/<token>` (the visitor surface) and add latency.
+  Layouts only run when a request reaches them; doing the
+  `profiles.status` check there means we pay the DB cost
+  only on app-area requests, where we'd be paying it anyway.
+
+- **Why React `cache()` for the profile lookup**? Multiple
+  server components in the same request may need the
+  current user (layout, page header, page body). Without
+  caching, each call hits the DB. React's request-scoped
+  cache deduplicates them automatically. It's the standard
+  Next.js App Router pattern.
+
+- **Why GET for approve/decline** instead of POST? The
+  click happens in the sysadmin's email client. Email
+  clients don't submit forms — they open links. GET is the
+  only option that works. The design absorbs the trade-offs
+  (idempotent re-click, no session needed, token-as-auth)
+  intentionally; every signup-approval-by-link service uses
+  the same pattern.
+
+- **Why server actions for the four form posts** instead of
+  route handlers? Server actions ship CSRF protection
+  automatically and pair cleanly with `useActionState` for
+  inline form errors. Route handlers force us to re-
+  implement both. Where Next.js doesn't give us a server
+  action (GET callbacks, no-JS POST), we drop to route
+  handlers.
+
+### M. PROJ-2 forward-constraint compliance matrix
+
+PROJ-2 exited QA with five Low findings that the QA review
+declared "caller-responsibility per spec". Four of them
+land in PROJ-3 (the fifth, `recipientName` validation in
+the deletion template, lands in PROJ-14). This section is
+the consolidated answer for the `/frontend` and `/backend`
+implementers — every box must be ticked by the time
+PROJ-3 hits QA.
+
+| PROJ-2 finding | PROJ-3 mitigation | Module where enforced |
+|----------------|-------------------|-----------------------|
+| **L1** Plain-text body injection via `name` field | Signup-form Zod schema strips ASCII control characters (`\r`, `\n`, etc.) and trims whitespace before passing `newUserName` to `signupNotification()`. Server-side validation is authoritative. | `src/app/(auth)/auth/signup/schema.ts` |
+| **L2** Caller must produce `https:` URLs only | `APP_URL` validated at module load with a Zod schema that requires `protocol === 'https:'` outside `NODE_ENV=development`. All outgoing-mail URLs (`approveUrl`, `declineUrl`, `loginUrl`) are derived from `APP_URL`, so the one boundary check covers all three. | `src/lib/auth/app-url.ts` (single source of `APP_URL`) |
+| **Runtime pin** `export const runtime = 'nodejs'` on every caller of `sendMail()` | Top-of-module pin on the two modules that call `sendMail()` in PROJ-3. (Forgot-password action delegates to Supabase Auth's native flow and is unaffected.) | `src/app/(auth)/auth/signup/actions.ts` and `src/app/auth/admin/[token]/[action]/route.ts` |
+| **Caller-side Zod re-validation** of template inputs | Standing practice. Every PROJ-3 call site that invokes `signupNotification()` or `approvalConfirmation()` passes values that have already been Zod-parsed at the caller boundary (form schema for user input, URL schema for generated URLs). | All `sendMail()` call sites in PROJ-3 |
+
+The `app-url.ts` module owns one named export — the
+validated absolute URL string — and is the only allowed
+reader of `process.env.APP_URL` in PROJ-3 code. This
+prevents accidental bypass of the protocol check by
+inlining `process.env.APP_URL` elsewhere.
 
 ## QA Test Results
 _To be added by /qa_
