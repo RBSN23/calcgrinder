@@ -535,11 +535,13 @@ test.describe('PROJ-9 — Cell Authoring & Section Management', () => {
       expect(body.error).toBe('section_not_empty');
       expect(body.child_count).toBe(1);
 
-      // DELETE with confirm succeeds.
+      // DELETE with confirm succeeds and echoes the bumped calculator_updated_at.
       const confirmRes = await page.request.delete(
         `/api/sections/${firstSectionId}?confirm_delete_with_children=true`,
       );
-      expect(confirmRes.status()).toBe(204);
+      expect(confirmRes.status()).toBe(200);
+      const confirmBody = await confirmRes.json();
+      expect(typeof confirmBody.calculator_updated_at).toBe('string');
     } finally {
       await teardown(user.userId);
     }
