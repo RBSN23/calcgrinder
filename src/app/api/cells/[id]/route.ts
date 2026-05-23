@@ -374,11 +374,28 @@ export async function PATCH(req: Request, { params }: Ctx): Promise<Response> {
     updates.display_order = target;
   }
 
+  // Track calculator.updated_at via UPDATE...RETURNING instead of a
+  // post-write SELECT. The cell-table BEFORE-UPDATE trigger sets
+  // NEW.updated_at = NOW() and the parent-bump trigger sets
+  // calculators.updated_at = NOW() *in the same transaction*, so
+  // cell.updated_at returned via RETURNING equals calculators.updated_at
+  // after this write. The previous post-write SELECT could race with
+  // PostgREST/PgBouncer connection pooling and surface a stale value,
+  // which caused the 2nd-rename-in-a-row 409 reported as Cycle-2
+  // Bug A: cell.updated_at would correctly advance, but the *separate*
+  // SELECT for calc.updated_at could come back with the value as of
+  // *before* the last dependent-rewrite commit.
+  // Seed with the calculator's current value (already loaded for the
+  // stale check above) so a no-op PATCH still returns the truth.
+  let lastBumpAt: string = calculator.updated_at;
+
   if (Object.keys(updates).length > 0) {
-    const { error: updErr } = await supabase
+    const { data: updated, error: updErr } = await supabase
       .from('cells')
       .update(updates as never)
-      .eq('id', cellId);
+      .eq('id', cellId)
+      .select('updated_at')
+      .single();
     if (updErr) {
       const msg = updErr.message ?? '';
       if (
@@ -394,18 +411,24 @@ export async function PATCH(req: Request, { params }: Ctx): Promise<Response> {
       console.error('PATCH cell: update failed', updErr);
       return NextResponse.json({ error: 'update_failed' }, { status: 500 });
     }
+    if (updated?.updated_at) lastBumpAt = updated.updated_at;
   }
 
-  // Apply dependent-formula rewrites.
+  // Apply dependent-formula rewrites; each one bumps calc.updated_at
+  // via the parent-bump trigger, so we keep advancing `lastBumpAt`
+  // across the loop.
   for (const rw of rewrites) {
-    const { error: rwErr } = await supabase
+    const { data: rwUpdated, error: rwErr } = await supabase
       .from('cells')
       .update({ formula: rw.formula })
-      .eq('id', rw.id);
+      .eq('id', rw.id)
+      .select('updated_at')
+      .single();
     if (rwErr) {
       console.error('PATCH cell: rewrite failed', rwErr);
       return NextResponse.json({ error: 'update_failed' }, { status: 500 });
     }
+    if (rwUpdated?.updated_at) lastBumpAt = rwUpdated.updated_at;
   }
 
   const { data: refreshed } = await supabase
@@ -417,20 +440,10 @@ export async function PATCH(req: Request, { params }: Ctx): Promise<Response> {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
 
-  // Re-read calculator.updated_at — every cell update (and every
-  // dependent-formula rewrite) fired the parent-bump trigger, so the
-  // value the client sent is now stale. Echoing it back here keeps the
-  // next mutation from racing into a 409.
-  const { data: bumped } = await supabase
-    .from('calculators')
-    .select('updated_at')
-    .eq('id', current.calculator_id)
-    .maybeSingle();
-
   return NextResponse.json({
     cell: refreshed,
     rewritten_cell_ids: rewrites.map((r) => r.id),
-    calculator_updated_at: bumped?.updated_at ?? null,
+    calculator_updated_at: lastBumpAt,
   });
 }
 

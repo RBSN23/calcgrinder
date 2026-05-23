@@ -55,6 +55,7 @@ import {
   type Operation,
   type ViewportMode,
 } from './reducer';
+import { computeReorderUpdates } from './reorder';
 
 type PatchFn = typeof patchCalculator;
 type ToastReporter = (message: string) => void;
@@ -363,10 +364,36 @@ class EditorStore {
         : {}),
       ...(body.display_order !== undefined ? { display_order: body.display_order } : {}),
     };
+    // When the body includes display_order, mirror the server's
+    // transactional renumber locally so the dragged section doesn't
+    // visually snap back. Without this, the dragged section's order
+    // updates but its siblings keep their old orders — two rows
+    // collide, the stable sort renders them in original positions,
+    // the API response only echoes the dragged row, and the broken
+    // sibling orders persist until the next reload.
+    //
+    // We snapshot the pre-drag rows here so the error-rollback path can
+    // restore each sibling to its actual prior display_order rather
+    // than its post-optimistic value.
+    const renumberPlan =
+      body.display_order !== undefined
+        ? computeReorderUpdates(this.state.sections, id, body.display_order)
+            .filter((u) => u.id !== id)
+        : [];
+    const siblingsPre: SectionRow[] = renumberPlan
+      .map((u) => this.state.sections.find((s) => s.id === u.id))
+      .filter((s): s is SectionRow => !!s);
+    const siblingsPost: SectionRow[] = renumberPlan.map((u) => {
+      const sib = siblingsPre.find((s) => s.id === u.id)!;
+      return { ...sib, display_order: u.display_order };
+    });
     return this.recordOperation<SectionRow>({
       label: 'Update section',
       doFn: async () => {
         this.dispatch({ type: 'UPSERT_SECTION', section: optimistic });
+        for (const sib of siblingsPost) {
+          this.dispatch({ type: 'UPSERT_SECTION', section: sib });
+        }
         try {
           const res = await patchSectionApi(id, {
             ...body,
@@ -377,8 +404,13 @@ class EditorStore {
           return res.section;
         } catch (e) {
           // Roll back the optimistic paint so the UI matches the
-          // server's last-known state.
+          // server's last-known state. Restore siblings from the
+          // pre-drag snapshot (siblingsPre), not from current state
+          // (which holds the post-optimistic values).
           this.dispatch({ type: 'UPSERT_SECTION', section: previous });
+          for (const sib of siblingsPre) {
+            this.dispatch({ type: 'UPSERT_SECTION', section: sib });
+          }
           throw e;
         }
       },
@@ -542,10 +574,52 @@ class EditorStore {
       (optimistic as unknown as Record<string, unknown>)[key] =
         next === undefined && key === 'default_value' ? null : next;
     }
+    // Rename: pre-apply the dependent-formula rewrites locally so the
+    // engine never sees an intermediate state where the renamed cell
+    // has its new name but dependents still reference the old name —
+    // without this, an `unknown_name` red error briefly flashes on
+    // every dependent during the ~500ms PATCH window.
+    const renameDependentsPre: CellRow[] = [];
+    const renameDependentsPost: CellRow[] = [];
+    if (isRename && newName) {
+      for (const cell of this.state.cells) {
+        if (cell.id === id) continue;
+        if (cell.kind !== 'output') continue;
+        if (!cell.formula) continue;
+        const next = rewriteFormulaReference(cell.formula, oldName, newName);
+        if (next === cell.formula) continue;
+        renameDependentsPre.push(cell);
+        renameDependentsPost.push({ ...cell, formula: next });
+      }
+    }
+    // Reorder: mirror the server's renumber so the dragged cell
+    // doesn't visually snap back (same bug as patchSection above).
+    // Scope is the section the cell currently sits in.
+    const renumberPlan =
+      body.display_order !== undefined
+        ? computeReorderUpdates(
+            this.state.cells.filter((c) => c.section_id === previous.section_id),
+            id,
+            body.display_order,
+          ).filter((u) => u.id !== id)
+        : [];
+    const siblingsPre: CellRow[] = renumberPlan
+      .map((u) => this.state.cells.find((c) => c.id === u.id))
+      .filter((c): c is CellRow => !!c);
+    const siblingsPost: CellRow[] = renumberPlan.map((u) => {
+      const sib = siblingsPre.find((c) => c.id === u.id)!;
+      return { ...sib, display_order: u.display_order };
+    });
     return this.recordOperation<CellRow>({
       label: 'Update cell',
       doFn: async () => {
         this.dispatch({ type: 'UPSERT_CELL', cell: optimistic });
+        if (renameDependentsPost.length > 0) {
+          this.dispatch({ type: 'UPSERT_CELLS', cells: renameDependentsPost });
+        }
+        if (siblingsPost.length > 0) {
+          this.dispatch({ type: 'UPSERT_CELLS', cells: siblingsPost });
+        }
         let res;
         try {
           res = await patchCellApi(id, {
@@ -553,16 +627,23 @@ class EditorStore {
             updated_at: this.state.calculator.updated_at,
           });
         } catch (e) {
-          // Roll back the optimistic paint.
+          // Roll back the optimistic paint, including dependents and
+          // siblings, to their pre-mutation snapshots.
           this.dispatch({ type: 'UPSERT_CELL', cell: previous });
+          if (renameDependentsPre.length > 0) {
+            this.dispatch({ type: 'UPSERT_CELLS', cells: renameDependentsPre });
+          }
+          if (siblingsPre.length > 0) {
+            this.dispatch({ type: 'UPSERT_CELLS', cells: siblingsPre });
+          }
           throw e;
         }
         this.dispatch({ type: 'UPSERT_CELL', cell: res.cell });
         if (isRename && newName && res.rewritten_cell_ids.length > 0) {
-          // Apply the same rewrite the server applied. Using
-          // rewriteFormulaReference from @/lib/formula guarantees parity
-          // with the server-side transform (same code path), so the
-          // resulting formula text matches the row on disk exactly.
+          // The server confirms which dependents it rewrote. Re-apply
+          // the rewrite via rewriteFormulaReference for parity with
+          // the server-side transform (same code path → identical
+          // formula text on disk).
           const rewrittenIds = new Set(res.rewritten_cell_ids);
           const updated: CellRow[] = [];
           for (const cell of this.state.cells) {

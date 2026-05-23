@@ -146,17 +146,18 @@ export async function POST(req: Request, { params }: Ctx): Promise<Response> {
     return NextResponse.json({ error: 'create_failed' }, { status: 500 });
   }
 
-  // Re-read calculator.updated_at — the section insert bumped it via
-  // trigger, and the client needs the fresh value to send a non-stale
-  // optimistic-concurrency token on the next mutation.
-  const { data: bumped } = await supabase
-    .from('calculators')
-    .select('updated_at')
-    .eq('id', calculatorId)
-    .maybeSingle();
-
+  // `inserted.updated_at` was set by the section's BEFORE-INSERT trigger
+  // in the same transaction as the parent-bump trigger that updated
+  // calculators.updated_at to NOW(). Both NOW() invocations within a
+  // single transaction return the same value, so the inserted row's
+  // updated_at is deterministically equal to the parent calculator's
+  // updated_at after this write — and avoids the post-write SELECT
+  // race that could otherwise surface a stale token.
   return NextResponse.json(
-    { section: inserted, calculator_updated_at: bumped?.updated_at ?? null },
+    {
+      section: inserted,
+      calculator_updated_at: inserted.updated_at,
+    },
     { status: 201 },
   );
 }

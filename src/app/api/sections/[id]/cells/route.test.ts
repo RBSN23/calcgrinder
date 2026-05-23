@@ -103,8 +103,7 @@ describe('POST /api/sections/:id/cells', () => {
         { data: null, error: null, count: 0 }, // cell-cap count
         { data: [], error: null }, // existing names
         { data: null, error: null, count: 0 }, // section cell count
-        { data: INSERTED_CELL, error: null }, // insert
-        { data: { updated_at: '2026-05-23T10:05:00.000Z' }, error: null }, // bumped calc read
+        { data: INSERTED_CELL, error: null }, // insert (RETURNING)
       ],
     });
     installSupabaseMock(mockCreateClient, supabase);
@@ -114,7 +113,10 @@ describe('POST /api/sections/:id/cells', () => {
     const body = await res.json();
     expect(body.cell.name).toBe('cell_1');
     expect(body.cell.kind).toBe('input');
-    expect(body.calculator_updated_at).toBe('2026-05-23T10:05:00.000Z');
+    // Inserted row's updated_at is the same NOW() the parent-bump
+    // trigger used (same transaction), so we return it directly
+    // instead of via a separate, race-prone SELECT.
+    expect(body.calculator_updated_at).toBe(INSERTED_CELL.updated_at);
 
     const insertCall = supabase._builders[5]?.insert.mock.calls[0]?.[0] as {
       kind: string;

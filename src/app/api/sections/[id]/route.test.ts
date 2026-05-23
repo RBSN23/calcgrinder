@@ -98,9 +98,10 @@ describe('PATCH /api/sections/:id', () => {
       fromResults: [
         { data: SECTION_ROW, error: null }, // section read
         { data: { id: CALC_ID, updated_at: STALE_AT }, error: null }, // calc read
-        { data: null, error: null }, // section update (await)
-        { data: { ...SECTION_ROW, title: 'Renamed' }, error: null }, // refresh read
-        { data: { updated_at: FRESH_AT }, error: null }, // bumped calc read
+        // section UPDATE...RETURNING — its updated_at == calc.updated_at
+        // after the parent-bump trigger fires in the same transaction.
+        { data: { updated_at: FRESH_AT }, error: null },
+        { data: { ...SECTION_ROW, title: 'Renamed', updated_at: FRESH_AT }, error: null }, // refresh read
       ],
     });
     installSupabaseMock(mockCreateClient, supabase);

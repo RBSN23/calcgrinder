@@ -2111,3 +2111,86 @@ PATCH sent the (now-stale) cached token and got 409 stale.
 
 Plus the reducer test `SET_CALCULATOR_UPDATED_AT refreshes only
 the token, leaves other fields intact`.
+
+### Post-deploy hotfix — 2026-05-23 (Cycle 2)
+
+Two follow-up bugs surfaced after the first hotfix landed.
+
+**Bug A — Second rename in a session 409s.** Pattern: rename
+cell_1 → ok. Rename anything else → "Save failed". Symptoms
+identical to Cycle 1 (stale optimistic-concurrency token) but
+only on rename, and only the *second* one.
+
+Root cause: PATCH `/api/cells/:id` and `/api/sections/:id` were
+echoing `calculator_updated_at` from a *separate* post-write
+`SELECT calculators.updated_at`. With dependent-formula rewrites
+in the loop, each rewrite ran in its own PostgREST transaction;
+the post-write SELECT then ran in yet another transaction.
+Under PostgREST/PgBouncer connection pooling that final SELECT
+could occasionally surface a value as-of *before* the last
+dependent-rewrite's commit, even though all the writes had been
+acknowledged. Client cached the stale value → next rename's
+`updated_at` token didn't match server's actual value → 409.
+
+Fix: switched every mutation route to capture
+`calculator_updated_at` from `UPDATE ... RETURNING updated_at`
+on the last write, instead of a post-write SELECT. The cell's
+own `updated_at` trigger and the parent-bump trigger both fire
+`NOW()` inside the same transaction, so `cell.updated_at`
+returned via `RETURNING` is provably equal to
+`calculators.updated_at` after that write — no pool race
+window. POST routes likewise use `inserted.updated_at`.
+
+**Bug A UI symptom — Red error flashes on dependents during
+rename.** The optimistic update repainted the renamed cell's
+new name immediately, but didn't pre-apply the dependent
+rewrites until the API response. During the ~500ms window
+dependents still referenced the old name and the evaluator
+returned `unknown_name`, painting them red.
+
+Fix: `patchCell` now runs `rewriteFormulaReference` locally for
+every dependent at optimistic-update time, dispatched as a
+single `UPSERT_CELLS`. Engine never sees an inconsistent state.
+
+**Bug B — Drag-reorder off-by-one when dropping downstream.**
+Dragging cell_A (order 0) onto cell_B → cell_A snaps back to
+position 0. Dragging cell_A onto cell_C → cell_A lands at
+position 1 instead of 2. Same broken pattern for section drag.
+
+Root cause was purely client-side. The optimistic `UPSERT_CELL`
+updated the dragged cell's `display_order` to the new value but
+left siblings at their old orders. With two rows now tied on
+the same `display_order`, the reducer's stable sort kept them
+in original-array order — the drop visually went nowhere. The
+API response only echoes the dragged row, so the server's
+correct renumber for siblings never reached the client until a
+manual reload.
+
+Fix: extracted a `computeReorderUpdates` helper (a port of the
+server-side renumber math) and used it in `patchCell` and
+`patchSection` to dispatch `UPSERT_CELLS` / `UPSERT_SECTION` for
+every affected sibling as part of the optimistic update. Pre-
+mutation snapshots are kept so the error path can revert all
+of them, not just the dragged row.
+
+**Regression coverage.** Additions to
+`tests/PROJ-9-cell-authoring.spec.ts`:
+- "Two consecutive renames in one session succeed, with
+  dependents rewritten each time" — covers Bug A's API path.
+- "Rename does not flash unknown_name red error on dependents"
+  — covers Bug A's UX guarantee at the on-disk level.
+- "Drag cell from position 0 to 1 swaps the two cells (no
+  off-by-one)" — covers Bug B for cells, position 1.
+- "Drag cell from position 0 to 2 lands at the end (no
+  off-by-one)" — covers Bug B for cells, position 2.
+- "Drag section from position 0 to 1 swaps; from 0 to 2 lands
+  at end" — covers Bug B for sections.
+
+New unit-test file `src/lib/editor/reorder.test.ts` for the
+renumber helper (downstream, upstream, same-position no-op,
+out-of-range clamp, unknown-id defensive).
+
+Updated rename-route mock in `src/app/api/cells/[id]/route.test.ts`
+to feed an `updated_at` from each `UPDATE … RETURNING` and
+asserts the LAST rewrite's `updated_at` wins as
+`calculator_updated_at`.

@@ -76,17 +76,19 @@ describe('POST /api/calculators/:id/sections', () => {
           data: [{ id: 'sec-0', display_order: 0 }],
           error: null,
         }, // sibling read (await)
-        { data: INSERTED_SECTION, error: null }, // section insert
-        { data: { updated_at: '2026-05-23T10:05:00.000Z' }, error: null }, // bumped calc read
+        { data: INSERTED_SECTION, error: null }, // section insert (RETURNING)
       ],
     });
     installSupabaseMock(mockCreateClient, supabase);
 
     const res = await POST(postRequest({}), ctx());
     expect(res.status).toBe(201);
+    // The inserted row's updated_at is deterministically equal to
+    // calc.updated_at after this write (same trigger NOW()), so we
+    // return it directly instead of doing a separate SELECT.
     expect(await res.json()).toEqual({
       section: INSERTED_SECTION,
-      calculator_updated_at: '2026-05-23T10:05:00.000Z',
+      calculator_updated_at: INSERTED_SECTION.updated_at,
     });
 
     const insertCall = supabase._builders[2]?.insert.mock.calls[0]?.[0] as {

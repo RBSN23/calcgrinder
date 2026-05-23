@@ -200,15 +200,26 @@ export async function PATCH(req: Request, { params }: Ctx): Promise<Response> {
     }
   }
 
+  // Track calculator.updated_at via UPDATE...RETURNING on the section
+  // itself — the section's own `updated_at` trigger and the parent-bump
+  // trigger both fire NOW() in the same transaction, so they're equal.
+  // See the cell PATCH route for why we don't use a post-write SELECT.
+  // Seed with the calculator's current value (which we already loaded
+  // for the stale check) so a no-op PATCH still returns the truth.
+  let lastBumpAt: string = calculator.updated_at;
+
   if (Object.keys(updates).length > 0) {
-    const { error: updErr } = await supabase
+    const { data: updated, error: updErr } = await supabase
       .from('sections')
       .update(updates)
-      .eq('id', sectionId);
+      .eq('id', sectionId)
+      .select('updated_at')
+      .single();
     if (updErr) {
       console.error('PATCH section: update failed', updErr);
       return NextResponse.json({ error: 'update_failed' }, { status: 500 });
     }
+    if (updated?.updated_at) lastBumpAt = updated.updated_at;
   }
 
   const { data: refreshed } = await supabase
@@ -220,19 +231,17 @@ export async function PATCH(req: Request, { params }: Ctx): Promise<Response> {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
 
-  // Re-read the parent calculator.updated_at — every PATCH against a
-  // section bumps the parent via trigger; without echoing the fresh
-  // value back, the client's cached token goes stale on the very next
-  // mutation and the user sees a 409 storm.
-  const { data: bumped } = await supabase
-    .from('calculators')
-    .select('updated_at')
-    .eq('id', section.calculator_id)
-    .maybeSingle();
+  // If only a display_order change happened, the reorder block already
+  // ran its own UPDATEs above (each one bumped the parent). Pick up
+  // the latest from the refreshed row's updated_at (same NOW() as the
+  // last parent bump within that transaction).
+  if (refreshed.updated_at && refreshed.updated_at > lastBumpAt) {
+    lastBumpAt = refreshed.updated_at;
+  }
 
   return NextResponse.json({
     section: refreshed,
-    calculator_updated_at: bumped?.updated_at ?? null,
+    calculator_updated_at: lastBumpAt,
   });
 }
 

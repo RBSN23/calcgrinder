@@ -149,9 +149,10 @@ describe('PATCH /api/cells/:id', () => {
         fromResults: [
           { data: CELL_ROW, error: null },
           { data: { id: CALC_ID, updated_at: STALE_AT }, error: null },
-          { data: null, error: null }, // update
+          // UPDATE...RETURNING — cell.updated_at == calc.updated_at
+          // post-trigger (same transaction NOW()).
+          { data: { updated_at: FRESH_AT }, error: null },
           { data: { ...CELL_ROW, label: 'Principal' }, error: null }, // refresh
-          { data: { updated_at: FRESH_AT }, error: null }, // bumped calc read
         ],
       }),
     );
@@ -186,7 +187,19 @@ describe('PATCH /api/cells/:id', () => {
     expect((await res.json()).error).toBe('name_collision');
   });
 
-  it('rewrites dependent formulas on rename', async () => {
+  it('rewrites dependent formulas on rename and tracks the LAST rewrite\'s updated_at as calculator_updated_at', async () => {
+    // The rename + each dependent rewrite are separate transactions;
+    // each one bumps calc.updated_at via the parent-bump trigger to
+    // its own NOW(). The route tracks the last RETURNING value as the
+    // authoritative calc.updated_at — this matters because the prior
+    // implementation read calc.updated_at via a separate post-write
+    // SELECT, which could race with the PostgREST/PgBouncer pool and
+    // surface a stale value (Cycle-2 Bug A: second rename in a row
+    // 409'ing because the client cache was set to a pre-final-bump
+    // timestamp).
+    const T_CELL = '2026-05-23T10:01:00.000Z';
+    const T_R1 = '2026-05-23T10:02:00.000Z';
+    const T_R2 = '2026-05-23T10:03:00.000Z';
     const supabase = makeSupabaseMock({
       user: USER_FIXTURE,
       fromResults: [
@@ -200,11 +213,10 @@ describe('PATCH /api/cells/:id', () => {
           ],
           error: null,
         }, // outputs read (await)
-        { data: null, error: null }, // cell update
-        { data: null, error: null }, // rewrite out-1
-        { data: null, error: null }, // rewrite out-2
+        { data: { updated_at: T_CELL }, error: null }, // cell update RETURNING
+        { data: { updated_at: T_R1 }, error: null }, // rewrite out-1 RETURNING
+        { data: { updated_at: T_R2 }, error: null }, // rewrite out-2 RETURNING
         { data: { ...CELL_ROW, name: 'principal' }, error: null }, // refresh
-        { data: { updated_at: FRESH_AT }, error: null }, // bumped calc read
       ],
     });
     installSupabaseMock(mockCreateClient, supabase);
@@ -217,6 +229,9 @@ describe('PATCH /api/cells/:id', () => {
     const body = await res.json();
     expect(body.cell.name).toBe('principal');
     expect(body.rewritten_cell_ids).toEqual(['out-1', 'out-2']);
+    // Last rewrite's RETURNING wins — that's the calc.updated_at after
+    // all writes commit.
+    expect(body.calculator_updated_at).toBe(T_R2);
 
     // The two rewrites should have been written.
     const rewrite1 = supabase._builders[5]?.update.mock.calls[0]?.[0] as {
