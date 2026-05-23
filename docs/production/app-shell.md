@@ -138,7 +138,14 @@ form factors against three surfaces. No score targets, no follow-up
 optimisation pass — the baseline exists for future regression
 detection only.
 
-**Deploy date:** _to be filled in at /deploy_
+**Deploy date:** 2026-05-23
+**Production URL:** https://calcgrinder.vercel.app
+
+Manual capture pending: Lighthouse cannot be run from a headless
+environment without browser access. The deployer should open each
+surface in Chrome DevTools → Lighthouse → run a report for both form
+factors and fill in the table below. The baseline exists for future
+regression detection only — no score targets.
 
 | Surface         | Form factor | Performance | Accessibility | Best Practices | SEO |
 | --------------- | ----------- | ----------- | ------------- | -------------- | --- |

@@ -1,6 +1,6 @@
 # PROJ-4: App Shell, Routing & Top-Level Navigation
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-23
 **Last Updated:** 2026-05-23
 
@@ -1159,4 +1159,93 @@ against the live domain) and the Lighthouse baseline capture
 into `docs/production/app-shell.md`.
 
 ## Deployment
-_To be added by /deploy_
+
+**Deployed:** 2026-05-23
+**Production URL:** https://calcgrinder.vercel.app
+**Deployed commit:** `67bd113 feat(PROJ-4): Implement App Shell, Routing & Top-Level Navigation`
+**Git tag:** `v1.0.0-PROJ-4`
+
+### What shipped to production
+
+- The `AppShell` Client Component wrapping every `(app)` surface
+  (Dashboard, Settings, Editor placeholder) — top bar (desktop
+  tabs + mobile compact bar), avatar popover with Light/Dark/System
+  theme picker, Settings link, and form-POST sign-out.
+- Shared `EmptyOrErrorState` primitive plus per-group
+  `(app)/not-found.tsx` and the `(app)/[...slug]/page.tsx` catch-all
+  that routes unmatched URLs into the chrome-aware not-found surface.
+- Chrome semantic palette wired as a parallel `--cg-*` CSS variable
+  layer in `globals.css`, exposed under Tailwind's `colors.cg.*`
+  namespace. Shadcn token set untouched.
+- Four production security headers (`X-Frame-Options: DENY`,
+  `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy: origin-when-cross-origin`,
+  `Strict-Transport-Security: max-age=31536000; includeSubDomains`)
+  applied to `/:path*` via `next.config.ts`. CSP intentionally absent.
+- Operational docs at `docs/production/app-shell.md`.
+
+### Environment variables added in Vercel
+
+None. PROJ-4 is presentational; no new env vars, no migrations.
+
+### Vercel build notes
+
+- Auto-deploy from `main` on push (GitHub integration). New code
+  live within ≈1 minute of the push to commit `67bd113`.
+- Next 16 Turbopack build still emits the documented
+  `middleware → proxy` deprecation warning (tracked separately in
+  the spec's Open Questions; not in PROJ-4 scope).
+- 17 routes generated (Dashboard, Editor placeholder, Settings,
+  catch-all `[...slug]`, eight auth surfaces, sign-out + confirm
+  endpoints, cron `/api/cron/purge` schedule from PROJ-1
+  unchanged).
+
+### Production verification (post-deploy smoke)
+
+| Surface | Status | All four security headers? |
+|---|---|---|
+| `/` (anon) | 307 → `/auth/login` | YES |
+| `/auth/login` | 200 | YES |
+| `/dashboard` (anon) | 307 → `/auth/login?next=%2Fdashboard` | YES |
+| `/dashboard/nope` (anon) | 307 → `/auth/login?next=%2Fdashboard%2Fnope` | YES |
+| `/c/anytoken` | 307 | YES |
+| `/auth/admin/bogus/approve` | 200 (admin landing's own error UI) | YES |
+| CSP header | **absent (by design)** | n/a |
+
+All four PROJ-4 security headers verified live with the exact values
+from `docs/production/security-headers.md`. The PROJ-3 route-gate
+matrix is intact: anonymous requests for both matched and unmatched
+`(app)` routes redirect to `/auth/login?next=…`.
+
+### Lighthouse baseline
+
+Capture deferred to manual deployer step — Lighthouse requires
+Chrome DevTools and cannot be driven from a headless deploy
+context. Placeholder table in `docs/production/app-shell.md`
+(section 7) carries the deploy date and TBD scores; the deployer
+fills them in once via DevTools → Lighthouse for both form factors
+across `/dashboard`, `/settings`, and `/auth/login`. No score
+target — baseline-only for future regression detection (per Product
+Decision in this spec's Decision Log).
+
+### Known deferred items carried into PROJ-4 deploy
+
+- **L2 (Low)** — disabled "+ New calculator" tooltip is mouse-only.
+  Documented under "Deferred — Known Issues" in the Implementation
+  Notes; resolution ships when PROJ-10 replaces the disabled button
+  with the real creation flow.
+- **CSP header** — deliberately omitted; revisit if/when the app
+  opens to outside users.
+- **`middleware.ts` → `proxy.ts`** — explicit Next-17-prep chore
+  tracked in this spec's Open Questions, not in PROJ-4 scope.
+
+### Post-deploy hand-off
+
+PROJ-4 is live. Next dependent work per `features/INDEX.md`:
+
+- **PROJ-5 Account Dashboard** — fills the body of `/dashboard`
+  (Hero, My Calculators, Presets, My Scenarios, Trash sections).
+- **PROJ-6 Calculator Theme System** — ports the eight themes; will
+  consume the `rightExtras` slot on the editor.
+- **PROJ-7 Formula Engine** — pure engine; can build in parallel.
+- **PROJ-14 Settings Page** — fills the body of `/settings`.

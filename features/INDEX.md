@@ -18,7 +18,7 @@
 | PROJ-1  | Supabase Infrastructure Setup                        | P0       | None                                  | Deployed    | [PROJ-1](PROJ-1-supabase-infrastructure-setup.md) | 2026-05-22 |
 | PROJ-2  | Email Infrastructure (SMTP + transactional)          | P0       | PROJ-1                                | Deployed | [PROJ-2](PROJ-2-email-infrastructure.md) | 2026-05-22 |
 | PROJ-3  | Authentication & Account Approval Flow               | P0       | PROJ-1, PROJ-2                        | Deployed | [PROJ-3](PROJ-3-authentication-and-account-approval-flow.md) | 2026-05-22 |
-| PROJ-4  | App Shell, Routing & Top-Level Navigation            | P0       | PROJ-3                                | Approved | [PROJ-4](PROJ-4-app-shell-routing-and-top-level-navigation.md) | 2026-05-22 |
+| PROJ-4  | App Shell, Routing & Top-Level Navigation            | P0       | PROJ-3                                | Deployed | [PROJ-4](PROJ-4-app-shell-routing-and-top-level-navigation.md) | 2026-05-22 |
 | PROJ-5  | Account Dashboard                                    | P0       | PROJ-4                                | Roadmap | —    | 2026-05-22 |
 | PROJ-6  | Calculator Theme System                              | P0       | PROJ-4                                | Roadmap | —    | 2026-05-22 |
 | PROJ-7  | Formula Engine                                       | P0       | PROJ-1                                | Roadmap | —    | 2026-05-22 |
