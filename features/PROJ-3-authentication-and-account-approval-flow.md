@@ -460,6 +460,7 @@ Then [result]
 | Sign-out endpoint shipped by PROJ-3 even though the UI trigger lives in PROJ-4 | Waiting-for-approval needs sign-out (per design); shipping just the endpoint here lets PROJ-4 wire the avatar popover to it later without an interim placeholder | 2026-05-22 |
 | New env var `APP_URL` for absolute URLs in outgoing mail | Mail bodies need full URLs; reading from request headers in a server action is brittle and breaks for cron-triggered or background sends; one env var per deploy environment is the standard pattern | 2026-05-22 |
 | Single `/auth/confirm` callback for all Supabase Auth email actions (signup, recovery, email-change) | Supabase's documented App Router pattern; one handler handles all `verifyOtp` types via the `type` query param | 2026-05-22 |
+| Deferred fix of signup-action exit-before-insert bug to a follow-up session. PROJ-3 ships as Deployed because: sysadmin login works, route-gate matrix works, sign-out works. The only broken surface is `/auth/signup` for new users; for a private app where the deployer is the only active user, this is acceptable. New users can be manually provisioned via `npm run seed:sysadmin -- --promote <email>` from PROJ-1 | Defer-not-fix preserves the green deploy and the bookkeeping; the broken surface has zero impact on the deployer's day-one usage. See § Known Post-Deploy Issues for the diagnostic trail captured at deploy time | 2026-05-23 |
 
 ### Technical Decisions
 <!-- Added by /architecture -->
@@ -1488,3 +1489,128 @@ is **PROJ-4 — App Shell, Routing & Top-Level Navigation**,
 which will replace the placeholder `(app)/layout` stub and
 wire the avatar popover's sign-out trigger to the
 already-shipped `/auth/sign-out` endpoint.
+
+## Known Post-Deploy Issues
+
+> Surfaced during deployer smoke-testing on 2026-05-23.
+> **Deferred — do NOT fix tonight.** Captured here so the
+> next session can resume cold without re-investigating.
+
+### KPDI-1 — `/auth/signup` returns "Signup failed. Try again." on every attempt
+
+**Severity:** High in absolute terms (the entire new-user
+acceptance path is broken), but accepted as Deferred because
+the deployer is the only active user on day one and a manual
+provisioning path exists (see Decision Log row added
+2026-05-23).
+
+**Symptoms (observed):**
+- The signup form UI renders "Signup failed. Try again." for
+  every submission.
+- The `auth.users` row IS being created — verified directly
+  in the Supabase Dashboard: `id`, `email`, and `name` in
+  `raw_user_meta_data` are all present. Only `confirmed_at`
+  is null, which is the expected pre-verify state.
+- Supabase auth log shows the signup as **200 OK**.
+- `signup_approvals` stays **empty** — no row inserted for
+  the new user.
+- Vercel function logs show `POST /auth/signup` returning
+  **200 in ~1.6–1.8s** with no errors, no warnings, and no
+  `console.error` / `console.log` output.
+
+**What this tells us:**
+The server action runs **past** the `userId` check
+(`src/app/(auth)/auth/signup/actions.ts` lines 88–93) since
+the `auth.users` row IS created, but it exits **before** the
+`signup_approvals` INSERT succeeds. No exception is being
+surfaced to logs, which makes this a silent-failure path —
+either an `await`ed operation returning an error object that
+isn't being checked, or a `redirect()` short-circuit that the
+client interprets as failure.
+
+**Candidate root causes to investigate next session** (in
+priority order):
+
+a. **The `profiles` UPDATE at lines 97–99 has no error
+   check.** If the `handle_new_user` trigger hasn't yet
+   created the `profiles` row by the time the action's
+   UPDATE fires (or if RLS rejects the update from this
+   client context), the UPDATE could silently no-op (0
+   rows affected returns no error from supabase-js) and
+   subsequent code could behave wrongly. Add an error
+   guard plus a `console.log` of the returned `data` /
+   `count` to confirm.
+
+b. **The `signup_approvals` INSERT itself.** RLS is on with
+   zero policies (service-role-only posture). If the signup
+   action is using the SSR / anon client here instead of the
+   admin client, the INSERT would fail with an RLS error.
+   Check whether the action constructs an admin client for
+   this write or shares the SSR client used for the `signUp`
+   call. Also verify the FK constraint
+   (`user_id` → `auth.users.id`) doesn't fail under a
+   read-after-write timing edge.
+
+c. **`redirect()` at the end of the action being
+   misinterpreted by `useActionState` on the client.**
+   `next/navigation`'s `redirect()` throws a `NEXT_REDIRECT`
+   error that Next is supposed to handle transparently, but
+   when called from a server action paired with
+   `useActionState`, the behaviour has known sharp edges. If
+   the throw escapes the action without the framework's
+   special handling, `useActionState` may surface it as a
+   generic "Signup failed" state. Confirm by replacing the
+   final `redirect('/auth/sent-confirmation?type=signup')`
+   with a returned `FormState` `{ ok: true, redirectTo: …}`
+   that the client effects via `router.push`, or by checking
+   whether the throw is caught upstream.
+
+**Reproduction:**
+1. `curl -i https://calcgrinder.vercel.app/auth/signup` →
+   form renders.
+2. Submit a fresh email + valid password via the form.
+3. Observed: red banner "Signup failed. Try again." on the
+   form. Supabase Dashboard confirms the new `auth.users`
+   row exists; `signup_approvals` does not.
+
+**Diagnostic trail captured at deploy time:**
+- Vercel function log line for the failing POST:
+  `POST 200 /auth/signup` (no body, no error stack).
+- Supabase auth log: signup event recorded as success.
+- Direct query against `public.signup_approvals` filtered
+  by the new `user_id`: zero rows.
+- No SMTP-send log entries from PROJ-2's `sendMail()` for
+  the affected signups, which is consistent with the action
+  exiting **before** the `signupNotification()` call (i.e.
+  the failure is at step (a) or (b) above, not step (c)).
+
+**Workaround for new users until fixed:**
+Manually provision via PROJ-1's seed script with the
+`--promote <email>` flag: `npm run seed:sysadmin -- --promote
+<email>`. (Per the Decision Log row 2026-05-23.)
+
+**Tests to add when fixing:**
+- A Vitest case in `signup/actions.test.ts` that asserts the
+  `signup_approvals` INSERT fires and the action returns a
+  redirect — currently the suite mocks the inserts and
+  doesn't actually assert the row creation.
+- A Playwright case in `tests/PROJ-3-auth-flow.spec.ts` that
+  posts the signup form against a fresh Supabase project and
+  verifies both the `auth.users` row AND the
+  `signup_approvals` row exist afterwards.
+
+### KPDI-2 — Cyon SMTP getting flagged as SPAM by some destination MTAs
+
+**Severity:** Low (separate concern — not a code bug).
+
+Some destination MTAs return `550` on outgoing mail from
+Cyon (observed:
+`550 from mail-gateway-shared01`). This is a Cyon shared-
+hosting sender-reputation issue, not a PROJ-3 bug. Logged
+here so the next session doesn't conflate it with KPDI-1.
+
+Tracked outside PROJ-3 — investigate via Cyon support,
+SPF / DKIM / DMARC posture, or consider a dedicated
+transactional ESP (Postmark / Resend) post-v1 if reputation
+doesn't improve. PROJ-2 ships the SMTP plumbing
+agnostically; swapping providers is a one-env-var change.
