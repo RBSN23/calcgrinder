@@ -1,13 +1,15 @@
 'use client';
 
-// PROJ-9 — Calculator hero with hover-edit affordance for title +
-// description. Both commits route through the editor store
-// (renameCalculator / setDescription) so they enroll in undo / redo.
+// PROJ-9 / PROJ-10 — Calculator hero with hover-edit affordance for
+// title + description. Title rename uses the checked variant that
+// surfaces `title_taken` inline (per-user uniqueness constraint
+// landed in PROJ-10); description still uses the fire-and-forget
+// path. Both commits enroll in undo / redo via the editor store.
 
 import * as React from 'react';
 
 import { useEditor } from '@/lib/editor/EditorProvider';
-import { validateTitle } from '@/lib/calculators/types';
+import { MAX_TITLE_LENGTH, validateTitle } from '@/lib/calculators/types';
 import { cardSurface, getTheme } from '@/lib/themes';
 
 import { EditableText } from './editable-text';
@@ -17,8 +19,12 @@ interface CalculatorHeroProps {
   title: string;
 }
 
+const TITLE_TAKEN_MESSAGE = 'A calculator with this title already exists.';
+const TITLE_REQUIRED_MESSAGE = 'Title is required.';
+const TITLE_TOO_LONG_MESSAGE = `Titles can be at most ${MAX_TITLE_LENGTH} characters.`;
+
 export function CalculatorHero({ themeId, title }: CalculatorHeroProps) {
-  const { state, renameCalculator, setDescription } = useEditor();
+  const { state, renameCalculatorChecked, setDescription } = useEditor();
   const theme = getTheme(themeId);
   const heroSurface = cardSurface(theme, 'hero');
   const heroColor = theme.cardTints?.heroFg ?? theme.ink;
@@ -39,7 +45,21 @@ export function CalculatorHero({ themeId, title }: CalculatorHeroProps) {
         ariaLabel="Calculator title"
         maxLength={100}
         validate={(next) => ({ ok: validateTitle(next).ok })}
-        onCommit={(next) => renameCalculator(next)}
+        onCommit={async (next) => {
+          const result = await renameCalculatorChecked(next);
+          if (result.ok) return { ok: true };
+          if (result.code === 'title_taken') {
+            return { ok: false, error: TITLE_TAKEN_MESSAGE };
+          }
+          if (result.code === 'title_required') {
+            return { ok: false, error: TITLE_REQUIRED_MESSAGE };
+          }
+          if (result.code === 'title_too_long') {
+            return { ok: false, error: TITLE_TOO_LONG_MESSAGE };
+          }
+          // Stale-write or unknown error — the store already toasted.
+          return { ok: true };
+        }}
         renderResting={({ displayValue, isPlaceholder }) => (
           <h1
             style={{

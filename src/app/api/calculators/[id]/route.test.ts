@@ -6,7 +6,7 @@ vi.mock('@/lib/supabase/server', () => ({
 
 import { createClient } from '@/lib/supabase/server';
 
-import { GET, PATCH } from './route';
+import { DELETE, GET, PATCH } from './route';
 import {
   installSupabaseMock,
   makeSupabaseMock,
@@ -27,6 +27,14 @@ function ctx(id: string = CALC_ID): { params: Promise<{ id: string }> } {
 function patchRequest(body: unknown | string): Request {
   return new Request(`http://localhost:3000/api/calculators/${CALC_ID}`, {
     method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: typeof body === 'string' ? body : JSON.stringify(body),
+  });
+}
+
+function deleteRequest(body: unknown | string): Request {
+  return new Request(`http://localhost:3000/api/calculators/${CALC_ID}`, {
+    method: 'DELETE',
     headers: { 'content-type': 'application/json' },
     body: typeof body === 'string' ? body : JSON.stringify(body),
   });
@@ -186,11 +194,55 @@ describe('PATCH /api/calculators/:id', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual(updated);
 
-    // The builder records the .update call shape; the stale-check is
-    // applied as a chained .eq('updated_at', STALE_AT).
     const builder = supabase._builders[0]!;
     expect(builder.update).toHaveBeenCalledWith({ title: 'Mortgage' });
     expect(builder.eq.mock.calls).toContainEqual(['updated_at', STALE_AT]);
+  });
+
+  it('returns 200 when published is toggled and forwards the boolean to the update', async () => {
+    const updated = { ...ROW_FIXTURE, published: true, updated_at: FRESH_AT };
+    const supabase = makeSupabaseMock({
+      user: USER_FIXTURE,
+      fromResults: [{ data: updated, error: null }],
+    });
+    installSupabaseMock(mockCreateClient, supabase);
+
+    const res = await PATCH(
+      patchRequest({ updated_at: STALE_AT, published: true }),
+      ctx(),
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.published).toBe(true);
+    const builder = supabase._builders[0]!;
+    expect(builder.update).toHaveBeenCalledWith({ published: true });
+  });
+
+  it('returns 409 title_taken when the DB raises a 23505 unique violation on (owner_id, title)', async () => {
+    const supabase = makeSupabaseMock({
+      user: USER_FIXTURE,
+      fromResults: [
+        {
+          data: null,
+          error: {
+            code: '23505',
+            message:
+              'duplicate key value violates unique constraint "idx_calculators_owner_title_active"',
+            details: 'Key (owner_id, title)=(...) already exists.',
+          },
+        },
+      ],
+    });
+    installSupabaseMock(mockCreateClient, supabase);
+
+    const res = await PATCH(
+      patchRequest({ updated_at: STALE_AT, title: 'Already Used' }),
+      ctx(),
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'title_taken' });
   });
 
   it('returns 409 with server_updated_at when the stale check fails', async () => {
@@ -241,7 +293,7 @@ describe('PATCH /api/calculators/:id', () => {
     expect(await res.json()).toEqual({ error: 'not_found' });
   });
 
-  it('silently ignores unknown keys (owner_id, published, etc.) via the whitelist', async () => {
+  it('silently ignores unknown keys (owner_id, public_token, etc.) via the whitelist', async () => {
     const updated = { ...ROW_FIXTURE, title: 'New', updated_at: FRESH_AT };
     const supabase = makeSupabaseMock({
       user: USER_FIXTURE,
@@ -255,7 +307,6 @@ describe('PATCH /api/calculators/:id', () => {
         title: 'New',
         // Fields the route MUST ignore:
         owner_id: 'attacker-id',
-        published: true,
         public_token: 'leaked-token',
         soft_delete_at: '2025-01-01T00:00:00Z',
         id: 'replaced-id',
@@ -303,5 +354,104 @@ describe('PATCH /api/calculators/:id', () => {
     // Confirm no .update() was called on the single builder.
     expect(supabase._builders).toHaveLength(1);
     expect(supabase._builders[0]!.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('DELETE /api/calculators/:id', () => {
+  beforeEach(() => {
+    mockCreateClient.mockReset();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('returns 401 when no user is signed in', async () => {
+    installSupabaseMock(mockCreateClient, makeSupabaseMock({ user: null, fromResults: [] }));
+
+    const res = await DELETE(deleteRequest({ updated_at: STALE_AT }), ctx());
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: 'unauthorized' });
+  });
+
+  it('returns 400 when the body is not valid JSON', async () => {
+    installSupabaseMock(
+      mockCreateClient,
+      makeSupabaseMock({ user: USER_FIXTURE, fromResults: [] }),
+    );
+
+    const res = await DELETE(deleteRequest('not-json'), ctx());
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'invalid_json' });
+  });
+
+  it('returns 400 when updated_at is missing', async () => {
+    installSupabaseMock(
+      mockCreateClient,
+      makeSupabaseMock({ user: USER_FIXTURE, fromResults: [] }),
+    );
+
+    const res = await DELETE(deleteRequest({}), ctx());
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'invalid_request' });
+  });
+
+  it('returns 200 with the new updated_at when the stale check matches and the soft-delete commits', async () => {
+    const supabase = makeSupabaseMock({
+      user: USER_FIXTURE,
+      fromResults: [{ data: { updated_at: FRESH_AT }, error: null }],
+    });
+    installSupabaseMock(mockCreateClient, supabase);
+
+    const res = await DELETE(deleteRequest({ updated_at: STALE_AT }), ctx());
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ updated_at: FRESH_AT });
+
+    const builder = supabase._builders[0]!;
+    const updateCall = builder.update.mock.calls[0]?.[0] as {
+      soft_delete_at: string;
+    };
+    expect(typeof updateCall.soft_delete_at).toBe('string');
+    expect(builder.eq.mock.calls).toContainEqual(['updated_at', STALE_AT]);
+  });
+
+  it('returns 409 with server_updated_at when the stale check fails', async () => {
+    installSupabaseMock(
+      mockCreateClient,
+      makeSupabaseMock({
+        user: USER_FIXTURE,
+        fromResults: [
+          { data: null, error: null }, // UPDATE matched 0 rows
+          { data: { updated_at: FRESH_AT }, error: null }, // disambiguating SELECT
+        ],
+      }),
+    );
+
+    const res = await DELETE(deleteRequest({ updated_at: STALE_AT }), ctx());
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: 'stale',
+      server_updated_at: FRESH_AT,
+    });
+  });
+
+  it('returns 404 when the row is missing / not owned / already soft-deleted', async () => {
+    installSupabaseMock(
+      mockCreateClient,
+      makeSupabaseMock({
+        user: USER_FIXTURE,
+        fromResults: [
+          { data: null, error: null }, // UPDATE matched 0 rows
+          { data: null, error: null }, // SELECT also empty
+        ],
+      }),
+    );
+
+    const res = await DELETE(deleteRequest({ updated_at: STALE_AT }), ctx());
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: 'not_found' });
   });
 });

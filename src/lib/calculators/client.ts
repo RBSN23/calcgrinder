@@ -61,6 +61,11 @@ export interface PatchCalculatorBody {
   title?: string;
   description?: string;
   theme_id?: string;
+  // PROJ-10 — extended whitelist: the publish toggle rides on PATCH so
+  // it shares the same optimistic-concurrency contract as other field
+  // edits. Dedicated token rotation and soft-delete live in their own
+  // endpoints below.
+  published?: boolean;
 }
 
 export async function patchCalculator(
@@ -74,4 +79,66 @@ export async function patchCalculator(
   });
   if (!res.ok) throw await parseError(res);
   return (await res.json()) as CalculatorRow;
+}
+
+// PROJ-10 — token rotation. Overwrites public_token with a fresh
+// 22-char URL-safe base64 string and bumps updated_at. The popover
+// in the editor toolbar re-paints with the response; the old URL
+// becomes 404 once PROJ-11 ships.
+export async function regenerateCalculatorToken(
+  id: string,
+  updatedAt: string,
+): Promise<CalculatorRow> {
+  const res = await fetch(
+    `/api/calculators/${encodeURIComponent(id)}/regenerate-token`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ updated_at: updatedAt }),
+    },
+  );
+  if (!res.ok) throw await parseError(res);
+  return (await res.json()) as CalculatorRow;
+}
+
+// PROJ-10 — same-owner deep copy. Returns the new row (plus a
+// `default_section_id` hint for the editor's first paint, same
+// shape as POST /api/calculators).
+export interface DuplicateResponse extends CalculatorRow {
+  default_section_id: string;
+}
+
+export async function duplicateCalculator(
+  id: string,
+): Promise<DuplicateResponse> {
+  const res = await fetch(
+    `/api/calculators/${encodeURIComponent(id)}/duplicate`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    },
+  );
+  if (!res.ok) throw await parseError(res);
+  return (await res.json()) as DuplicateResponse;
+}
+
+// PROJ-10 — soft-delete. Sets soft_delete_at = NOW(); recovery
+// lives in PROJ-13. Echoes the new updated_at so any callers
+// holding the row in memory can refresh their concurrency token.
+export interface SoftDeleteResponse {
+  updated_at: string;
+}
+
+export async function softDeleteCalculator(
+  id: string,
+  updatedAt: string,
+): Promise<SoftDeleteResponse> {
+  const res = await fetch(`/api/calculators/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ updated_at: updatedAt }),
+  });
+  if (!res.ok) throw await parseError(res);
+  return (await res.json()) as SoftDeleteResponse;
 }

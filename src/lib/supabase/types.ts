@@ -45,6 +45,8 @@ export type Database = {
           description: string
           id: string
           owner_id: string
+          public_token: string
+          published: boolean
           soft_delete_at: string | null
           theme_id: string
           title: string
@@ -55,6 +57,8 @@ export type Database = {
           description?: string
           id?: string
           owner_id: string
+          public_token?: string
+          published?: boolean
           soft_delete_at?: string | null
           theme_id?: string
           title?: string
@@ -65,6 +69,8 @@ export type Database = {
           description?: string
           id?: string
           owner_id?: string
+          public_token?: string
+          published?: boolean
           soft_delete_at?: string | null
           theme_id?: string
           title?: string
@@ -295,6 +301,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      fn_duplicate_calculator: {
+        Args: { source_id: string }
+        Returns: {
+          default_section_id: string
+          description: string
+          id: string
+          public_token: string
+          published: boolean
+          theme_id: string
+          title: string
+          updated_at: string
+        }[]
+      }
+      gen_calculator_public_token: { Args: never; Returns: string }
       is_sysadmin: { Args: { uid: string }; Returns: boolean }
     }
     Enums: {

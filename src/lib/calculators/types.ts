@@ -16,6 +16,11 @@ export interface CalculatorRow {
   description: string;
   theme_id: string;
   updated_at: string;
+  // PROJ-10 — lifecycle columns. `published` is the author's
+  // intent to expose the calculator; `public_token` is the
+  // stable, rotatable URL slug at `/c/<token>`.
+  published: boolean;
+  public_token: string;
 }
 
 export type TitleValidation =

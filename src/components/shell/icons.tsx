@@ -86,6 +86,65 @@ export const Icons = {
       <path d="M21 21l-4.3-4.3M8.5 8.5l5 5M13.5 8.5l-5 5" />
     </>,
   ),
+  // PROJ-10 — calculator card glyphs.
+  // Pencil — Edit affordance.
+  Pencil: makeIcon(
+    <path d="M12 20h9M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z" />,
+  ),
+  // External-link — Public-view / Preview affordance.
+  External: makeIcon(
+    <>
+      <path d="M14 3h7v7" />
+      <path d="M10 14L21 3" />
+      <path d="M21 14v7a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1h7" />
+    </>,
+  ),
+  // Copy — Duplicate affordance.
+  Copy: makeIcon(
+    <>
+      <rect x="9" y="9" width="13" height="13" rx="2" />
+      <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+    </>,
+  ),
+  // Calculator icon — top-left badge on <CalcCard>.
+  Calc: makeIcon(
+    <>
+      <rect x="4" y="2" width="16" height="20" rx="2" />
+      <path d="M8 6h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 19h.01M12 19h.01M16 19h.01" />
+    </>,
+  ),
+  // Kebab — vertical 3-dot menu trigger.
+  Kebab: makeIcon(
+    <>
+      <circle cx="12" cy="5" r="1" />
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="12" cy="19" r="1" />
+    </>,
+  ),
+  // Share / link — Sharing popover affordance in editor toolbar.
+  Share: makeIcon(
+    <>
+      <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
+      <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
+    </>,
+  ),
+  // Trash — Delete kebab item.
+  Trash: makeIcon(
+    <>
+      <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+    </>,
+  ),
+  // Eye — Publish kebab item.
+  Eye: makeIcon(
+    <>
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </>,
+  ),
+  // EyeOff — Unpublish kebab item.
+  EyeOff: makeIcon(
+    <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24M1 1l22 22" />,
+  ),
 };
 
 export type IconName = keyof typeof Icons;

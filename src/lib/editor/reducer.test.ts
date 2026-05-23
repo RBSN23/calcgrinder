@@ -17,6 +17,8 @@ const ROW = {
   description: '',
   theme_id: 'calcgrinder',
   updated_at: '2026-05-23T10:00:00.000Z',
+  published: false,
+  public_token: 'mocked-token-22-char-xx',
 };
 
 function makeOp(label = 'op'): Operation {

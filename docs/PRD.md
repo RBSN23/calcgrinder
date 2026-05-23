@@ -50,7 +50,7 @@ and cloning.
 | P0 (MVP) | Formula Engine                                       | Deployed |
 | P0 (MVP) | Editor — Grid + Builder Two-Panel Split              | Deployed |
 | P0 (MVP) | Cell Authoring & Section Management                  | Deployed |
-| P0 (MVP) | Calculator Lifecycle — Publish, Sharing, Token Regen | Roadmap  |
+| P0 (MVP) | Calculator Lifecycle — Publish, Sharing, Token Regen | Planned  |
 | P0 (MVP) | Visitor View — Calculator Interface                  | Roadmap  |
 | P0 (MVP) | Scenarios — Save, Load, Share                        | Roadmap  |
 | P0 (MVP) | Soft-Delete & Trash Recovery                         | Roadmap  |

@@ -1,4 +1,4 @@
-// PROJ-8 + PROJ-9 — POST /api/calculators
+// PROJ-8 + PROJ-9 + PROJ-10 — POST /api/calculators
 //
 // Owner-only create endpoint. Always creates a row with the calculator
 // defaults (title="Untitled calculator", description="",
@@ -6,6 +6,13 @@
 // flow. Returns the public CalculatorRow shape augmented with
 // `default_section_id` so the client can scroll into the default
 // section on first paint.
+//
+// PROJ-10 additions:
+//   * Title auto-resolves on the (owner_id, title) partial unique index:
+//     "Untitled calculator" → "Untitled calculator (2)" → "(3)" → …
+//     Never returns 409 on the default-title path.
+//   * Response includes `published` and `public_token` (the column
+//     DEFAULT mints the token in the same INSERT).
 //
 // "Atomic" here is best-effort at the API layer: if the section insert
 // fails, we delete the just-inserted calculator before returning 500.
@@ -19,11 +26,14 @@
 import { NextResponse } from 'next/server';
 
 import { createClient } from '@/lib/supabase/server';
-import {
-  DEFAULT_SECTION_TITLE,
-} from '@/lib/sections/types';
+import { DEFAULT_TITLE } from '@/lib/calculators/types';
+import { resolveUniqueTitle } from '@/lib/calculators/server';
+import { DEFAULT_SECTION_TITLE } from '@/lib/sections/types';
 
 export const runtime = 'nodejs';
+
+const CALCULATOR_ROW_COLUMNS =
+  'id, title, description, theme_id, updated_at, published, public_token' as const;
 
 export async function POST(): Promise<Response> {
   const supabase = await createClient();
@@ -35,10 +45,25 @@ export async function POST(): Promise<Response> {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
+  // PROJ-10: pre-resolve the default title against the owner's active
+  // set. Avoids a 23505 round-trip on the common "n-th Untitled
+  // calculator" path.
+  const resolvedTitle = await resolveUniqueTitle(
+    supabase,
+    user.id,
+    DEFAULT_TITLE,
+  );
+  if (!resolvedTitle) {
+    console.error(
+      `POST /api/calculators: title auto-resolve exhausted for owner ${user.id}`,
+    );
+    return NextResponse.json({ error: 'create_failed' }, { status: 500 });
+  }
+
   const { data: calculator, error: calcErr } = await supabase
     .from('calculators')
-    .insert({ owner_id: user.id })
-    .select('id, title, description, theme_id, updated_at')
+    .insert({ owner_id: user.id, title: resolvedTitle })
+    .select(CALCULATOR_ROW_COLUMNS)
     .single();
 
   if (calcErr || !calculator) {

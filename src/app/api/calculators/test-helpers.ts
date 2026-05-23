@@ -13,6 +13,9 @@ export const ROW_FIXTURE = {
   description: '',
   theme_id: 'calcgrinder',
   updated_at: '2026-05-23T10:00:00.000Z',
+  // PROJ-10 — added to the public row shape.
+  published: false,
+  public_token: 'mocked-token-22-char-xx',
 };
 
 export interface QueryResult {

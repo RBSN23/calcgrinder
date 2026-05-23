@@ -18,8 +18,19 @@ interface EditableTextProps {
   inputClassName?: string;
   multiline?: boolean;
   maxLength?: number;
-  /** Called with the trimmed new value. */
-  onCommit: (next: string) => void | Promise<void>;
+  /**
+   * Called with the trimmed new value. The return shape controls
+   * whether the editor closes on commit:
+   *   - `void` / `{ ok: true }` (or any non-error resolution) → close
+   *   - `{ ok: false, error: string }` → stay open + show inline error
+   *
+   * Throwing an error closes the editor (the caller can surface a
+   * toast). Use the `{ ok: false }` return for inline error surfacing
+   * (PROJ-10 hero title uniqueness).
+   */
+  onCommit: (
+    next: string,
+  ) => void | Promise<void | { ok: true } | { ok: false; error: string }>;
   /**
    * Optional validator run on commit. When it returns `ok: false` the
    * input stays in edit mode, the value is re-selected, and the input
@@ -50,6 +61,7 @@ export function EditableText({
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState(value);
   const [invalid, setInvalid] = React.useState(false);
+  const [inlineError, setInlineError] = React.useState<string | null>(null);
   const inputRef = React.useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
 
   React.useEffect(() => {
@@ -60,6 +72,7 @@ export function EditableText({
     setDraft(value);
     setEditing(true);
     setInvalid(false);
+    setInlineError(null);
   }, [value]);
 
   const commit = React.useCallback(async () => {
@@ -78,78 +91,119 @@ export function EditableText({
       window.setTimeout(() => setInvalid(false), 600);
       return;
     }
+    if (trimmed === value) {
+      setEditing(false);
+      setInlineError(null);
+      return;
+    }
+    // Keep editing open while the async commit runs. The handler can
+    // return `{ ok: false, error }` to surface an inline message without
+    // closing the input (PROJ-10 hero title uniqueness).
+    let result: void | { ok: true } | { ok: false; error: string };
+    try {
+      result = await onCommit(trimmed);
+    } catch {
+      // Caller surfaced the error via its own channel (toast); close.
+      setEditing(false);
+      setInlineError(null);
+      return;
+    }
+    if (result && typeof result === 'object' && 'ok' in result && result.ok === false) {
+      setInlineError(result.error);
+      requestAnimationFrame(() => {
+        const el = inputRef.current;
+        if (el) el.focus();
+      });
+      return;
+    }
     setEditing(false);
-    if (trimmed === value) return;
-    await onCommit(trimmed);
+    setInlineError(null);
   }, [draft, multiline, onCommit, value, validate]);
 
   const cancel = React.useCallback(() => {
     setDraft(value);
     setEditing(false);
     setInvalid(false);
+    setInlineError(null);
   }, [value]);
 
   if (editing) {
     if (multiline) {
       return (
-        <textarea
+        <div className="flex w-full flex-col gap-1">
+          <textarea
+            autoFocus
+            ref={(el) => {
+              inputRef.current = el;
+            }}
+            aria-label={ariaLabel}
+            aria-invalid={invalid || !!inlineError || undefined}
+            value={draft}
+            maxLength={maxLength}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                cancel();
+              }
+            }}
+            className={cn(
+              'w-full resize-none border-none bg-transparent outline-none ring-1 rounded px-1 py-0.5',
+              invalid || inlineError
+                ? 'ring-2 ring-cg-danger'
+                : 'ring-cg-accent/40',
+              invalid && 'animate-pulse',
+              inputClassName ?? className,
+            )}
+            rows={3}
+          />
+          {inlineError ? (
+            <p role="alert" className="text-[12px] font-medium text-red-600">
+              {inlineError}
+            </p>
+          ) : null}
+        </div>
+      );
+    }
+    return (
+      <div className="flex w-full flex-col gap-1">
+        <input
           autoFocus
           ref={(el) => {
             inputRef.current = el;
           }}
           aria-label={ariaLabel}
-          aria-invalid={invalid || undefined}
+          aria-invalid={invalid || !!inlineError || undefined}
           value={draft}
           maxLength={maxLength}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}
+          onFocus={(e) => e.currentTarget.select()}
           onKeyDown={(e) => {
-            if (e.key === 'Escape') {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              void commit();
+            } else if (e.key === 'Escape') {
               e.preventDefault();
               cancel();
             }
           }}
           className={cn(
-            'w-full resize-none border-none bg-transparent outline-none ring-1 rounded px-1 py-0.5',
-            invalid
-              ? 'ring-2 ring-cg-danger animate-pulse'
+            'border-none bg-transparent outline-none ring-1 rounded px-1',
+            invalid || inlineError
+              ? 'ring-2 ring-cg-danger'
               : 'ring-cg-accent/40',
+            invalid && 'animate-pulse',
             inputClassName ?? className,
           )}
-          rows={3}
         />
-      );
-    }
-    return (
-      <input
-        autoFocus
-        ref={(el) => {
-          inputRef.current = el;
-        }}
-        aria-label={ariaLabel}
-        aria-invalid={invalid || undefined}
-        value={draft}
-        maxLength={maxLength}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onFocus={(e) => e.currentTarget.select()}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            void commit();
-          } else if (e.key === 'Escape') {
-            e.preventDefault();
-            cancel();
-          }
-        }}
-        className={cn(
-          'border-none bg-transparent outline-none ring-1 rounded px-1',
-          invalid
-            ? 'ring-2 ring-cg-danger animate-pulse'
-            : 'ring-cg-accent/40',
-          inputClassName ?? className,
-        )}
-      />
+        {inlineError ? (
+          <p role="alert" className="text-[12px] font-medium text-red-600">
+            {inlineError}
+          </p>
+        ) : null}
+      </div>
     );
   }
 

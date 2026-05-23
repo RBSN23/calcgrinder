@@ -443,8 +443,9 @@ state only (§3 Public-token URLs):
 Drafts start as `published = false`; the maintainer toggles
 to `true` to mark "ready to share".
 
-Cloned calculators are always created with `published =
-false` so the clone owner reviews before publishing.
+Duplicated (same-account, PROJ-10) and cloned (cross-user,
+PROJ-18) calculators are always created with `published =
+false` so the new owner reviews before publishing.
 
 ### Soft delete
 
@@ -1388,8 +1389,9 @@ unguessable, opening a Draft calculator's URL is safe — only
 the maintainer (and anyone they've shared the link with)
 can reach it.
 
-**Cloned calculators always start `published = false`** —
-already in §2 Calculator visibility.
+**Duplicated and cloned calculators always start
+`published = false`** — already in §2 Calculator
+visibility.
 
 ### URL structure
 
@@ -1748,13 +1750,17 @@ footer, with different icon sets per surface:
   - Public-view (`Icons.External`) — opens `/c/<token>` in
     a new tab (same as card click; explicit affordance for
     discoverability).
-  - Clone (`Icons.Copy`) — creates a clone owned by the
-    current user (default Draft, new public token),
-    navigates to the clone's `/editor/<id>` in the same
-    tab.
-  - A kebab menu provides additional actions: Rename,
-    Duplicate, Publish/Unpublish, Delete (soft-delete →
-    Trash).
+  - **Duplicate** (`Icons.Copy`) — creates a same-account
+    copy owned by the current user (default Draft, new
+    public token), navigates to the new row's
+    `/editor/<id>` in the same tab. Naming note:
+    "Duplicate" is reserved for the same-account copy
+    flow; "Clone" is reserved for the cross-user / Preset
+    flow on the Presets card (PROJ-18) — never use "Clone"
+    for the same-account action.
+  - A kebab menu provides additional actions: Public Link
+    (opens `/c/<token>` in a new tab), Rename, Duplicate,
+    Publish/Unpublish, Delete (soft-delete → Trash).
 - **Presets** card — 2 icon-buttons:
   - Public-view (`Icons.External`) — opens `/c/<token>`
     in a new tab (same as card click; explicit affordance).

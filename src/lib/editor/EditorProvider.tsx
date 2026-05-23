@@ -68,6 +68,14 @@ export interface EditorApi {
   dispatch: (action: EditorAction) => void;
   /** Commit a title change. Records an undo entry on success. */
   renameCalculator: (next: string) => Promise<void>;
+  /**
+   * PROJ-10 — Checked rename that returns server-side validation
+   * codes (`title_taken`, `title_required`, `title_too_long`) instead
+   * of toasting them, so the caller can surface an inline error.
+   */
+  renameCalculatorChecked: (
+    next: string,
+  ) => Promise<{ ok: true } | { ok: false; code?: string }>;
   /** Commit a description change. Records an undo entry on success. */
   setDescription: (next: string) => Promise<void>;
   /** Commit a theme change. Records an undo entry on success. */
@@ -237,6 +245,74 @@ class EditorStore {
         });
       },
     });
+  };
+
+  // PROJ-10 — checked rename used by the hero / dashboard kebab.
+  // Surfaces validation codes back to the caller instead of toasting
+  // them, so the caller can render an inline error below the input.
+  // The undo-stack enrollment matches renameCalculator on success.
+  renameCalculatorChecked = async (
+    next: string,
+  ): Promise<{ ok: true } | { ok: false; code?: string }> => {
+    const current = this.state.calculator;
+    const previousTitle = current.title;
+    if (previousTitle === next) return { ok: true };
+    if (this.state.stale) {
+      this.reportError(new CalculatorApiError(409, 'stale'));
+      return { ok: false };
+    }
+    let row;
+    try {
+      row = await this.patchFn(current.id, {
+        updated_at: this.state.calculator.updated_at,
+        title: next,
+      });
+    } catch (e) {
+      if (e instanceof CalculatorApiError) {
+        if (
+          e.code === 'title_taken' ||
+          e.code === 'title_required' ||
+          e.code === 'title_too_long'
+        ) {
+          return { ok: false, code: e.code };
+        }
+      }
+      if (this.isStale(e)) this.dispatch({ type: 'MARK_STALE' });
+      this.reportError(e);
+      return { ok: false };
+    }
+    this.dispatch({
+      type: 'SET_TITLE',
+      title: row.title,
+      updated_at: row.updated_at,
+    });
+    const operation: Operation = {
+      label: `Rename to "${next}"`,
+      do: async () => {
+        const r = await this.patchFn(current.id, {
+          updated_at: this.state.calculator.updated_at,
+          title: next,
+        });
+        this.dispatch({
+          type: 'SET_TITLE',
+          title: r.title,
+          updated_at: r.updated_at,
+        });
+      },
+      undo: async () => {
+        const r = await this.patchFn(current.id, {
+          updated_at: this.state.calculator.updated_at,
+          title: previousTitle,
+        });
+        this.dispatch({
+          type: 'SET_TITLE',
+          title: r.title,
+          updated_at: r.updated_at,
+        });
+      },
+    };
+    this.dispatch({ type: 'PUSH_OPERATION', op: operation });
+    return { ok: true };
   };
 
   setDescription = async (next: string): Promise<void> => {
@@ -847,6 +923,7 @@ export function useEditor(): EditorApi {
     state,
     dispatch: store.dispatch,
     renameCalculator: store.renameCalculator,
+    renameCalculatorChecked: store.renameCalculatorChecked,
     setDescription: store.setDescription,
     setTheme: store.setTheme,
     undo: store.undo,

@@ -28,6 +28,7 @@ export { HiddenCellDot } from './hidden-cell-dot';
 export { HiddenCellsPill } from './hidden-cells-pill';
 export { LayoutPatternPicker } from './layout-pattern-picker';
 export { DestructiveConfirmSheet } from './destructive-confirm-sheet';
+export { SharingPopover } from './sharing-popover';
 export { EditableText } from './editable-text';
 export { GridColumn } from './grid-column';
 export { DragHandle, SortableItem, useEditorDndSensors } from './dnd-helpers';

@@ -61,6 +61,9 @@ export type EditorAction =
   // cell/section write. Mutation responses echo the fresh value so the
   // next optimistic-concurrency check sends a non-stale token.
   | { type: 'SET_CALCULATOR_UPDATED_AT'; updated_at: string }
+  // PROJ-10 — lifecycle column edits surfaced by the toolbar.
+  | { type: 'SET_PUBLISHED'; published: boolean; updated_at: string }
+  | { type: 'SET_PUBLIC_TOKEN'; public_token: string; updated_at: string }
   | { type: 'PUSH_OPERATION'; op: Operation }
   | { type: 'UNDO' }
   | { type: 'REDO' }
@@ -147,6 +150,24 @@ export function editorReducer(
         ...state,
         calculator: {
           ...state.calculator,
+          updated_at: action.updated_at,
+        },
+      };
+    case 'SET_PUBLISHED':
+      return {
+        ...state,
+        calculator: {
+          ...state.calculator,
+          published: action.published,
+          updated_at: action.updated_at,
+        },
+      };
+    case 'SET_PUBLIC_TOKEN':
+      return {
+        ...state,
+        calculator: {
+          ...state.calculator,
+          public_token: action.public_token,
           updated_at: action.updated_at,
         },
       };

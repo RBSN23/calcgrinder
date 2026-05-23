@@ -90,9 +90,12 @@ that own those data models:
   icon-button row, status pill) lands alongside the
   calculators table.
 - **My Calculators section content.** PROJ-10 wires the
-  data + the 3-icon footer (Edit / Public-view / Clone) +
-  the kebab menu (Rename, Duplicate, Publish/Unpublish,
-  Delete).
+  data + the 3-icon footer (Edit / Public-view /
+  Duplicate) + the kebab menu (Public Link, Rename,
+  Duplicate, Publish/Unpublish, Delete). Naming note:
+  same-account copy is "Duplicate"; cross-user copy from
+  Presets is "Clone" (PROJ-18) — never use "Clone" for
+  the same-account action.
 - **My Scenarios section content.** PROJ-12 wires the
   list-not-cards rendering + row buttons (Edit, Public-view)
   + row kebab (Copy link, Rename, Delete).
