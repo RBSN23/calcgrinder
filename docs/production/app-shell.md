@@ -133,25 +133,43 @@ All four headers should appear on every response (302 or 200).
 
 ## 7. Lighthouse baseline (PROJ-4)
 
-Captured manually from Chrome DevTools after deploy. Mobile + desktop
-form factors against three surfaces. No score targets, no follow-up
-optimisation pass — the baseline exists for future regression
-detection only.
+Captured manually from Chrome DevTools after deploy. The baseline
+exists for future regression detection only — no score targets, no
+follow-up optimisation pass.
 
 **Deploy date:** 2026-05-23
 **Production URL:** https://calcgrinder.vercel.app
-
-Manual capture pending: Lighthouse cannot be run from a headless
-environment without browser access. The deployer should open each
-surface in Chrome DevTools → Lighthouse → run a report for both form
-factors and fill in the table below. The baseline exists for future
-regression detection only — no score targets.
+**Capture time:** 2026-05-23T06:14:57Z
+**Sample size:** Single run, mobile form factor only (Moto G Power
+emulation). Desktop form factor and additional surfaces (`/settings`,
+`/auth/login`) deliberately skipped — App Shell ships placeholder
+content; a more meaningful baseline can be captured post-PROJ-5 when
+`/dashboard` has real content.
 
 | Surface         | Form factor | Performance | Accessibility | Best Practices | SEO |
 | --------------- | ----------- | ----------- | ------------- | -------------- | --- |
-| `/dashboard`    | desktop     | TBD         | TBD           | TBD            | TBD |
-| `/dashboard`    | mobile      | TBD         | TBD           | TBD            | TBD |
-| `/settings`     | desktop     | TBD         | TBD           | TBD            | TBD |
-| `/settings`     | mobile      | TBD         | TBD           | TBD            | TBD |
-| `/auth/login`   | desktop     | TBD         | TBD           | TBD            | TBD |
-| `/auth/login`   | mobile      | TBD         | TBD           | TBD            | TBD |
+| `/dashboard`    | mobile      | 96          | 100           | 81             | 100 |
+
+**Key metrics (mobile, `/dashboard`):**
+
+| Metric                          | Value |
+| ------------------------------- | ----- |
+| First Contentful Paint (FCP)    | 1.3s  |
+| Largest Contentful Paint (LCP)  | 1.4s  |
+| Cumulative Layout Shift (CLS)   | 0     |
+| Total Blocking Time (TBT)       | 230ms |
+| Time to Interactive (TTI)       | 2.0s  |
+
+**Notes:**
+
+- **Best Practices 81/100** traces to a single warning ("Unload event
+  listeners are deprecated") sourced from a Chrome extension's
+  `content.js`, not Calcgrinder code. The same extension also triggers
+  the "Page prevented back/forward cache restoration" diagnostic under
+  Performance. Re-running in Incognito would likely return 100 / clear
+  the bfcache flag. Not investigated further — baseline-only per
+  PROJ-4 scope discipline.
+- **Performance diagnostics** flag ~575 KiB unused JavaScript and
+  ~14 KiB legacy JavaScript polyfills (Next.js default bundling). Not
+  addressed — bundle optimisation is explicitly out-of-scope for v1
+  per the PROJ-4 Decision Log.
