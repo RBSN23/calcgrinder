@@ -69,6 +69,16 @@ export const Icons = {
   Logout: makeIcon(<path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />),
   Shield: makeIcon(<path d="M12 3l8 3v6c0 5-3.5 8.5-8 9-4.5-.5-8-4-8-9V6l8-3z" />),
   Menu: makeIcon(<path d="M3 6h18M3 12h18M3 18h18" />),
+  // Four filled squares — preset / template glyph (PROJ-5 Presets empty,
+  // PROJ-10 "Start from a template" Hero, PROJ-18 Presets card).
+  LayoutGrid: makeIcon(
+    <>
+      <rect x="3" y="3" width="7" height="7" rx="1.5" fill="currentColor" stroke="none" />
+      <rect x="14" y="3" width="7" height="7" rx="1.5" fill="currentColor" stroke="none" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" fill="currentColor" stroke="none" />
+      <rect x="14" y="14" width="7" height="7" rx="1.5" fill="currentColor" stroke="none" />
+    </>,
+  ),
   // Magnifying-glass with X — "page not found" glyph.
   NotFound: makeIcon(
     <>

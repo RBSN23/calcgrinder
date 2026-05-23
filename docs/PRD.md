@@ -45,7 +45,7 @@ and cloning.
 | P0 (MVP) | Email Infrastructure (SMTP + transactional)          | Deployed |
 | P0 (MVP) | Authentication & Account Approval Flow               | Deployed |
 | P0 (MVP) | App Shell, Routing & Top-Level Navigation            | Deployed |
-| P0 (MVP) | Account Dashboard                                    | Roadmap  |
+| P0 (MVP) | Account Dashboard                                    | Planned  |
 | P0 (MVP) | Calculator Theme System (8 themes as runtime tokens) | Roadmap  |
 | P0 (MVP) | Formula Engine                                       | Roadmap  |
 | P0 (MVP) | Editor — Grid + Builder Two-Panel Split              | Roadmap  |
