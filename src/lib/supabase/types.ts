@@ -39,6 +39,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      calculators: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          owner_id: string
+          soft_delete_at: string | null
+          theme_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          owner_id: string
+          soft_delete_at?: string | null
+          theme_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          owner_id?: string
+          soft_delete_at?: string | null
+          theme_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string

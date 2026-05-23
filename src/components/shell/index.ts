@@ -24,3 +24,9 @@ export { IconBtn } from './icon-btn';
 export { Icons, type IconName } from './icons';
 export { EmptyOrErrorState } from './empty-or-error-state';
 export { deriveInitials, cgAvatarHue } from './avatar-initials';
+export {
+  TopBarSlotsProvider,
+  useTopBarSlots,
+  useRegisterTopBarSlots,
+  type TopBarSlots,
+} from './top-bar-slots';

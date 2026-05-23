@@ -1,3 +1,10 @@
+import { notFound, redirect } from 'next/navigation';
+
+import { EditorBody } from '@/components/editor';
+import { EditorProvider } from '@/lib/editor/EditorProvider';
+import { getCurrentProfile } from '@/lib/auth/getCurrentProfile';
+import { getCalculatorForEditor } from '@/lib/calculators/server';
+
 export const metadata = {
   title: 'Editor · Calcgrinder',
 };
@@ -8,13 +15,19 @@ export default async function EditorPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const current = await getCurrentProfile();
+  if (!current) redirect(`/auth/login?next=/editor/${encodeURIComponent(id)}`);
+
+  // PROJ-8 — the row lookup collapses three AC scenarios (not yours,
+  // doesn't exist, soft-deleted) into one branch. RLS scopes the row to
+  // `auth.uid()` so non-owners get a null row even before the explicit
+  // `soft_delete_at IS NULL` filter kicks in.
+  const row = await getCalculatorForEditor(id);
+  if (!row) notFound();
+
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-4 px-6 py-12">
-      <h1 className="text-2xl font-semibold tracking-tight">Editor</h1>
-      <p className="text-muted-foreground">
-        Editing calculator <span className="font-mono">{id}</span>. The
-        Grid + Builder split ships with PROJ-8.
-      </p>
-    </main>
+    <EditorProvider initialRow={row}>
+      <EditorBody />
+    </EditorProvider>
   );
 }

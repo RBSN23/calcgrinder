@@ -48,7 +48,7 @@ and cloning.
 | P0 (MVP) | Account Dashboard                                    | Deployed |
 | P0 (MVP) | Calculator Theme System (8 themes as runtime tokens) | Planned  |
 | P0 (MVP) | Formula Engine                                       | Deployed |
-| P0 (MVP) | Editor — Grid + Builder Two-Panel Split              | Roadmap  |
+| P0 (MVP) | Editor — Grid + Builder Two-Panel Split              | Planned  |
 | P0 (MVP) | Cell Authoring & Section Management                  | Roadmap  |
 | P0 (MVP) | Calculator Lifecycle — Publish, Sharing, Token Regen | Roadmap  |
 | P0 (MVP) | Visitor View — Calculator Interface                  | Roadmap  |

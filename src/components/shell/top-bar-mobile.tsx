@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { Avatar } from './avatar';
 import { deriveInitials } from './avatar-initials';
 import { AvatarPopover, type AvatarPopoverUser } from './avatar-popover';
+import { useTopBarSlots } from './top-bar-slots';
 import { Wordmark } from './wordmark';
 
 export interface TopBarMobileProps {
@@ -33,6 +34,9 @@ export function TopBarMobile({
   className,
 }: TopBarMobileProps) {
   const pathname = usePathname() ?? '';
+  const slots = useTopBarSlots();
+  const effectiveLeftSlot = slots.mobileLeftSlot ?? mobileLeftSlot;
+  const effectiveCenter = slots.mobileCenter ?? mobileCenter;
   const initials = deriveInitials({ name: user.name, email: user.email });
 
   return (
@@ -43,7 +47,7 @@ export function TopBarMobile({
       )}
     >
       <div className="flex shrink-0 items-center">
-        {mobileLeftSlot ?? (
+        {effectiveLeftSlot ?? (
           <Link
             href="/dashboard"
             aria-label="Calcgrinder home"
@@ -55,7 +59,7 @@ export function TopBarMobile({
       </div>
 
       <div className="flex min-w-0 flex-1 items-center justify-center gap-[6px] text-[14px] font-semibold tracking-tight text-cg-text">
-        {mobileCenter ?? <DefaultMobileCenter pathname={pathname} />}
+        {effectiveCenter ?? <DefaultMobileCenter pathname={pathname} />}
       </div>
 
       <AvatarPopover user={user} align="end">

@@ -163,7 +163,7 @@ test.describe('PROJ-4 — App Shell walkthrough', () => {
     );
   });
 
-  test('disabled "+ New calculator" button shows the coming-soon tooltip', async ({
+  test('"+ New calculator" top-bar button is enabled and clickable', async ({
     page,
     isMobile,
   }) => {
@@ -173,9 +173,14 @@ test.describe('PROJ-4 — App Shell walkthrough', () => {
     const user = await bootstrapApprovedUser();
     try {
       await signIn(page, user);
-      const newCalc = page.getByRole('button', { name: /new calculator/i });
-      await expect(newCalc).toBeDisabled();
-      await expect(newCalc).toHaveAttribute('aria-disabled', 'true');
+      // Scope to the top-bar banner — the dashboard Hero adds a second
+      // "Build a new calculator" button that would otherwise match.
+      const newCalc = page
+        .getByRole('banner')
+        .getByRole('button', { name: /^new calculator$/i });
+      await expect(newCalc).toBeVisible();
+      await expect(newCalc).toBeEnabled();
+      await expect(newCalc).not.toHaveAttribute('aria-disabled', 'true');
     } finally {
       await teardown(user.userId);
     }

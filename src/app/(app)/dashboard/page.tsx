@@ -9,7 +9,7 @@
 
 import { redirect } from 'next/navigation';
 
-import { Section, WelcomeLine } from '@/components/dashboard';
+import { NewCalculatorHero, Section, WelcomeLine } from '@/components/dashboard';
 import { EmptyOrErrorState, Icons } from '@/components/shell';
 import { getCurrentProfile } from '@/lib/auth/getCurrentProfile';
 
@@ -26,6 +26,7 @@ export default async function DashboardPage() {
   return (
     <div className="mx-auto flex max-w-[960px] flex-col gap-[18px] px-4 pb-8 pt-5 md:max-w-[960px] md:gap-7 md:px-8 md:pb-12 md:pt-8">
       <WelcomeLine name={current.profile.name} role={role} />
+      <NewCalculatorHero />
 
       {/*
         Canonical section order — downstream features insert their

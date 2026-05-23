@@ -5,3 +5,4 @@
 
 export { Section, SECTION_SCROLL_MAX_PX, type SectionProps } from './section';
 export { WelcomeLine, type WelcomeLineProps } from './welcome-line';
+export { NewCalculatorHero } from './new-calculator-hero';

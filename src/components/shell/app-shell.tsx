@@ -5,16 +5,15 @@
 // `not-found.tsx`). Consumes the `profile` row fetched server-side and
 // renders the desktop + mobile top bars plus the page body.
 //
-// Forward-compat seams:
-//   - rightExtras: PROJ-6 / PROJ-8 will mount the calculator-theme picker
-//   - mobileLeftSlot: PROJ-8 will mount the Grid drawer toggle on mobile
-//   - mobileCenter: PROJ-8 will inject the live calculator title on mobile
-//   - editorTitle: PROJ-8 will override the desktop breadcrumb's 2nd segment
+// PROJ-8 added a slot registry so deeper pages (the editor) can inject
+// rightExtras / editorTitle / onEditorTitleCommit / mobile slots without
+// restructuring the layout. Props still work for callers that prefer them.
 
 import * as React from 'react';
 
 import { TopBarDesktop } from './top-bar-desktop';
 import { TopBarMobile } from './top-bar-mobile';
+import { TopBarSlotsProvider } from './top-bar-slots';
 
 export interface AppShellUser {
   name: string | null;
@@ -29,6 +28,7 @@ export interface AppShellProps {
   mobileLeftSlot?: React.ReactNode;
   mobileCenter?: React.ReactNode;
   editorTitle?: string;
+  onEditorTitleCommit?: (next: string) => Promise<void> | void;
 }
 
 export function AppShell({
@@ -38,22 +38,26 @@ export function AppShell({
   mobileLeftSlot,
   mobileCenter,
   editorTitle,
+  onEditorTitleCommit,
 }: AppShellProps) {
   return (
-    <div className="flex min-h-screen flex-col bg-cg-bg text-cg-text">
-      <TopBarDesktop
-        user={user}
-        rightExtras={rightExtras}
-        editorTitle={editorTitle}
-        className="hidden md:flex"
-      />
-      <TopBarMobile
-        user={user}
-        mobileLeftSlot={mobileLeftSlot}
-        mobileCenter={mobileCenter}
-        className="flex md:hidden"
-      />
-      <main className="flex-1">{children}</main>
-    </div>
+    <TopBarSlotsProvider>
+      <div className="flex min-h-screen flex-col bg-cg-bg text-cg-text">
+        <TopBarDesktop
+          user={user}
+          rightExtras={rightExtras}
+          editorTitle={editorTitle}
+          onEditorTitleCommit={onEditorTitleCommit}
+          className="hidden md:flex"
+        />
+        <TopBarMobile
+          user={user}
+          mobileLeftSlot={mobileLeftSlot}
+          mobileCenter={mobileCenter}
+          className="flex md:hidden"
+        />
+        <main className="flex flex-1 flex-col">{children}</main>
+      </div>
+    </TopBarSlotsProvider>
   );
 }
