@@ -1,0 +1,747 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`cardSurface > is stable for bento × chart 1`] = `
+{
+  "background": "#DDD0F5",
+  "border": "none",
+  "borderRadius": 22,
+  "boxShadow": "0 1px 0 rgba(255,255,255,0.5) inset, 0 6px 18px rgba(26,26,46,0.06)",
+}
+`;
+
+exports[`cardSurface > is stable for bento × generic 1`] = `
+{
+  "background": "#FFF8E7",
+  "border": "1px solid transparent",
+  "borderRadius": 22,
+  "boxShadow": "0 1px 0 rgba(255,255,255,0.5) inset, 0 6px 18px rgba(26,26,46,0.06)",
+}
+`;
+
+exports[`cardSurface > is stable for bento × hero 1`] = `
+{
+  "background": "#1A1A2E",
+  "border": "none",
+  "borderRadius": 22,
+  "boxShadow": "0 1px 0 rgba(255,255,255,0.5) inset, 0 6px 18px rgba(26,26,46,0.06)",
+}
+`;
+
+exports[`cardSurface > is stable for bento × inputs 1`] = `
+{
+  "background": "#FFE2A3",
+  "border": "none",
+  "borderRadius": 22,
+  "boxShadow": "0 1px 0 rgba(255,255,255,0.5) inset, 0 6px 18px rgba(26,26,46,0.06)",
+}
+`;
+
+exports[`cardSurface > is stable for bento × results 1`] = `
+{
+  "background": "#C8D8F5",
+  "border": "none",
+  "borderRadius": 22,
+  "boxShadow": "0 1px 0 rgba(255,255,255,0.5) inset, 0 6px 18px rgba(26,26,46,0.06)",
+}
+`;
+
+exports[`cardSurface > is stable for bentoGlassy × chart 1`] = `
+{
+  "WebkitBackdropFilter": "blur(20px) saturate(140%)",
+  "backdropFilter": "blur(20px) saturate(140%)",
+  "background": "rgba(237,230,248,0.50)",
+  "border": "1px solid rgba(255,255,255,0.70)",
+  "borderRadius": 20,
+  "boxShadow": "0 8px 32px rgba(26,26,46,0.10), inset 0 1px 0 rgba(255,255,255,0.7)",
+}
+`;
+
+exports[`cardSurface > is stable for bentoGlassy × generic 1`] = `
+{
+  "WebkitBackdropFilter": "blur(20px) saturate(140%)",
+  "backdropFilter": "blur(20px) saturate(140%)",
+  "background": "rgba(255,255,255,0.55)",
+  "border": "1px solid rgba(255,255,255,0.70)",
+  "borderRadius": 20,
+  "boxShadow": "0 8px 32px rgba(26,26,46,0.10), inset 0 1px 0 rgba(255,255,255,0.7)",
+}
+`;
+
+exports[`cardSurface > is stable for bentoGlassy × hero 1`] = `
+{
+  "WebkitBackdropFilter": "blur(20px) saturate(140%)",
+  "backdropFilter": "blur(20px) saturate(140%)",
+  "background": "rgba(26,26,46,0.78)",
+  "border": "1px solid rgba(255,255,255,0.70)",
+  "borderRadius": 20,
+  "boxShadow": "0 8px 32px rgba(26,26,46,0.10), inset 0 1px 0 rgba(255,255,255,0.7)",
+}
+`;
+
+exports[`cardSurface > is stable for bentoGlassy × inputs 1`] = `
+{
+  "WebkitBackdropFilter": "blur(20px) saturate(140%)",
+  "backdropFilter": "blur(20px) saturate(140%)",
+  "background": "rgba(252,227,212,0.50)",
+  "border": "1px solid rgba(255,255,255,0.70)",
+  "borderRadius": 20,
+  "boxShadow": "0 8px 32px rgba(26,26,46,0.10), inset 0 1px 0 rgba(255,255,255,0.7)",
+}
+`;
+
+exports[`cardSurface > is stable for bentoGlassy × results 1`] = `
+{
+  "WebkitBackdropFilter": "blur(20px) saturate(140%)",
+  "backdropFilter": "blur(20px) saturate(140%)",
+  "background": "rgba(214,230,248,0.50)",
+  "border": "1px solid rgba(255,255,255,0.70)",
+  "borderRadius": 20,
+  "boxShadow": "0 8px 32px rgba(26,26,46,0.10), inset 0 1px 0 rgba(255,255,255,0.7)",
+}
+`;
+
+exports[`cardSurface > is stable for calcgrinder × chart 1`] = `
+{
+  "background": "#FFFFFF",
+  "border": "1px solid #E7E5E4",
+  "borderRadius": 8,
+  "boxShadow": "0 1px 2px rgba(28,25,23,0.04), 0 1px 1px rgba(28,25,23,0.03)",
+}
+`;
+
+exports[`cardSurface > is stable for calcgrinder × generic 1`] = `
+{
+  "background": "#FFFFFF",
+  "border": "1px solid #E7E5E4",
+  "borderRadius": 8,
+  "boxShadow": "0 1px 2px rgba(28,25,23,0.04), 0 1px 1px rgba(28,25,23,0.03)",
+}
+`;
+
+exports[`cardSurface > is stable for calcgrinder × hero 1`] = `
+{
+  "background": "#FFFFFF",
+  "border": "1px solid #E7E5E4",
+  "borderRadius": 8,
+  "boxShadow": "0 1px 2px rgba(28,25,23,0.04), 0 1px 1px rgba(28,25,23,0.03)",
+}
+`;
+
+exports[`cardSurface > is stable for calcgrinder × inputs 1`] = `
+{
+  "background": "#FFFFFF",
+  "border": "1px solid #E7E5E4",
+  "borderRadius": 8,
+  "boxShadow": "0 1px 2px rgba(28,25,23,0.04), 0 1px 1px rgba(28,25,23,0.03)",
+}
+`;
+
+exports[`cardSurface > is stable for calcgrinder × results 1`] = `
+{
+  "background": "#FFFFFF",
+  "border": "1px solid #E7E5E4",
+  "borderRadius": 8,
+  "boxShadow": "0 1px 2px rgba(28,25,23,0.04), 0 1px 1px rgba(28,25,23,0.03)",
+}
+`;
+
+exports[`cardSurface > is stable for calcgrinderCI × chart 1`] = `
+{
+  "background": "#FFFFFF",
+  "border": "1px solid #E7E5E4",
+  "borderRadius": 8,
+  "boxShadow": "0 1px 2px rgba(28,25,23,0.04), 0 1px 1px rgba(28,25,23,0.03)",
+}
+`;
+
+exports[`cardSurface > is stable for calcgrinderCI × generic 1`] = `
+{
+  "background": "#FFFFFF",
+  "border": "1px solid #E7E5E4",
+  "borderRadius": 8,
+  "boxShadow": "0 1px 2px rgba(28,25,23,0.04), 0 1px 1px rgba(28,25,23,0.03)",
+}
+`;
+
+exports[`cardSurface > is stable for calcgrinderCI × hero 1`] = `
+{
+  "background": "#FFFFFF",
+  "border": "1px solid #E7E5E4",
+  "borderRadius": 8,
+  "boxShadow": "0 1px 2px rgba(28,25,23,0.04), 0 1px 1px rgba(28,25,23,0.03)",
+}
+`;
+
+exports[`cardSurface > is stable for calcgrinderCI × inputs 1`] = `
+{
+  "background": "#FFFFFF",
+  "border": "1px solid #E7E5E4",
+  "borderRadius": 8,
+  "boxShadow": "0 1px 2px rgba(28,25,23,0.04), 0 1px 1px rgba(28,25,23,0.03)",
+}
+`;
+
+exports[`cardSurface > is stable for calcgrinderCI × results 1`] = `
+{
+  "background": "#FFFFFF",
+  "border": "1px solid #E7E5E4",
+  "borderRadius": 8,
+  "boxShadow": "0 1px 2px rgba(28,25,23,0.04), 0 1px 1px rgba(28,25,23,0.03)",
+}
+`;
+
+exports[`cardSurface > is stable for editorial × chart 1`] = `
+{
+  "background": "#FFFFFF",
+  "border": "1px solid #E5E2DC",
+  "borderRadius": 10,
+  "boxShadow": "0 1px 2px rgba(0,0,0,0.03)",
+}
+`;
+
+exports[`cardSurface > is stable for editorial × generic 1`] = `
+{
+  "background": "#FFFFFF",
+  "border": "1px solid #E5E2DC",
+  "borderRadius": 10,
+  "boxShadow": "0 1px 2px rgba(0,0,0,0.03)",
+}
+`;
+
+exports[`cardSurface > is stable for editorial × hero 1`] = `
+{
+  "background": "#FFFFFF",
+  "border": "1px solid #E5E2DC",
+  "borderRadius": 10,
+  "boxShadow": "0 1px 2px rgba(0,0,0,0.03)",
+}
+`;
+
+exports[`cardSurface > is stable for editorial × inputs 1`] = `
+{
+  "background": "#FFFFFF",
+  "border": "1px solid #E5E2DC",
+  "borderRadius": 10,
+  "boxShadow": "0 1px 2px rgba(0,0,0,0.03)",
+}
+`;
+
+exports[`cardSurface > is stable for editorial × results 1`] = `
+{
+  "background": "#FFFFFF",
+  "border": "1px solid #E5E2DC",
+  "borderRadius": 10,
+  "boxShadow": "0 1px 2px rgba(0,0,0,0.03)",
+}
+`;
+
+exports[`cardSurface > is stable for minimal × chart 1`] = `
+{
+  "background": "#FFFFFF",
+  "border": "1px solid #EEEEEE",
+  "borderRadius": 8,
+  "boxShadow": "none",
+}
+`;
+
+exports[`cardSurface > is stable for minimal × generic 1`] = `
+{
+  "background": "#FFFFFF",
+  "border": "1px solid #EEEEEE",
+  "borderRadius": 8,
+  "boxShadow": "none",
+}
+`;
+
+exports[`cardSurface > is stable for minimal × hero 1`] = `
+{
+  "background": "#FFFFFF",
+  "border": "1px solid #EEEEEE",
+  "borderRadius": 8,
+  "boxShadow": "none",
+}
+`;
+
+exports[`cardSurface > is stable for minimal × inputs 1`] = `
+{
+  "background": "#FFFFFF",
+  "border": "1px solid #EEEEEE",
+  "borderRadius": 8,
+  "boxShadow": "none",
+}
+`;
+
+exports[`cardSurface > is stable for minimal × results 1`] = `
+{
+  "background": "#FFFFFF",
+  "border": "1px solid #EEEEEE",
+  "borderRadius": 8,
+  "boxShadow": "none",
+}
+`;
+
+exports[`cardSurface > is stable for terminal × chart 1`] = `
+{
+  "background": "#0F0F0F",
+  "border": "1px solid #1F1F1F",
+  "borderRadius": 8,
+  "boxShadow": "0 0 0 1px rgba(255,255,255,0.05), 0 0 24px rgba(74,222,128,0.06), 0 12px 40px rgba(0,0,0,0.4)",
+}
+`;
+
+exports[`cardSurface > is stable for terminal × generic 1`] = `
+{
+  "background": "#0F0F0F",
+  "border": "1px solid #1F1F1F",
+  "borderRadius": 8,
+  "boxShadow": "0 0 0 1px rgba(255,255,255,0.05), 0 0 24px rgba(74,222,128,0.06), 0 12px 40px rgba(0,0,0,0.4)",
+}
+`;
+
+exports[`cardSurface > is stable for terminal × hero 1`] = `
+{
+  "background": "#0F0F0F",
+  "border": "1px solid #1F1F1F",
+  "borderRadius": 8,
+  "boxShadow": "0 0 0 1px rgba(255,255,255,0.05), 0 0 24px rgba(74,222,128,0.06), 0 12px 40px rgba(0,0,0,0.4)",
+}
+`;
+
+exports[`cardSurface > is stable for terminal × inputs 1`] = `
+{
+  "background": "#0F0F0F",
+  "border": "1px solid #1F1F1F",
+  "borderRadius": 8,
+  "boxShadow": "0 0 0 1px rgba(255,255,255,0.05), 0 0 24px rgba(74,222,128,0.06), 0 12px 40px rgba(0,0,0,0.4)",
+}
+`;
+
+exports[`cardSurface > is stable for terminal × results 1`] = `
+{
+  "background": "#0F0F0F",
+  "border": "1px solid #1F1F1F",
+  "borderRadius": 8,
+  "boxShadow": "0 0 0 1px rgba(255,255,255,0.05), 0 0 24px rgba(74,222,128,0.06), 0 12px 40px rgba(0,0,0,0.4)",
+}
+`;
+
+exports[`cardSurface > is stable for vessel × chart 1`] = `
+{
+  "background": "#0F0F0F",
+  "border": "1px solid #1F1F1F",
+  "borderRadius": 14,
+  "boxShadow": "0 0 0 1px rgba(255,255,255,0.04), 0 0 32px rgba(0,220,130,0.05), 0 12px 40px rgba(0,0,0,0.5)",
+}
+`;
+
+exports[`cardSurface > is stable for vessel × generic 1`] = `
+{
+  "background": "#0F0F0F",
+  "border": "1px solid #1F1F1F",
+  "borderRadius": 14,
+  "boxShadow": "0 0 0 1px rgba(255,255,255,0.04), 0 0 32px rgba(0,220,130,0.05), 0 12px 40px rgba(0,0,0,0.5)",
+}
+`;
+
+exports[`cardSurface > is stable for vessel × hero 1`] = `
+{
+  "background": "#0F0F0F",
+  "border": "1px solid #1F1F1F",
+  "borderRadius": 14,
+  "boxShadow": "0 0 0 1px rgba(255,255,255,0.04), 0 0 32px rgba(0,220,130,0.05), 0 12px 40px rgba(0,0,0,0.5)",
+}
+`;
+
+exports[`cardSurface > is stable for vessel × inputs 1`] = `
+{
+  "background": "#0F0F0F",
+  "border": "1px solid #1F1F1F",
+  "borderRadius": 14,
+  "boxShadow": "0 0 0 1px rgba(255,255,255,0.04), 0 0 32px rgba(0,220,130,0.05), 0 12px 40px rgba(0,0,0,0.5)",
+}
+`;
+
+exports[`cardSurface > is stable for vessel × results 1`] = `
+{
+  "background": "#0F0F0F",
+  "border": "1px solid #1F1F1F",
+  "borderRadius": 14,
+  "boxShadow": "0 0 0 1px rgba(255,255,255,0.04), 0 0 32px rgba(0,220,130,0.05), 0 12px 40px rgba(0,0,0,0.5)",
+}
+`;
+
+exports[`labelTextStyle > is stable for bento 1`] = `
+{
+  "color": "rgba(26,26,46,0.65)",
+  "fontFamily": "inherit",
+  "fontSize": 11,
+  "fontWeight": 600,
+  "letterSpacing": 0.6,
+  "textTransform": "uppercase",
+}
+`;
+
+exports[`labelTextStyle > is stable for bentoGlassy 1`] = `
+{
+  "color": "rgba(26,26,46,0.65)",
+  "fontFamily": "inherit",
+  "fontSize": 11,
+  "fontWeight": 600,
+  "letterSpacing": 0.6,
+  "textTransform": "uppercase",
+}
+`;
+
+exports[`labelTextStyle > is stable for calcgrinder 1`] = `
+{
+  "color": "#78716C",
+  "fontFamily": "inherit",
+  "fontSize": 11,
+  "fontWeight": 600,
+  "letterSpacing": 0.6,
+  "textTransform": "uppercase",
+}
+`;
+
+exports[`labelTextStyle > is stable for calcgrinderCI 1`] = `
+{
+  "color": "#78716C",
+  "fontFamily": "inherit",
+  "fontSize": 11,
+  "fontWeight": 600,
+  "letterSpacing": 0.6,
+  "textTransform": "uppercase",
+}
+`;
+
+exports[`labelTextStyle > is stable for editorial 1`] = `
+{
+  "color": "#6F6A60",
+  "fontFamily": "inherit",
+  "fontSize": 11,
+  "fontWeight": 600,
+  "letterSpacing": 0.6,
+  "textTransform": "uppercase",
+}
+`;
+
+exports[`labelTextStyle > is stable for minimal 1`] = `
+{
+  "color": "#737373",
+  "fontFamily": "inherit",
+  "fontSize": 11,
+  "fontWeight": 600,
+  "letterSpacing": 0.6,
+  "textTransform": "uppercase",
+}
+`;
+
+exports[`labelTextStyle > is stable for terminal 1`] = `
+{
+  "color": "#8A8A8A",
+  "fontFamily": "inherit",
+  "fontSize": 11,
+  "fontWeight": 600,
+  "letterSpacing": 0.6,
+  "textTransform": "uppercase",
+}
+`;
+
+exports[`labelTextStyle > is stable for vessel 1`] = `
+{
+  "color": "#8A8A8A",
+  "fontFamily": "inherit",
+  "fontSize": 11,
+  "fontWeight": 600,
+  "letterSpacing": 0.6,
+  "textTransform": "uppercase",
+}
+`;
+
+exports[`numberStyle > is stable for bento @ size 18 1`] = `
+{
+  "color": "#1A1A2E",
+  "fontFamily": "var(--font-geist-mono), monospace",
+  "fontSize": 18,
+  "fontVariantNumeric": "tabular-nums",
+  "fontWeight": 600,
+  "letterSpacing": -0.3,
+  "lineHeight": 1,
+}
+`;
+
+exports[`numberStyle > is stable for bento @ size 28 1`] = `
+{
+  "color": "#1A1A2E",
+  "fontFamily": "var(--font-geist-mono), monospace",
+  "fontSize": 28,
+  "fontVariantNumeric": "tabular-nums",
+  "fontWeight": 600,
+  "letterSpacing": -0.5,
+  "lineHeight": 1,
+}
+`;
+
+exports[`numberStyle > is stable for bento @ size 40 1`] = `
+{
+  "color": "#1A1A2E",
+  "fontFamily": "var(--font-geist-mono), monospace",
+  "fontSize": 40,
+  "fontVariantNumeric": "tabular-nums",
+  "fontWeight": 600,
+  "letterSpacing": -1.2,
+  "lineHeight": 1,
+}
+`;
+
+exports[`numberStyle > is stable for bentoGlassy @ size 18 1`] = `
+{
+  "color": "#1A1A2E",
+  "fontFamily": "var(--font-geist-mono), monospace",
+  "fontSize": 18,
+  "fontVariantNumeric": "tabular-nums",
+  "fontWeight": 600,
+  "letterSpacing": -0.3,
+  "lineHeight": 1,
+}
+`;
+
+exports[`numberStyle > is stable for bentoGlassy @ size 28 1`] = `
+{
+  "color": "#1A1A2E",
+  "fontFamily": "var(--font-geist-mono), monospace",
+  "fontSize": 28,
+  "fontVariantNumeric": "tabular-nums",
+  "fontWeight": 600,
+  "letterSpacing": -0.5,
+  "lineHeight": 1,
+}
+`;
+
+exports[`numberStyle > is stable for bentoGlassy @ size 40 1`] = `
+{
+  "color": "#1A1A2E",
+  "fontFamily": "var(--font-geist-mono), monospace",
+  "fontSize": 40,
+  "fontVariantNumeric": "tabular-nums",
+  "fontWeight": 600,
+  "letterSpacing": -1.2,
+  "lineHeight": 1,
+}
+`;
+
+exports[`numberStyle > is stable for calcgrinder @ size 18 1`] = `
+{
+  "color": "#1C1917",
+  "fontFamily": "var(--font-geist-mono), monospace",
+  "fontSize": 18,
+  "fontVariantNumeric": "tabular-nums",
+  "fontWeight": 600,
+  "letterSpacing": -0.3,
+  "lineHeight": 1,
+}
+`;
+
+exports[`numberStyle > is stable for calcgrinder @ size 28 1`] = `
+{
+  "color": "#1C1917",
+  "fontFamily": "var(--font-geist-mono), monospace",
+  "fontSize": 28,
+  "fontVariantNumeric": "tabular-nums",
+  "fontWeight": 600,
+  "letterSpacing": -0.5,
+  "lineHeight": 1,
+}
+`;
+
+exports[`numberStyle > is stable for calcgrinder @ size 40 1`] = `
+{
+  "color": "#1C1917",
+  "fontFamily": "var(--font-geist-mono), monospace",
+  "fontSize": 40,
+  "fontVariantNumeric": "tabular-nums",
+  "fontWeight": 600,
+  "letterSpacing": -1.2,
+  "lineHeight": 1,
+}
+`;
+
+exports[`numberStyle > is stable for calcgrinderCI @ size 18 1`] = `
+{
+  "color": "#1C1917",
+  "fontFamily": "var(--font-geist-mono), monospace",
+  "fontSize": 18,
+  "fontVariantNumeric": "tabular-nums",
+  "fontWeight": 600,
+  "letterSpacing": -0.3,
+  "lineHeight": 1,
+}
+`;
+
+exports[`numberStyle > is stable for calcgrinderCI @ size 28 1`] = `
+{
+  "color": "#1C1917",
+  "fontFamily": "var(--font-geist-mono), monospace",
+  "fontSize": 28,
+  "fontVariantNumeric": "tabular-nums",
+  "fontWeight": 600,
+  "letterSpacing": -0.5,
+  "lineHeight": 1,
+}
+`;
+
+exports[`numberStyle > is stable for calcgrinderCI @ size 40 1`] = `
+{
+  "color": "#1C1917",
+  "fontFamily": "var(--font-geist-mono), monospace",
+  "fontSize": 40,
+  "fontVariantNumeric": "tabular-nums",
+  "fontWeight": 600,
+  "letterSpacing": -1.2,
+  "lineHeight": 1,
+}
+`;
+
+exports[`numberStyle > is stable for editorial @ size 18 1`] = `
+{
+  "color": "#16140F",
+  "fontFamily": "var(--font-geist-mono), monospace",
+  "fontSize": 18,
+  "fontVariantNumeric": "tabular-nums",
+  "fontWeight": 600,
+  "letterSpacing": -0.3,
+  "lineHeight": 1,
+}
+`;
+
+exports[`numberStyle > is stable for editorial @ size 28 1`] = `
+{
+  "color": "#16140F",
+  "fontFamily": "var(--font-geist-mono), monospace",
+  "fontSize": 28,
+  "fontVariantNumeric": "tabular-nums",
+  "fontWeight": 600,
+  "letterSpacing": -0.5,
+  "lineHeight": 1,
+}
+`;
+
+exports[`numberStyle > is stable for editorial @ size 40 1`] = `
+{
+  "color": "#16140F",
+  "fontFamily": "var(--font-geist-mono), monospace",
+  "fontSize": 40,
+  "fontVariantNumeric": "tabular-nums",
+  "fontWeight": 600,
+  "letterSpacing": -1.2,
+  "lineHeight": 1,
+}
+`;
+
+exports[`numberStyle > is stable for minimal @ size 18 1`] = `
+{
+  "color": "#0A0A0A",
+  "fontFamily": "var(--font-geist-mono), "SF Mono", monospace",
+  "fontSize": 18,
+  "fontVariantNumeric": "tabular-nums",
+  "fontWeight": 600,
+  "letterSpacing": -0.3,
+  "lineHeight": 1,
+}
+`;
+
+exports[`numberStyle > is stable for minimal @ size 28 1`] = `
+{
+  "color": "#0A0A0A",
+  "fontFamily": "var(--font-geist-mono), "SF Mono", monospace",
+  "fontSize": 28,
+  "fontVariantNumeric": "tabular-nums",
+  "fontWeight": 600,
+  "letterSpacing": -0.5,
+  "lineHeight": 1,
+}
+`;
+
+exports[`numberStyle > is stable for minimal @ size 40 1`] = `
+{
+  "color": "#0A0A0A",
+  "fontFamily": "var(--font-geist-mono), "SF Mono", monospace",
+  "fontSize": 40,
+  "fontVariantNumeric": "tabular-nums",
+  "fontWeight": 600,
+  "letterSpacing": -1.2,
+  "lineHeight": 1,
+}
+`;
+
+exports[`numberStyle > is stable for terminal @ size 18 1`] = `
+{
+  "color": "#E8E8E8",
+  "fontFamily": "var(--font-geist-mono), monospace",
+  "fontSize": 18,
+  "fontVariantNumeric": "tabular-nums",
+  "fontWeight": 600,
+  "letterSpacing": -0.3,
+  "lineHeight": 1,
+}
+`;
+
+exports[`numberStyle > is stable for terminal @ size 28 1`] = `
+{
+  "color": "#E8E8E8",
+  "fontFamily": "var(--font-geist-mono), monospace",
+  "fontSize": 28,
+  "fontVariantNumeric": "tabular-nums",
+  "fontWeight": 600,
+  "letterSpacing": -0.5,
+  "lineHeight": 1,
+}
+`;
+
+exports[`numberStyle > is stable for terminal @ size 40 1`] = `
+{
+  "color": "#E8E8E8",
+  "fontFamily": "var(--font-geist-mono), monospace",
+  "fontSize": 40,
+  "fontVariantNumeric": "tabular-nums",
+  "fontWeight": 600,
+  "letterSpacing": -1.2,
+  "lineHeight": 1,
+}
+`;
+
+exports[`numberStyle > is stable for vessel @ size 18 1`] = `
+{
+  "color": "#FAFAFA",
+  "fontFamily": "var(--font-geist-mono), monospace",
+  "fontSize": 18,
+  "fontVariantNumeric": "tabular-nums",
+  "fontWeight": 600,
+  "letterSpacing": -0.3,
+  "lineHeight": 1,
+}
+`;
+
+exports[`numberStyle > is stable for vessel @ size 28 1`] = `
+{
+  "color": "#FAFAFA",
+  "fontFamily": "var(--font-geist-mono), monospace",
+  "fontSize": 28,
+  "fontVariantNumeric": "tabular-nums",
+  "fontWeight": 600,
+  "letterSpacing": -0.5,
+  "lineHeight": 1,
+}
+`;
+
+exports[`numberStyle > is stable for vessel @ size 40 1`] = `
+{
+  "color": "#FAFAFA",
+  "fontFamily": "var(--font-geist-mono), monospace",
+  "fontSize": 40,
+  "fontVariantNumeric": "tabular-nums",
+  "fontWeight": 600,
+  "letterSpacing": -1.2,
+  "lineHeight": 1,
+}
+`;

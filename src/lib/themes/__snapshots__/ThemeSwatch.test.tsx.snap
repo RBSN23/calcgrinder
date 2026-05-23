@@ -1,0 +1,185 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<ThemeSwatch> > renders a stable snapshot for bento 1`] = `
+<div
+  aria-label="Bento · Vibrant theme preview"
+  data-theme-id="bento"
+  role="img"
+  style="width: 56px; height: 56px; background: rgb(241, 236, 223); border-radius: 10px; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; font-family: var(--font-geist-sans), -apple-system, system-ui, sans-serif;"
+>
+  <div
+    style="background: rgb(255, 248, 231); border: 1px solid transparent; border-radius: 22px; box-shadow: 0 1px 0 rgba(255,255,255,0.5) inset, 0 6px 18px rgba(26,26,46,0.06); position: absolute; inset: 7px; display: flex; align-items: center; justify-content: space-between; padding: 0px 8px; overflow: hidden;"
+  >
+    <span
+      aria-hidden="true"
+      style="width: 8px; height: 8px; border-radius: 50%; background: rgb(54, 35, 165); flex-shrink: 0;"
+    />
+    <span
+      style="font-family: var(--font-geist-sans), -apple-system, system-ui, sans-serif; font-size: 11px; font-weight: 600; color: rgb(26, 26, 46); letter-spacing: -0.2px; text-transform: none; line-height: 1;"
+    >
+      BV
+    </span>
+  </div>
+</div>
+`;
+
+exports[`<ThemeSwatch> > renders a stable snapshot for bentoGlassy 1`] = `
+<div
+  aria-label="Bento · Glassy theme preview"
+  data-theme-id="bentoGlassy"
+  role="img"
+  style="width: 56px; height: 56px; background: linear-gradient(135deg, rgb(237, 230, 248) 0%, rgb(252, 227, 212) 50%, rgb(214, 230, 248) 100%); border-radius: 10px; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; font-family: var(--font-geist-sans), -apple-system, system-ui, sans-serif;"
+>
+  <div
+    style="background: rgba(255, 255, 255, 0.55); border: 1px solid rgba(255, 255, 255, 0.7); border-radius: 20px; box-shadow: 0 8px 32px rgba(26,26,46,0.10), inset 0 1px 0 rgba(255,255,255,0.7); backdrop-filter: blur(20px) saturate(140%); position: absolute; inset: 7px; display: flex; align-items: center; justify-content: space-between; padding: 0px 8px; overflow: hidden;"
+  >
+    <span
+      aria-hidden="true"
+      style="width: 8px; height: 8px; border-radius: 50%; background: rgb(91, 108, 186); flex-shrink: 0;"
+    />
+    <span
+      style="font-family: var(--font-geist-sans), -apple-system, system-ui, sans-serif; font-size: 11px; font-weight: 600; color: rgb(26, 26, 46); letter-spacing: -0.2px; text-transform: none; line-height: 1;"
+    >
+      BG
+    </span>
+  </div>
+</div>
+`;
+
+exports[`<ThemeSwatch> > renders a stable snapshot for calcgrinder 1`] = `
+<div
+  aria-label="Calcgrinder · Light theme preview"
+  data-theme-id="calcgrinder"
+  role="img"
+  style="width: 56px; height: 56px; background: rgb(250, 250, 249); border-radius: 8px; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; font-family: var(--font-geist-sans), -apple-system, system-ui, sans-serif;"
+>
+  <div
+    style="background: rgb(255, 255, 255); border: 1px solid rgb(231, 229, 228); border-radius: 8px; box-shadow: 0 1px 2px rgba(28,25,23,0.04), 0 1px 1px rgba(28,25,23,0.03); position: absolute; inset: 7px; display: flex; align-items: center; justify-content: space-between; padding: 0px 8px; overflow: hidden;"
+  >
+    <span
+      aria-hidden="true"
+      style="width: 8px; height: 8px; border-radius: 50%; background: rgb(79, 70, 229); flex-shrink: 0;"
+    />
+    <span
+      style="font-family: var(--font-geist-sans), -apple-system, system-ui, sans-serif; font-size: 11px; font-weight: 600; color: rgb(28, 25, 23); letter-spacing: -0.2px; text-transform: none; line-height: 1;"
+    >
+      CL
+    </span>
+  </div>
+</div>
+`;
+
+exports[`<ThemeSwatch> > renders a stable snapshot for calcgrinderCI 1`] = `
+<div
+  aria-label="Calcgrinder · CI theme preview"
+  data-theme-id="calcgrinderCI"
+  role="img"
+  style="width: 56px; height: 56px; background: rgb(250, 250, 249); border-radius: 8px; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; font-family: var(--font-geist-sans), -apple-system, system-ui, sans-serif;"
+>
+  <div
+    style="background: rgb(255, 255, 255); border: 1px solid rgb(231, 229, 228); border-radius: 8px; box-shadow: 0 1px 2px rgba(28,25,23,0.04), 0 1px 1px rgba(28,25,23,0.03); position: absolute; inset: 7px; display: flex; align-items: center; justify-content: space-between; padding: 0px 8px; overflow: hidden;"
+  >
+    <span
+      aria-hidden="true"
+      style="width: 8px; height: 8px; border-radius: 50%; background: rgb(79, 70, 229); flex-shrink: 0;"
+    />
+    <span
+      style="font-family: var(--font-geist-sans), -apple-system, system-ui, sans-serif; font-size: 11px; font-weight: 600; color: rgb(28, 25, 23); letter-spacing: -0.2px; text-transform: none; line-height: 1;"
+    >
+      CC
+    </span>
+  </div>
+</div>
+`;
+
+exports[`<ThemeSwatch> > renders a stable snapshot for editorial 1`] = `
+<div
+  aria-label="Editorial · Cream theme preview"
+  data-theme-id="editorial"
+  role="img"
+  style="width: 56px; height: 56px; background: rgb(244, 241, 236); border-radius: 10px; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; font-family: var(--font-geist-sans), -apple-system, system-ui, sans-serif;"
+>
+  <div
+    style="background: rgb(255, 255, 255); border: 1px solid rgb(229, 226, 220); border-radius: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); position: absolute; inset: 7px; display: flex; align-items: center; justify-content: space-between; padding: 0px 8px; overflow: hidden;"
+  >
+    <span
+      aria-hidden="true"
+      style="width: 8px; height: 8px; border-radius: 50%; background: rgb(22, 20, 15); flex-shrink: 0;"
+    />
+    <span
+      style="font-family: var(--font-geist-sans), -apple-system, system-ui, sans-serif; font-size: 11px; font-weight: 600; color: rgb(22, 20, 15); letter-spacing: -0.2px; text-transform: none; line-height: 1;"
+    >
+      EC
+    </span>
+  </div>
+</div>
+`;
+
+exports[`<ThemeSwatch> > renders a stable snapshot for minimal 1`] = `
+<div
+  aria-label="Minimal · Linear theme preview"
+  data-theme-id="minimal"
+  role="img"
+  style="width: 56px; height: 56px; background: rgb(255, 255, 255); border-radius: 8px; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; font-family: var(--font-geist-sans), "Inter", -apple-system, system-ui, sans-serif;"
+>
+  <div
+    style="background: rgb(255, 255, 255); border: 1px solid rgb(238, 238, 238); border-radius: 8px; box-shadow: none; position: absolute; inset: 7px; display: flex; align-items: center; justify-content: space-between; padding: 0px 8px; overflow: hidden;"
+  >
+    <span
+      aria-hidden="true"
+      style="width: 8px; height: 8px; border-radius: 50%; background: rgb(94, 106, 210); flex-shrink: 0;"
+    />
+    <span
+      style="font-family: var(--font-geist-sans), "Inter", -apple-system, system-ui, sans-serif; font-size: 11px; font-weight: 600; color: rgb(10, 10, 10); letter-spacing: -0.2px; text-transform: none; line-height: 1;"
+    >
+      ML
+    </span>
+  </div>
+</div>
+`;
+
+exports[`<ThemeSwatch> > renders a stable snapshot for terminal 1`] = `
+<div
+  aria-label="Terminal · Cyber theme preview"
+  data-theme-id="terminal"
+  role="img"
+  style="width: 56px; height: 56px; background: rgb(10, 10, 10); border-radius: 8px; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; font-family: var(--font-geist-mono), "SF Mono", monospace;"
+>
+  <div
+    style="background: rgb(15, 15, 15); border: 1px solid rgb(31, 31, 31); border-radius: 8px; box-shadow: 0 0 0 1px rgba(255,255,255,0.05), 0 0 24px rgba(74,222,128,0.06), 0 12px 40px rgba(0,0,0,0.4); position: absolute; inset: 7px; display: flex; align-items: center; justify-content: space-between; padding: 0px 8px; overflow: hidden;"
+  >
+    <span
+      aria-hidden="true"
+      style="width: 8px; height: 8px; border-radius: 50%; background: rgb(74, 222, 128); flex-shrink: 0;"
+    />
+    <span
+      style="font-family: var(--font-geist-mono), "SF Mono", monospace; font-size: 11px; font-weight: 600; color: rgb(232, 232, 232); letter-spacing: -0.2px; text-transform: none; line-height: 1;"
+    >
+      TC
+    </span>
+  </div>
+</div>
+`;
+
+exports[`<ThemeSwatch> > renders a stable snapshot for vessel 1`] = `
+<div
+  aria-label="Vessel theme preview"
+  data-theme-id="vessel"
+  role="img"
+  style="width: 56px; height: 56px; background: rgb(10, 10, 10); border-radius: 10px; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; font-family: var(--font-geist-sans), -apple-system, system-ui, sans-serif;"
+>
+  <div
+    style="background: rgb(15, 15, 15); border: 1px solid rgb(31, 31, 31); border-radius: 14px; box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 0 32px rgba(0,220,130,0.05), 0 12px 40px rgba(0,0,0,0.5); position: absolute; inset: 7px; display: flex; align-items: center; justify-content: space-between; padding: 0px 8px; overflow: hidden;"
+  >
+    <span
+      aria-hidden="true"
+      style="width: 8px; height: 8px; border-radius: 50%; background: rgb(0, 220, 130); flex-shrink: 0;"
+    />
+    <span
+      style="font-family: var(--font-geist-sans), -apple-system, system-ui, sans-serif; font-size: 11px; font-weight: 600; color: rgb(250, 250, 250); letter-spacing: -0.2px; text-transform: none; line-height: 1;"
+    >
+      V
+    </span>
+  </div>
+</div>
+`;

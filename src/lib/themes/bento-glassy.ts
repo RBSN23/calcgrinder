@@ -1,0 +1,43 @@
+import type { Theme } from './types';
+
+export const bentoGlassy: Theme = {
+  id: 'bentoGlassy',
+  displayName: 'Bento · Glassy',
+  description:
+    'Glass tiles over a soft pastel wash. Backdrop blur, calm accents.',
+  font: 'var(--font-geist-sans), -apple-system, system-ui, sans-serif',
+  fontMono: 'var(--font-geist-mono), monospace',
+  bg: 'linear-gradient(135deg, #EDE6F8 0%, #FCE3D4 50%, #D6E6F8 100%)',
+  surface: 'transparent',
+  card: 'rgba(255,255,255,0.55)',
+  cardAlt: 'rgba(255,255,255,0.40)',
+  border: 'rgba(255,255,255,0.50)',
+  borderStr: 'rgba(255,255,255,0.70)',
+  rule: 'rgba(26,26,46,0.08)',
+  ink: '#1A1A2E',
+  text: '#1A1A2E',
+  muted: 'rgba(26,26,46,0.65)',
+  subtle: 'rgba(26,26,46,0.42)',
+  accent: '#5B6CBA',
+  accentFg: '#FFFFFF',
+  accentSoft: 'rgba(91,108,186,0.14)',
+  chartA: '#1A1A2E',
+  chartB: '#5B6CBA',
+  chartGrid: 'rgba(26,26,46,0.08)',
+  cardStyle: 'glass',
+  radius: 20,
+  fieldRadius: 12,
+  padding: 24,
+  cardShadow:
+    '0 8px 32px rgba(26,26,46,0.10), inset 0 1px 0 rgba(255,255,255,0.7)',
+  cols2: '1fr 1.3fr',
+  cols3: '1fr 1fr 1.55fr',
+  headerH: 72,
+  cardTints: {
+    inputs: 'rgba(252,227,212,0.50)',
+    results: 'rgba(214,230,248,0.50)',
+    chart: 'rgba(237,230,248,0.50)',
+    hero: 'rgba(26,26,46,0.78)',
+    heroFg: '#FFFFFF',
+  },
+};
