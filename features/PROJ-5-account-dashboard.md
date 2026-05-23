@@ -1,6 +1,6 @@
 # PROJ-5: Account Dashboard
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-23
 **Last Updated:** 2026-05-23
 
@@ -740,4 +740,45 @@ Screenshots captured at `/tmp/proj5-screens/` (not checked in — local artefact
 > Next step: Run `/deploy` to deploy this feature to production.
 
 ## Deployment
-_To be added by /deploy_
+
+**Production URL:** https://calcgrinder.vercel.app
+**Deployed:** 2026-05-23
+**Deployed commit:** `b89ed5d feat(PROJ-5): Implement Account Dashboard`
+**Git tag:** `v1.0.0-PROJ-5`
+
+### Pre-deployment checks
+- `npm run build` — succeeded (Next.js 16.1.1 / Turbopack, 15 routes generated).
+- `npm run lint` — clean (no warnings or errors).
+- `npm test` — 109 / 109 passed (15 files), including the 10
+  `<Section>` + 9 `<WelcomeLine>` unit tests added in this feature.
+- `npm run test:e2e` — 36 / 36 passed across Chromium + Mobile Safari
+  (2 correctly skipped: mobile project skip of the desktop-only test).
+- No new env vars, migrations, or schema changes — pure presentation
+  feature.
+- `.env.local.example` unchanged.
+- No secrets staged for commit.
+
+### Post-deployment verification
+- `GET /` → 307 Location: `/auth/login` (PROJ-3 middleware healthy).
+- `GET /dashboard` → 307 Location: `/auth/login?next=%2Fdashboard`
+  (auth gate intact; PROJ-3 regression clean).
+- `GET /auth/login` → 200 HTML, `<title>Sign in · Calcgrinder</title>`
+  (PROJ-3 / PROJ-4 chrome unchanged).
+- Vercel security headers present on every response
+  (`strict-transport-security`, `x-content-type-options: nosniff`,
+  `x-frame-options: DENY`, `referrer-policy: origin-when-cross-origin`).
+- Visual / authenticated check of the dashboard surface itself
+  (welcome line + Presets empty state + Section collapse/expand)
+  belongs to the deployer's smoke pass — exercised pre-deploy via
+  Playwright (Chromium + Mobile Safari) against the same build.
+
+### Forward-compat notes
+The dashboard scaffold is now live with only the Presets section
+rendering. Downstream features slot into the canonical order
+documented in `docs/production/dashboard.md`:
+- PROJ-10 → My Calculators (also retires the PROJ-4
+  "Coming soon" tooltip on the "+ New calculator" top-bar button).
+- PROJ-12 → My Scenarios.
+- PROJ-13 → Trash.
+- PROJ-18 → swaps the Presets empty state for a populated grid.
+- PROJ-19 → User Calculators (sysadmin-only, `tint="danger"`).
