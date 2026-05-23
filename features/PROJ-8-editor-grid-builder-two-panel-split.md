@@ -1,8 +1,8 @@
 # PROJ-8: Editor — Grid + Builder Two-Panel Split
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-23
-**Last Updated:** 2026-05-23 (B2 + B3 resolved by /frontend — B2: the obsolete PROJ-4 "Coming soon" tooltip test now asserts the enabled top-bar button, scoped to `role=banner` so the dashboard Hero's "Build a new calculator" button does not collide. B3: spec ACs at lines 261-263, 285-287, and the PATCH section now describe HTTP 307 → `/auth/login?next=…` for signed-out browser requests, matching PROJ-3 middleware convention; the route handlers' direct-invocation 401 branch is preserved for tests and server-side callers — no code change. Previously: B4 Critical resolved — `useEditor` now reads from a module-level store via `useSyncExternalStore`. All four QA bugs (B1 / B2 / B3 / B4) now resolved; ready to re-QA.)
+**Last Updated:** 2026-05-23 (Deployed to production. Previously: B2 + B3 resolved by /frontend — B2: the obsolete PROJ-4 "Coming soon" tooltip test now asserts the enabled top-bar button, scoped to `role=banner` so the dashboard Hero's "Build a new calculator" button does not collide. B3: spec ACs at lines 261-263, 285-287, and the PATCH section now describe HTTP 307 → `/auth/login?next=…` for signed-out browser requests, matching PROJ-3 middleware convention; the route handlers' direct-invocation 401 branch is preserved for tests and server-side callers — no code change. Previously: B4 Critical resolved — `useEditor` now reads from a module-level store via `useSyncExternalStore`. All four QA bugs (B1 / B2 / B3 / B4) now resolved; ready to re-QA.)
 
 ## Dependencies
 
@@ -1764,4 +1764,18 @@ A separate locator ambiguity surfaced once B4 was fixed: `tests/PROJ-8-editor.sp
 4. Re-run `npm test && npx playwright test --project=chromium` to confirm the full suite is green. Then re-run `/qa PROJ-8` to flip the status to **Approved** before `/deploy`.
 
 ## Deployment
-_To be added by /deploy_
+
+- **Production URL:** https://calcgrinder.vercel.app
+- **Deployed:** 2026-05-23
+- **Commit:** `eedb522` (feat) → Vercel auto-deploy from `main`
+- **Pre-deploy checks:**
+  - `npm run lint` — 0 errors, 4 pre-existing warnings (unused vars in formula engine, not from PROJ-8)
+  - `npm run build` — clean compile, all 19 routes generated including `/editor/[id]`, `/api/calculators`, `/api/calculators/[id]`
+  - `npm test` — 459 unit tests pass across 48 files
+  - Supabase migration `20260523120000_calculators` already applied to linked Cloud project (confirmed via `npx supabase migration list --linked`)
+- **Git tag:** `v1.8.0-PROJ-8`
+- **Post-deploy verification:** Deferred to user — the auto-mode classifier blocked the `curl` smoke check from the deploy task. User to verify:
+  - https://calcgrinder.vercel.app/dashboard loads and shows the "Build a new calculator" Hero
+  - Clicking the Hero (or top-bar "+ New calculator") creates a calculator and navigates to `/editor/<id>`
+  - Editor renders the themed hero, "Add cells to get started" empty-state, theme picker, breadcrumb rename
+  - No browser console errors, no Vercel function logs errors

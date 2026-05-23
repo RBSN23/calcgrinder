@@ -22,7 +22,7 @@
 | PROJ-5  | Account Dashboard                                    | P0       | PROJ-4                                | Deployed | [PROJ-5](PROJ-5-account-dashboard.md) | 2026-05-22 |
 | PROJ-6  | Calculator Theme System                              | P0       | PROJ-4                                | Deployed | [PROJ-6](PROJ-6-calculator-theme-system.md) | 2026-05-22 |
 | PROJ-7  | Formula Engine                                       | P0       | PROJ-1                                | Deployed | [PROJ-7](PROJ-7-formula-engine.md) | 2026-05-22 |
-| PROJ-8  | Editor — Grid + Builder Two-Panel Split              | P0       | PROJ-4, PROJ-5, PROJ-6, PROJ-7        | Approved | [PROJ-8](PROJ-8-editor-grid-builder-two-panel-split.md) | 2026-05-23 |
+| PROJ-8  | Editor — Grid + Builder Two-Panel Split              | P0       | PROJ-4, PROJ-5, PROJ-6, PROJ-7        | Deployed | [PROJ-8](PROJ-8-editor-grid-builder-two-panel-split.md) | 2026-05-23 |
 | PROJ-9  | Cell Authoring & Section Management                  | P0       | PROJ-7, PROJ-8                        | Roadmap | —    | 2026-05-22 |
 | PROJ-10 | Calculator Lifecycle — Publish, Sharing, Token Regen | P0       | PROJ-5, PROJ-8                        | Roadmap | —    | 2026-05-22 |
 | PROJ-11 | Visitor View — Calculator Interface                  | P0       | PROJ-6, PROJ-7, PROJ-10               | Roadmap | —    | 2026-05-22 |
