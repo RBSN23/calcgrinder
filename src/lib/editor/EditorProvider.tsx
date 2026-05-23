@@ -300,6 +300,17 @@ class EditorStore {
     });
   };
 
+  // Refresh the cached calculator.updated_at from a mutation response.
+  // Every cell/section write bumps the parent via DB trigger, so we
+  // must roll the cached token forward in lock-step or the very next
+  // mutation will 409. A null `next` is a defensive no-op for the case
+  // where the server response omits the field (shouldn't happen post-
+  // PROJ-9-bugfix, but cheap insurance).
+  private refreshCalculatorUpdatedAt(next: string | null | undefined): void {
+    if (!next) return;
+    this.dispatch({ type: 'SET_CALCULATOR_UPDATED_AT', updated_at: next });
+  }
+
   // ── PROJ-9 — section mutations ───────────────────────────────────────────
 
   addSection = async (body: CreateSectionBody = {}): Promise<SectionRow | null> => {
@@ -310,18 +321,20 @@ class EditorStore {
       doFn: async () => {
         // On redo, forward the original id so the recreated row keeps the
         // same UUID (PROJ-9 spec AC line 985-989).
-        const row = await createSectionApi(calcId, {
+        const res = await createSectionApi(calcId, {
           ...body,
           ...(createdId ? { id: createdId } : {}),
         });
-        createdId = row.id;
-        this.dispatch({ type: 'UPSERT_SECTION', section: row });
-        return row;
+        createdId = res.section.id;
+        this.dispatch({ type: 'UPSERT_SECTION', section: res.section });
+        this.refreshCalculatorUpdatedAt(res.calculatorUpdatedAt);
+        return res.section;
       },
       undoFn: async () => {
         if (!createdId) return;
-        await deleteSectionApi(createdId, { confirmDeleteWithChildren: true });
+        const res = await deleteSectionApi(createdId, { confirmDeleteWithChildren: true });
         this.dispatch({ type: 'REMOVE_SECTION', id: createdId });
+        this.refreshCalculatorUpdatedAt(res.calculatorUpdatedAt);
       },
     });
   };
@@ -337,33 +350,45 @@ class EditorStore {
     if (body.description !== undefined) inverse.description = previous.description;
     if (body.layout_pattern_id !== undefined) inverse.layout_pattern_id = previous.layout_pattern_id;
     if (body.display_order !== undefined) inverse.display_order = previous.display_order;
+    // Optimistic update: paint the new values immediately so controlled
+    // inputs (textareas, Select triggers) don't briefly snap back to
+    // the prior value while the PATCH is in flight. If the request
+    // fails we revert below.
+    const optimistic: SectionRow = {
+      ...previous,
+      ...(body.title !== undefined ? { title: body.title } : {}),
+      ...(body.description !== undefined ? { description: body.description } : {}),
+      ...(body.layout_pattern_id !== undefined
+        ? { layout_pattern_id: body.layout_pattern_id }
+        : {}),
+      ...(body.display_order !== undefined ? { display_order: body.display_order } : {}),
+    };
     return this.recordOperation<SectionRow>({
       label: 'Update section',
       doFn: async () => {
-        const row = await patchSectionApi(id, {
-          ...body,
-          updated_at: this.state.calculator.updated_at,
-        });
-        this.dispatch({ type: 'UPSERT_SECTION', section: row });
-        // Section writes bump calculator.updated_at via trigger; refresh it.
-        this.dispatch({
-          type: 'SET_TITLE',
-          title: this.state.calculator.title,
-          updated_at: row.updated_at,
-        });
-        return row;
+        this.dispatch({ type: 'UPSERT_SECTION', section: optimistic });
+        try {
+          const res = await patchSectionApi(id, {
+            ...body,
+            updated_at: this.state.calculator.updated_at,
+          });
+          this.dispatch({ type: 'UPSERT_SECTION', section: res.section });
+          this.refreshCalculatorUpdatedAt(res.calculatorUpdatedAt);
+          return res.section;
+        } catch (e) {
+          // Roll back the optimistic paint so the UI matches the
+          // server's last-known state.
+          this.dispatch({ type: 'UPSERT_SECTION', section: previous });
+          throw e;
+        }
       },
       undoFn: async () => {
-        const row = await patchSectionApi(id, {
+        const res = await patchSectionApi(id, {
           ...inverse,
           updated_at: this.state.calculator.updated_at,
         });
-        this.dispatch({ type: 'UPSERT_SECTION', section: row });
-        this.dispatch({
-          type: 'SET_TITLE',
-          title: this.state.calculator.title,
-          updated_at: row.updated_at,
-        });
+        this.dispatch({ type: 'UPSERT_SECTION', section: res.section });
+        this.refreshCalculatorUpdatedAt(res.calculatorUpdatedAt);
       },
     });
   };
@@ -378,8 +403,9 @@ class EditorStore {
     await this.recordOperation<void>({
       label: 'Delete section',
       doFn: async () => {
-        await deleteSectionApi(id, opts);
+        const res = await deleteSectionApi(id, opts);
         this.dispatch({ type: 'REMOVE_SECTION', id });
+        this.refreshCalculatorUpdatedAt(res.calculatorUpdatedAt);
       },
       undoFn: async () => {
         // Restore the section AND its children with their original UUIDs so
@@ -388,15 +414,16 @@ class EditorStore {
         // selection state) keeps working. PROJ-9 spec AC line 985-989
         // mandates id restoration; the API accepts an optional `id` for
         // exactly this case.
-        const row = await createSectionApi(this.state.calculator.id, {
+        const res = await createSectionApi(this.state.calculator.id, {
           id: previous.id,
           title: previous.title,
           description: previous.description,
           layout_pattern_id: previous.layout_pattern_id,
         });
-        this.dispatch({ type: 'UPSERT_SECTION', section: row });
+        this.dispatch({ type: 'UPSERT_SECTION', section: res.section });
+        this.refreshCalculatorUpdatedAt(res.calculatorUpdatedAt);
         for (const cell of previousCells) {
-          const recreated = await createCellApi(row.id, {
+          const recreated = await createCellApi(res.section.id, {
             id: cell.id,
             kind: cell.kind,
             name: cell.name,
@@ -424,7 +451,8 @@ class EditorStore {
             text_size: cell.text_size,
             text_colour: cell.text_colour,
           });
-          this.dispatch({ type: 'UPSERT_CELL', cell: recreated });
+          this.dispatch({ type: 'UPSERT_CELL', cell: recreated.cell });
+          this.refreshCalculatorUpdatedAt(recreated.calculatorUpdatedAt);
         }
       },
     });
@@ -444,18 +472,20 @@ class EditorStore {
         // same UUID — selection / scroll-into-view / "added cell" anchors
         // that referenced it stay valid across undo/redo (PROJ-9 spec AC
         // line 985-989: original id is restored).
-        const cell = await createCellApi(sectionId, {
+        const res = await createCellApi(sectionId, {
           ...body,
           ...(createdId ? { id: createdId } : {}),
         });
-        createdId = cell.id;
-        this.dispatch({ type: 'UPSERT_CELL', cell });
-        return cell;
+        createdId = res.cell.id;
+        this.dispatch({ type: 'UPSERT_CELL', cell: res.cell });
+        this.refreshCalculatorUpdatedAt(res.calculatorUpdatedAt);
+        return res.cell;
       },
       undoFn: async () => {
         if (!createdId) return;
-        await deleteCellApi(createdId);
+        const res = await deleteCellApi(createdId);
         this.dispatch({ type: 'REMOVE_CELL', id: createdId });
+        this.refreshCalculatorUpdatedAt(res.calculatorUpdatedAt);
       },
       errorOverride: (e) => {
         if (e instanceof CellApiError) {
@@ -500,13 +530,33 @@ class EditorStore {
         if (cell.formula) dependentSnapshot.set(cell.id, cell.formula);
       }
     }
+    // Build the optimistic-update row. Painting the new values
+    // immediately (before the PATCH resolves) keeps controlled inputs
+    // and Select triggers from flashing back to the prior value during
+    // the ~500ms request window. We revert below if the PATCH fails.
+    const optimistic: CellRow = { ...previous };
+    for (const key of Object.keys(body) as (keyof PatchCellBody)[]) {
+      if (key === 'rewrite_dependents') continue;
+      const next = (body as unknown as Record<string, unknown>)[key];
+      // `default_value` of `undefined` is a real clear signal; copy as null.
+      (optimistic as unknown as Record<string, unknown>)[key] =
+        next === undefined && key === 'default_value' ? null : next;
+    }
     return this.recordOperation<CellRow>({
       label: 'Update cell',
       doFn: async () => {
-        const res = await patchCellApi(id, {
-          ...body,
-          updated_at: this.state.calculator.updated_at,
-        });
+        this.dispatch({ type: 'UPSERT_CELL', cell: optimistic });
+        let res;
+        try {
+          res = await patchCellApi(id, {
+            ...body,
+            updated_at: this.state.calculator.updated_at,
+          });
+        } catch (e) {
+          // Roll back the optimistic paint.
+          this.dispatch({ type: 'UPSERT_CELL', cell: previous });
+          throw e;
+        }
         this.dispatch({ type: 'UPSERT_CELL', cell: res.cell });
         if (isRename && newName && res.rewritten_cell_ids.length > 0) {
           // Apply the same rewrite the server applied. Using
@@ -526,11 +576,7 @@ class EditorStore {
             this.dispatch({ type: 'UPSERT_CELLS', cells: updated });
           }
         }
-        this.dispatch({
-          type: 'SET_TITLE',
-          title: this.state.calculator.title,
-          updated_at: res.cell.updated_at,
-        });
+        this.refreshCalculatorUpdatedAt(res.calculatorUpdatedAt);
         return res.cell;
       },
       undoFn: async () => {
@@ -556,11 +602,7 @@ class EditorStore {
             this.dispatch({ type: 'UPSERT_CELLS', cells: restored });
           }
         }
-        this.dispatch({
-          type: 'SET_TITLE',
-          title: this.state.calculator.title,
-          updated_at: res.cell.updated_at,
-        });
+        this.refreshCalculatorUpdatedAt(res.calculatorUpdatedAt);
       },
       errorOverride: (e) => {
         if (e instanceof CellApiError) {
@@ -597,8 +639,9 @@ class EditorStore {
     await this.recordOperation<void>({
       label: 'Delete cell',
       doFn: async () => {
-        await deleteCellApi(id);
+        const res = await deleteCellApi(id);
         this.dispatch({ type: 'REMOVE_CELL', id });
+        this.refreshCalculatorUpdatedAt(res.calculatorUpdatedAt);
       },
       undoFn: async () => {
         // Restore with the original id (PROJ-9 spec AC line 985-989).
@@ -630,7 +673,8 @@ class EditorStore {
           text_size: previous.text_size,
           text_colour: previous.text_colour,
         });
-        this.dispatch({ type: 'UPSERT_CELL', cell: recreated });
+        this.dispatch({ type: 'UPSERT_CELL', cell: recreated.cell });
+        this.refreshCalculatorUpdatedAt(recreated.calculatorUpdatedAt);
       },
     });
   };

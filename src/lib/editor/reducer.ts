@@ -57,6 +57,10 @@ export type EditorAction =
   | { type: 'SET_TITLE'; title: string; updated_at: string }
   | { type: 'SET_DESCRIPTION'; description: string; updated_at: string }
   | { type: 'SET_THEME'; theme_id: string; updated_at: string }
+  // Parent calculators.updated_at is bumped by a DB trigger on every
+  // cell/section write. Mutation responses echo the fresh value so the
+  // next optimistic-concurrency check sends a non-stale token.
+  | { type: 'SET_CALCULATOR_UPDATED_AT'; updated_at: string }
   | { type: 'PUSH_OPERATION'; op: Operation }
   | { type: 'UNDO' }
   | { type: 'REDO' }
@@ -134,6 +138,15 @@ export function editorReducer(
         calculator: {
           ...state.calculator,
           theme_id: action.theme_id,
+          updated_at: action.updated_at,
+        },
+      };
+    case 'SET_CALCULATOR_UPDATED_AT':
+      if (state.calculator.updated_at === action.updated_at) return state;
+      return {
+        ...state,
+        calculator: {
+          ...state.calculator,
           updated_at: action.updated_at,
         },
       };

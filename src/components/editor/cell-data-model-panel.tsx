@@ -180,7 +180,23 @@ export function CellDataModelPanel({ cell, onPatch, onClose }: CellDataModelPane
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="visible">Visible</SelectItem>
-              <SelectItem value="hidden">Hidden</SelectItem>
+              {/* The DB check constraint forbids visibility=hidden with
+                  default_value IS NULL — hidden cells must still feed
+                  formulas with a real value. Disable the option here
+                  so the user gets a clear hint instead of a 422 toast. */}
+              <SelectItem
+                value="hidden"
+                disabled={
+                  cell.default_value === null || cell.default_value === undefined
+                }
+              >
+                Hidden
+                {(cell.default_value === null || cell.default_value === undefined) && (
+                  <span className="ml-2 text-[10px] text-cg-text-subtle">
+                    set default value first
+                  </span>
+                )}
+              </SelectItem>
             </SelectContent>
           </Select>
         </Field>

@@ -59,10 +59,22 @@ export interface CreateSectionBody {
   id?: string;
 }
 
+// Every mutation response echoes the parent calculator's bumped
+// `updated_at` so the client can refresh its optimistic-concurrency
+// token in lock-step with the server's parent-bump trigger.
+export interface SectionMutationResult {
+  section: SectionRow;
+  calculatorUpdatedAt: string | null;
+}
+
+export interface DeleteSectionResult {
+  calculatorUpdatedAt: string | null;
+}
+
 export async function createSection(
   calculatorId: string,
   body: CreateSectionBody = {},
-): Promise<SectionRow> {
+): Promise<SectionMutationResult> {
   const res = await fetch(
     `/api/calculators/${encodeURIComponent(calculatorId)}/sections`,
     {
@@ -72,7 +84,14 @@ export async function createSection(
     },
   );
   if (!res.ok) throw await parseError(res);
-  return (await res.json()) as SectionRow;
+  const payload = (await res.json()) as {
+    section: SectionRow;
+    calculator_updated_at: string | null;
+  };
+  return {
+    section: payload.section,
+    calculatorUpdatedAt: payload.calculator_updated_at,
+  };
 }
 
 export interface PatchSectionBody {
@@ -86,20 +105,27 @@ export interface PatchSectionBody {
 export async function patchSection(
   id: string,
   body: PatchSectionBody,
-): Promise<SectionRow> {
+): Promise<SectionMutationResult> {
   const res = await fetch(`/api/sections/${encodeURIComponent(id)}`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw await parseError(res);
-  return (await res.json()) as SectionRow;
+  const payload = (await res.json()) as {
+    section: SectionRow;
+    calculator_updated_at: string | null;
+  };
+  return {
+    section: payload.section,
+    calculatorUpdatedAt: payload.calculator_updated_at,
+  };
 }
 
 export async function deleteSection(
   id: string,
   opts: { confirmDeleteWithChildren?: boolean } = {},
-): Promise<void> {
+): Promise<DeleteSectionResult> {
   const url = new URL(
     `/api/sections/${encodeURIComponent(id)}`,
     'http://placeholder',
@@ -112,4 +138,6 @@ export async function deleteSection(
     { method: 'DELETE' },
   );
   if (!res.ok) throw await parseError(res);
+  const payload = (await res.json()) as { calculator_updated_at: string | null };
+  return { calculatorUpdatedAt: payload.calculator_updated_at };
 }

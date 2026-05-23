@@ -2066,3 +2066,48 @@ Recommended next step: run `/deploy PROJ-9`. The deploy must include:
   chart/text-block registration (PROJ-15 / PROJ-16), Builder
   hover-discoverability pattern reused by PROJ-11's visitor
   renderer.
+
+### Post-deploy hotfix — 2026-05-23
+
+User-reported repro: editing or adding a second cell after the
+first mutation surfaced "Save failed — reload to retry." Even
+after reload, dropdowns snapped back and textfields blanked for
+~1 s before the saved value reappeared.
+
+**Root cause.** The DB trigger `bump_parent_calculator_updated_at`
+advances `calculators.updated_at` on every cell/section write.
+The mutation API responses didn't echo the bumped value, so the
+client's cached optimistic-concurrency token stayed at the
+page-load value. The first PATCH succeeded; every subsequent
+PATCH sent the (now-stale) cached token and got 409 stale.
+
+**Fix.**
+1. Every cells/sections mutation response now echoes
+   `calculator_updated_at` (PATCH/POST/DELETE on `/api/cells/:id`,
+   `/api/sections/:id`, `/api/calculators/:cid/sections`,
+   `/api/sections/:sid/cells`). DELETE returns 200 with a body
+   instead of 204 to carry the field.
+2. The `EditorStore` dispatches `SET_CALCULATOR_UPDATED_AT` after
+   every successful mutation so the next PATCH sends a fresh
+   token.
+3. `patchCell` and `patchSection` now paint the new values
+   optimistically before the PATCH resolves and roll back on
+   error — kills the post-blur "value disappears for 1 s" flash.
+4. The visibility=hidden option in the cell data-model panel is
+   now disabled when `default_value` is null (the DB constraint
+   forbids the combination), with an inline "set default value
+   first" hint.
+
+**Regression coverage.** New E2E specs in
+`tests/PROJ-9-cell-authoring.spec.ts`:
+- "Sequential cell mutations succeed without a page reload" —
+  add cell → edit → add another → edit, walking the
+  `calculator_updated_at` from each response.
+- "Visibility toggle to hidden is rejected when default_value
+  is null" — confirms the 422, then succeeds when both are set
+  atomically.
+- "Sequential section reorders succeed without a page reload"
+  — the drag-reorder surface that was also affected.
+
+Plus the reducer test `SET_CALCULATOR_UPDATED_AT refreshes only
+the token, leaves other fields intact`.

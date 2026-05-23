@@ -237,5 +237,17 @@ export async function POST(req: Request, { params }: Ctx): Promise<Response> {
     return NextResponse.json({ error: 'create_failed' }, { status: 500 });
   }
 
-  return NextResponse.json(inserted, { status: 201 });
+  // The cell insert bumped calculator.updated_at via trigger; echo the
+  // fresh value back so the client's next PATCH sends a non-stale
+  // optimistic-concurrency token.
+  const { data: bumped } = await supabase
+    .from('calculators')
+    .select('updated_at')
+    .eq('id', section.calculator_id)
+    .maybeSingle();
+
+  return NextResponse.json(
+    { cell: inserted, calculator_updated_at: bumped?.updated_at ?? null },
+    { status: 201 },
+  );
 }

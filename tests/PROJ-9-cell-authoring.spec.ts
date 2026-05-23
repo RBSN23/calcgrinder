@@ -446,7 +446,7 @@ test.describe('PROJ-9 — Cell Authoring & Section Management', () => {
         data: {},
       });
       expect(createRes.status()).toBe(201);
-      const cell = await createRes.json();
+      const { cell } = await createRes.json();
 
       const { data: calc } = await admin
         .from('calculators')
@@ -571,7 +571,7 @@ test.describe('PROJ-9 — Cell Authoring & Section Management', () => {
         },
       );
       expect(inputRes.status()).toBe(201);
-      const inputCell = await inputRes.json();
+      const { cell: inputCell } = await inputRes.json();
 
       const outputRes = await page.request.post(
         `/api/sections/${sectionId}/cells`,
@@ -585,7 +585,7 @@ test.describe('PROJ-9 — Cell Authoring & Section Management', () => {
         },
       );
       expect(outputRes.status()).toBe(201);
-      const outputCell = await outputRes.json();
+      const { cell: outputCell } = await outputRes.json();
 
       // Rename loan_amount → principal.
       const { data: calc } = await admin
@@ -729,7 +729,7 @@ test.describe('PROJ-9 — Cell Authoring & Section Management', () => {
         { data: {} },
       );
       expect(cellRes.status()).toBe(201);
-      const originalCell = await cellRes.json();
+      const { cell: originalCell } = await cellRes.json();
       // Reload so the editor store hydrates the new rows.
       await page.reload();
       await page.waitForURL(/\/editor\/[0-9a-f-]{36}$/);
@@ -814,6 +814,195 @@ test.describe('PROJ-9 — Cell Authoring & Section Management', () => {
         .maybeSingle();
       expect(restoredCell?.id).toBe(originalCell.id);
       expect(restoredCell?.section_id).toBe(firstSectionId);
+    } finally {
+      await teardown(user.userId);
+    }
+  });
+
+  // Regression for the post-PROJ-9 deploy bug: mutation responses must
+  // echo the parent calculator's bumped `updated_at` so the next
+  // mutation sends a non-stale optimistic-concurrency token. Prior to
+  // the fix this sequence failed at step 3 with a 409 "stale".
+  test('Sequential cell mutations succeed without a page reload (updated_at echo)', async ({
+    page,
+  }) => {
+    const user = await bootstrapApprovedUser();
+    try {
+      await signIn(page, user);
+      const calcId = await createCalculator(page);
+      const { data: sections } = await admin
+        .from('sections')
+        .select('id')
+        .eq('calculator_id', calcId);
+      const sectionId = sections![0].id;
+
+      // Read the *current* updated_at and use it for the first cell create.
+      // From here on we MUST rely on the API to feed us each new token —
+      // the bug was that the client never learned the bumped value.
+      const { data: calc0 } = await admin
+        .from('calculators')
+        .select('updated_at')
+        .eq('id', calcId)
+        .maybeSingle();
+      let token = calc0!.updated_at as string;
+
+      // Step 1: add a cell.
+      const c1Res = await page.request.post(
+        `/api/sections/${sectionId}/cells`,
+        { data: {} },
+      );
+      expect(c1Res.status()).toBe(201);
+      const c1Body = await c1Res.json();
+      expect(c1Body.calculator_updated_at).toBeTruthy();
+      expect(c1Body.calculator_updated_at).not.toBe(token);
+      token = c1Body.calculator_updated_at;
+      const cell1 = c1Body.cell;
+
+      // Step 2: edit the first cell's label — uses the *response* token,
+      // NOT the original page-load value. Without the fix this would 409.
+      const p1Res = await page.request.patch(`/api/cells/${cell1.id}`, {
+        data: { updated_at: token, label: 'First label' },
+      });
+      expect(p1Res.status()).toBe(200);
+      const p1Body = await p1Res.json();
+      expect(p1Body.cell.label).toBe('First label');
+      expect(p1Body.calculator_updated_at).not.toBe(token);
+      token = p1Body.calculator_updated_at;
+
+      // Step 3: add a second cell. Bug repro: stays at the page-load
+      // token without the fix.
+      const c2Res = await page.request.post(
+        `/api/sections/${sectionId}/cells`,
+        { data: {} },
+      );
+      expect(c2Res.status()).toBe(201);
+      const c2Body = await c2Res.json();
+      token = c2Body.calculator_updated_at;
+      const cell2 = c2Body.cell;
+
+      // Step 4: edit the second cell's label. Should also succeed.
+      const p2Res = await page.request.patch(`/api/cells/${cell2.id}`, {
+        data: { updated_at: token, label: 'Second label' },
+      });
+      expect(p2Res.status()).toBe(200);
+      const p2Body = await p2Res.json();
+      expect(p2Body.cell.label).toBe('Second label');
+      token = p2Body.calculator_updated_at;
+
+      // Confirm both labels persisted.
+      const { data: persisted } = await admin
+        .from('cells')
+        .select('id, label')
+        .eq('calculator_id', calcId)
+        .order('display_order', { ascending: true });
+      expect(persisted).toEqual([
+        expect.objectContaining({ id: cell1.id, label: 'First label' }),
+        expect.objectContaining({ id: cell2.id, label: 'Second label' }),
+      ]);
+    } finally {
+      await teardown(user.userId);
+    }
+  });
+
+  test('Visibility toggle to hidden is rejected when default_value is null (422 hidden_requires_value)', async ({
+    page,
+  }) => {
+    const user = await bootstrapApprovedUser();
+    try {
+      await signIn(page, user);
+      const calcId = await createCalculator(page);
+      const { data: sections } = await admin
+        .from('sections')
+        .select('id')
+        .eq('calculator_id', calcId);
+      const sectionId = sections![0].id;
+
+      // Add a cell with no default_value (the default-Input scaffold).
+      const createRes = await page.request.post(
+        `/api/sections/${sectionId}/cells`,
+        { data: {} },
+      );
+      expect(createRes.status()).toBe(201);
+      const createBody = await createRes.json();
+      const cell = createBody.cell;
+      let token = createBody.calculator_updated_at as string;
+
+      // Attempt to flip visibility → hidden without setting a default value.
+      const hideRes = await page.request.patch(`/api/cells/${cell.id}`, {
+        data: { updated_at: token, visibility: 'hidden' },
+      });
+      expect(hideRes.status()).toBe(422);
+      const hideBody = await hideRes.json();
+      expect(hideBody.error).toBe('hidden_requires_value');
+
+      // Now set a default_value AND visibility=hidden atomically — should succeed.
+      // The fix's stale-updated_at echo means we can still use the
+      // create-response token here (the failed PATCH above didn't bump it).
+      const okRes = await page.request.patch(`/api/cells/${cell.id}`, {
+        data: { updated_at: token, default_value: 42, visibility: 'hidden' },
+      });
+      expect(okRes.status()).toBe(200);
+      const okBody = await okRes.json();
+      expect(okBody.cell.visibility).toBe('hidden');
+      expect(okBody.cell.default_value).toBe(42);
+      token = okBody.calculator_updated_at;
+    } finally {
+      await teardown(user.userId);
+    }
+  });
+
+  // Reorder is the other surface that was breaking — drag-reorder sends
+  // a PATCH per drop, and without the updated_at echo the second drag
+  // in a row would 409 and the card would snap back.
+  test('Sequential section reorders succeed without a page reload', async ({
+    page,
+  }) => {
+    const user = await bootstrapApprovedUser();
+    try {
+      await signIn(page, user);
+      const calcId = await createCalculator(page);
+
+      // Calculator already has one section; add two more so we have three.
+      const sec2Res = await page.request.post(
+        `/api/calculators/${calcId}/sections`,
+        { data: { title: 'Second' } },
+      );
+      expect(sec2Res.status()).toBe(201);
+      const sec2Body = await sec2Res.json();
+      let token = sec2Body.calculator_updated_at as string;
+      const section2Id = sec2Body.section.id;
+
+      const sec3Res = await page.request.post(
+        `/api/calculators/${calcId}/sections`,
+        { data: { title: 'Third' } },
+      );
+      expect(sec3Res.status()).toBe(201);
+      const sec3Body = await sec3Res.json();
+      token = sec3Body.calculator_updated_at;
+      const section3Id = sec3Body.section.id;
+
+      // First reorder: move section3 to position 0.
+      const r1Res = await page.request.patch(`/api/sections/${section3Id}`, {
+        data: { updated_at: token, display_order: 0 },
+      });
+      expect(r1Res.status()).toBe(200);
+      const r1Body = await r1Res.json();
+      token = r1Body.calculator_updated_at;
+
+      // Second reorder back-to-back: move section2 to position 0. Without
+      // the updated_at echo this would 409.
+      const r2Res = await page.request.patch(`/api/sections/${section2Id}`, {
+        data: { updated_at: token, display_order: 0 },
+      });
+      expect(r2Res.status()).toBe(200);
+
+      const { data: finalOrder } = await admin
+        .from('sections')
+        .select('id, display_order')
+        .eq('calculator_id', calcId)
+        .order('display_order', { ascending: true });
+      expect(finalOrder?.[0].id).toBe(section2Id);
+      expect(finalOrder?.[1].id).toBe(section3Id);
     } finally {
       await teardown(user.userId);
     }

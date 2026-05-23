@@ -53,6 +53,33 @@ describe('editorReducer — calculator slice', () => {
     expect(next.calculator.theme_id).toBe('vessel');
     expect(next.calculator.updated_at).toBe('2026-05-23T10:02:00.000Z');
   });
+
+  it('SET_CALCULATOR_UPDATED_AT refreshes only the token, leaves other fields intact', () => {
+    const start = withHistory('a');
+    const next = editorReducer(start, {
+      type: 'SET_CALCULATOR_UPDATED_AT',
+      updated_at: '2026-05-23T10:09:00.000Z',
+    });
+    // Token is refreshed.
+    expect(next.calculator.updated_at).toBe('2026-05-23T10:09:00.000Z');
+    // Other slices untouched — this is the fix for the post-PROJ-9 409
+    // storm where cell/section writes bumped calculators.updated_at via
+    // trigger but the client never refreshed its cache.
+    expect(next.calculator.title).toBe(start.calculator.title);
+    expect(next.calculator.theme_id).toBe(start.calculator.theme_id);
+    expect(next.past).toHaveLength(1);
+  });
+
+  it('SET_CALCULATOR_UPDATED_AT is a no-op when the value already matches', () => {
+    const start = initialEditorState(ROW);
+    const next = editorReducer(start, {
+      type: 'SET_CALCULATOR_UPDATED_AT',
+      updated_at: ROW.updated_at,
+    });
+    // Returning the same reference keeps useSyncExternalStore from
+    // re-rendering subscribers needlessly.
+    expect(next).toBe(start);
+  });
 });
 
 describe('editorReducer — undo / redo', () => {

@@ -417,9 +417,20 @@ export async function PATCH(req: Request, { params }: Ctx): Promise<Response> {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
 
+  // Re-read calculator.updated_at — every cell update (and every
+  // dependent-formula rewrite) fired the parent-bump trigger, so the
+  // value the client sent is now stale. Echoing it back here keeps the
+  // next mutation from racing into a 409.
+  const { data: bumped } = await supabase
+    .from('calculators')
+    .select('updated_at')
+    .eq('id', current.calculator_id)
+    .maybeSingle();
+
   return NextResponse.json({
     cell: refreshed,
     rewritten_cell_ids: rewrites.map((r) => r.id),
+    calculator_updated_at: bumped?.updated_at ?? null,
   });
 }
 
@@ -480,5 +491,17 @@ export async function DELETE(_req: Request, { params }: Ctx): Promise<Response> 
     }
   }
 
-  return new Response(null, { status: 204 });
+  // Echo the bumped calculator.updated_at (delete + repack both fired
+  // the parent-bump trigger). Returning a JSON body in place of the
+  // prior 204 keeps the response shape consistent with PATCH/POST and
+  // lets the client refresh its concurrency token.
+  const { data: bumped } = await supabase
+    .from('calculators')
+    .select('updated_at')
+    .eq('id', cell.calculator_id)
+    .maybeSingle();
+
+  return NextResponse.json({
+    calculator_updated_at: bumped?.updated_at ?? null,
+  });
 }

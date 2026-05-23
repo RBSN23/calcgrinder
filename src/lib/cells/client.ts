@@ -106,10 +106,22 @@ export interface CreateCellBody {
   id?: string;
 }
 
+// Every mutation response echoes the parent calculator's bumped
+// `updated_at` so the client can refresh its optimistic-concurrency
+// token in lock-step with the server's parent-bump trigger.
+export interface CreateCellResult {
+  cell: CellRow;
+  calculatorUpdatedAt: string | null;
+}
+
+export interface DeleteCellResult {
+  calculatorUpdatedAt: string | null;
+}
+
 export async function createCell(
   sectionId: string,
   body: CreateCellBody = {},
-): Promise<CellRow> {
+): Promise<CreateCellResult> {
   const res = await fetch(
     `/api/sections/${encodeURIComponent(sectionId)}/cells`,
     {
@@ -119,7 +131,14 @@ export async function createCell(
     },
   );
   if (!res.ok) throw await parseError(res);
-  return (await res.json()) as CellRow;
+  const payload = (await res.json()) as {
+    cell: CellRow;
+    calculator_updated_at: string | null;
+  };
+  return {
+    cell: payload.cell,
+    calculatorUpdatedAt: payload.calculator_updated_at,
+  };
 }
 
 export interface PatchCellBody extends Omit<CreateCellBody, 'id'> {
@@ -132,6 +151,7 @@ export interface PatchCellBody extends Omit<CreateCellBody, 'id'> {
 export interface PatchCellResponse {
   cell: CellRow;
   rewritten_cell_ids: string[];
+  calculatorUpdatedAt: string | null;
 }
 
 export async function patchCell(
@@ -144,12 +164,23 @@ export async function patchCell(
     body: JSON.stringify(body),
   });
   if (!res.ok) throw await parseError(res);
-  return (await res.json()) as PatchCellResponse;
+  const payload = (await res.json()) as {
+    cell: CellRow;
+    rewritten_cell_ids: string[];
+    calculator_updated_at: string | null;
+  };
+  return {
+    cell: payload.cell,
+    rewritten_cell_ids: payload.rewritten_cell_ids,
+    calculatorUpdatedAt: payload.calculator_updated_at,
+  };
 }
 
-export async function deleteCell(id: string): Promise<void> {
+export async function deleteCell(id: string): Promise<DeleteCellResult> {
   const res = await fetch(`/api/cells/${encodeURIComponent(id)}`, {
     method: 'DELETE',
   });
   if (!res.ok) throw await parseError(res);
+  const payload = (await res.json()) as { calculator_updated_at: string | null };
+  return { calculatorUpdatedAt: payload.calculator_updated_at };
 }

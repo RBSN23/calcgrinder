@@ -94,7 +94,7 @@ describe('POST /api/sections/:id/cells', () => {
     expect(res.status).toBe(404);
   });
 
-  it('creates a default Input cell with cell_1 when body is empty', async () => {
+  it('creates a default Input cell with cell_1 when body is empty and echoes calculator_updated_at', async () => {
     const supabase = makeSupabaseMock({
       user: USER_FIXTURE,
       fromResults: [
@@ -104,6 +104,7 @@ describe('POST /api/sections/:id/cells', () => {
         { data: [], error: null }, // existing names
         { data: null, error: null, count: 0 }, // section cell count
         { data: INSERTED_CELL, error: null }, // insert
+        { data: { updated_at: '2026-05-23T10:05:00.000Z' }, error: null }, // bumped calc read
       ],
     });
     installSupabaseMock(mockCreateClient, supabase);
@@ -111,8 +112,9 @@ describe('POST /api/sections/:id/cells', () => {
     const res = await POST(postRequest({}), ctx());
     expect(res.status).toBe(201);
     const body = await res.json();
-    expect(body.name).toBe('cell_1');
-    expect(body.kind).toBe('input');
+    expect(body.cell.name).toBe('cell_1');
+    expect(body.cell.kind).toBe('input');
+    expect(body.calculator_updated_at).toBe('2026-05-23T10:05:00.000Z');
 
     const insertCall = supabase._builders[5]?.insert.mock.calls[0]?.[0] as {
       kind: string;

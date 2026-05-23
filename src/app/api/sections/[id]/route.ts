@@ -220,7 +220,20 @@ export async function PATCH(req: Request, { params }: Ctx): Promise<Response> {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
 
-  return NextResponse.json(refreshed);
+  // Re-read the parent calculator.updated_at — every PATCH against a
+  // section bumps the parent via trigger; without echoing the fresh
+  // value back, the client's cached token goes stale on the very next
+  // mutation and the user sees a 409 storm.
+  const { data: bumped } = await supabase
+    .from('calculators')
+    .select('updated_at')
+    .eq('id', section.calculator_id)
+    .maybeSingle();
+
+  return NextResponse.json({
+    section: refreshed,
+    calculator_updated_at: bumped?.updated_at ?? null,
+  });
 }
 
 export async function DELETE(req: Request, { params }: Ctx): Promise<Response> {
@@ -320,5 +333,17 @@ export async function DELETE(req: Request, { params }: Ctx): Promise<Response> {
     }
   }
 
-  return new Response(null, { status: 204 });
+  // Echo the bumped calculator.updated_at so the client can refresh
+  // its cached token (the cascade delete + repack each triggered the
+  // parent-bump trigger). Returning a JSON body in place of the prior
+  // 204 keeps the response shape consistent with PATCH/POST.
+  const { data: bumped } = await supabase
+    .from('calculators')
+    .select('updated_at')
+    .eq('id', section.calculator_id)
+    .maybeSingle();
+
+  return NextResponse.json({
+    calculator_updated_at: bumped?.updated_at ?? null,
+  });
 }

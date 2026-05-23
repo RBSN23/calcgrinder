@@ -67,7 +67,7 @@ describe('POST /api/calculators/:id/sections', () => {
     expect(await res.json()).toEqual({ error: 'not_found' });
   });
 
-  it('creates a new section with defaults when the body is empty', async () => {
+  it('creates a new section with defaults when the body is empty and echoes calculator_updated_at', async () => {
     const supabase = makeSupabaseMock({
       user: USER_FIXTURE,
       fromResults: [
@@ -77,13 +77,17 @@ describe('POST /api/calculators/:id/sections', () => {
           error: null,
         }, // sibling read (await)
         { data: INSERTED_SECTION, error: null }, // section insert
+        { data: { updated_at: '2026-05-23T10:05:00.000Z' }, error: null }, // bumped calc read
       ],
     });
     installSupabaseMock(mockCreateClient, supabase);
 
     const res = await POST(postRequest({}), ctx());
     expect(res.status).toBe(201);
-    expect(await res.json()).toEqual(INSERTED_SECTION);
+    expect(await res.json()).toEqual({
+      section: INSERTED_SECTION,
+      calculator_updated_at: '2026-05-23T10:05:00.000Z',
+    });
 
     const insertCall = supabase._builders[2]?.insert.mock.calls[0]?.[0] as {
       calculator_id: string;

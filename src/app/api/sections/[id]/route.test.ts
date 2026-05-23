@@ -92,7 +92,7 @@ describe('PATCH /api/sections/:id', () => {
     expect(body.server_updated_at).toBe(FRESH_AT);
   });
 
-  it('updates the title and returns the refreshed row', async () => {
+  it('updates the title and returns the refreshed row plus bumped calculator_updated_at', async () => {
     const supabase = makeSupabaseMock({
       user: USER_FIXTURE,
       fromResults: [
@@ -100,6 +100,7 @@ describe('PATCH /api/sections/:id', () => {
         { data: { id: CALC_ID, updated_at: STALE_AT }, error: null }, // calc read
         { data: null, error: null }, // section update (await)
         { data: { ...SECTION_ROW, title: 'Renamed' }, error: null }, // refresh read
+        { data: { updated_at: FRESH_AT }, error: null }, // bumped calc read
       ],
     });
     installSupabaseMock(mockCreateClient, supabase);
@@ -109,7 +110,9 @@ describe('PATCH /api/sections/:id', () => {
       ctx(),
     );
     expect(res.status).toBe(200);
-    expect((await res.json()).title).toBe('Renamed');
+    const body = await res.json();
+    expect(body.section.title).toBe('Renamed');
+    expect(body.calculator_updated_at).toBe(FRESH_AT);
 
     const updateCall = supabase._builders[2]?.update.mock.calls[0]?.[0] as {
       title: string;
@@ -188,7 +191,7 @@ describe('DELETE /api/sections/:id', () => {
     expect(body.child_count).toBe(3);
   });
 
-  it('deletes when confirm=true and the section has children', async () => {
+  it('deletes when confirm=true and the section has children, returning bumped calculator_updated_at', async () => {
     const supabase = makeSupabaseMock({
       user: USER_FIXTURE,
       fromResults: [
@@ -198,6 +201,7 @@ describe('DELETE /api/sections/:id', () => {
         { data: null, error: null, count: 3 },
         { data: null, error: null }, // delete result
         { data: [], error: null }, // surviving repack list
+        { data: { updated_at: FRESH_AT }, error: null }, // bumped calc read
       ],
     });
     installSupabaseMock(mockCreateClient, supabase);
@@ -205,10 +209,11 @@ describe('DELETE /api/sections/:id', () => {
       deleteRequest('?confirm_delete_with_children=true'),
       ctx(),
     );
-    expect(res.status).toBe(204);
+    expect(res.status).toBe(200);
+    expect((await res.json()).calculator_updated_at).toBe(FRESH_AT);
   });
 
-  it('deletes immediately when the section has no children', async () => {
+  it('deletes immediately when the section has no children, returning bumped calculator_updated_at', async () => {
     installSupabaseMock(
       mockCreateClient,
       makeSupabaseMock({
@@ -220,10 +225,12 @@ describe('DELETE /api/sections/:id', () => {
           { data: null, error: null, count: 0 },
           { data: null, error: null },
           { data: [], error: null },
+          { data: { updated_at: FRESH_AT }, error: null },
         ],
       }),
     );
     const res = await DELETE(deleteRequest(), ctx());
-    expect(res.status).toBe(204);
+    expect(res.status).toBe(200);
+    expect((await res.json()).calculator_updated_at).toBe(FRESH_AT);
   });
 });

@@ -141,7 +141,7 @@ describe('PATCH /api/cells/:id', () => {
     expect((await res.json()).error).toBe('cross_section_move_unsupported');
   });
 
-  it('updates a label and returns the refreshed cell', async () => {
+  it('updates a label and returns the refreshed cell + bumped calculator_updated_at', async () => {
     installSupabaseMock(
       mockCreateClient,
       makeSupabaseMock({
@@ -151,6 +151,7 @@ describe('PATCH /api/cells/:id', () => {
           { data: { id: CALC_ID, updated_at: STALE_AT }, error: null },
           { data: null, error: null }, // update
           { data: { ...CELL_ROW, label: 'Principal' }, error: null }, // refresh
+          { data: { updated_at: FRESH_AT }, error: null }, // bumped calc read
         ],
       }),
     );
@@ -162,6 +163,7 @@ describe('PATCH /api/cells/:id', () => {
     const body = await res.json();
     expect(body.cell.label).toBe('Principal');
     expect(body.rewritten_cell_ids).toEqual([]);
+    expect(body.calculator_updated_at).toBe(FRESH_AT);
   });
 
   it('returns 409 name_collision when renaming clashes', async () => {
@@ -202,6 +204,7 @@ describe('PATCH /api/cells/:id', () => {
         { data: null, error: null }, // rewrite out-1
         { data: null, error: null }, // rewrite out-2
         { data: { ...CELL_ROW, name: 'principal' }, error: null }, // refresh
+        { data: { updated_at: FRESH_AT }, error: null }, // bumped calc read
       ],
     });
     installSupabaseMock(mockCreateClient, supabase);
@@ -290,7 +293,7 @@ describe('DELETE /api/cells/:id', () => {
     expect(res.status).toBe(404);
   });
 
-  it('deletes the cell and returns 204', async () => {
+  it('deletes the cell and returns the bumped calculator_updated_at', async () => {
     installSupabaseMock(
       mockCreateClient,
       makeSupabaseMock({
@@ -308,10 +311,12 @@ describe('DELETE /api/cells/:id', () => {
           { data: { id: CALC_ID }, error: null },
           { data: null, error: null }, // delete
           { data: [], error: null }, // surviving siblings (await)
+          { data: { updated_at: FRESH_AT }, error: null }, // bumped calc read
         ],
       }),
     );
     const res = await DELETE(deleteRequest(), ctx());
-    expect(res.status).toBe(204);
+    expect(res.status).toBe(200);
+    expect((await res.json()).calculator_updated_at).toBe(FRESH_AT);
   });
 });
