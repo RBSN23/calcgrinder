@@ -1,8 +1,36 @@
 # PROJ-10: Calculator Lifecycle — Publish, Sharing, Token Regen
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-23
-**Last Updated:** 2026-05-23 (QA re-run after BUG-C1 fix — all ACs + edge cases pass; ready to deploy)
+**Last Updated:** 2026-05-23 (deployed to production)
+
+### Deployment (2026-05-23)
+
+- **Production URL:** https://calcgrinder.vercel.app
+- **Commit:** `8af9122` (`feat(PROJ-10): Implement Calculator
+  Lifecycle — Publish, Sharing, Token Regen`)
+- **Migrations applied to linked Supabase Cloud project pre-deploy:**
+  - `20260525000000_calculator_lifecycle.sql` — adds `published`,
+    `public_token`, partial unique index on `(owner_id, title)`,
+    backfill, `fn_duplicate_calculator()` RPC.
+  - `20260525010000_fix_fn_duplicate_calculator_title_ambiguity.sql`
+    — BUG-C1 fix (column qualification in the title-resolve loop).
+  - Types regenerated via `npx supabase gen types typescript --linked`.
+- **Pre-deploy checks:** `npm run build` clean, `npm run lint`
+  clean (0 errors; 4 pre-existing warnings in formula engine
+  files unrelated to PROJ-10), `npm test` 600/600 passing.
+- **Smoke checks on production:**
+  - `/dashboard` redirects unauthenticated visitors to `/auth/login`
+    with `next=` preserved (307).
+  - `POST /api/calculators/:id/duplicate` and
+    `POST /api/calculators/:id/regenerate-token` are recognised by
+    middleware (auth-gated 307 to login; not 404), confirming the
+    new routes shipped.
+  - Security headers (HSTS, X-Content-Type-Options, X-Frame-Options,
+    Referrer-Policy) intact.
+
+### Pre-deploy snapshot — Status: Approved (2026-05-23)
+QA re-run after BUG-C1 fix — all ACs + edge cases pass; ready to deploy.
 
 ### Frontend Implementation Notes (2026-05-23)
 
