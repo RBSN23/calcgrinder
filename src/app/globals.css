@@ -46,6 +46,37 @@
     --auth-link: 221 83% 53%;
     --auth-accent-soft: 221 100% 96%;
     --auth-surface-muted: 240 4.8% 95.9%;
+
+    /* PROJ-4 — App-shell chrome tokens (light).
+       Parallel CSS variable layer (`--cg-*`) ported from
+       docs/design/chrome.jsx. Tailwind exposes these under
+       `colors.cg.*`. Chrome primitives consume only the cg layer;
+       shadcn body content is unaffected. */
+    --cg-bg: #fafaf9;
+    --cg-surface: #ffffff;
+    --cg-surface-2: #f5f5f4;
+    --cg-surface-3: #efedeb;
+    --cg-border: #e7e5e4;
+    --cg-border-strong: #d6d3d1;
+    --cg-text: #1c1917;
+    --cg-text-muted: #78716c;
+    --cg-text-subtle: #a8a29e;
+    --cg-accent: #4f46e5;
+    --cg-accent-hov: #4338ca;
+    --cg-accent-soft: #eef0ff;
+    --cg-accent-fg: #ffffff;
+    --cg-accent-text: #3730a3;
+    --cg-danger: #dc2626;
+    --cg-danger-hov: #b91c1c;
+    --cg-danger-fg: #ffffff;
+    --cg-danger-soft: #fef2f2;
+    --cg-danger-border: #fecaca;
+    --cg-danger-text: #991b1b;
+    --cg-shadow-lg: 0 12px 32px rgba(28, 25, 23, 0.10),
+      0 2px 8px rgba(28, 25, 23, 0.06);
+    /* Avatar background lightness (per-theme; consumed by the
+       oklch() expression in src/components/shell/avatar.tsx). */
+    --cg-avatar-l: 0.62;
   }
 
   .dark {
@@ -87,6 +118,31 @@
     --auth-link: 213 94% 78%;
     --auth-accent-soft: 222 47% 18%;
     --auth-surface-muted: 240 3.7% 15.9%;
+
+    /* PROJ-4 — App-shell chrome tokens (dark). */
+    --cg-bg: #0c0a09;
+    --cg-surface: #161412;
+    --cg-surface-2: #1f1d1b;
+    --cg-surface-3: #2a2724;
+    --cg-border: #292524;
+    --cg-border-strong: #3c3835;
+    --cg-text: #f5f5f4;
+    --cg-text-muted: #a8a29e;
+    --cg-text-subtle: #78716c;
+    --cg-accent: #818cf8;
+    --cg-accent-hov: #a5b4fc;
+    --cg-accent-soft: rgba(129, 140, 248, 0.12);
+    --cg-accent-fg: #0c0a09;
+    --cg-accent-text: #c7d2fe;
+    --cg-danger: #dc2626;
+    --cg-danger-hov: #b91c1c;
+    --cg-danger-fg: #ffffff;
+    --cg-danger-soft: rgba(220, 38, 38, 0.14);
+    --cg-danger-border: rgba(220, 38, 38, 0.40);
+    --cg-danger-text: #fca5a5;
+    --cg-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5),
+      0 2px 8px rgba(0, 0, 0, 0.3);
+    --cg-avatar-l: 0.55;
   }
 }
 

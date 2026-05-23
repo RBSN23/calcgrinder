@@ -57,6 +57,28 @@ const config: Config = {
   			},
   			'auth-link': 'hsl(var(--auth-link))',
   			'auth-surface-muted': 'hsl(var(--auth-surface-muted))',
+  			cg: {
+  				bg: 'var(--cg-bg)',
+  				surface: 'var(--cg-surface)',
+  				'surface-2': 'var(--cg-surface-2)',
+  				'surface-3': 'var(--cg-surface-3)',
+  				border: 'var(--cg-border)',
+  				'border-strong': 'var(--cg-border-strong)',
+  				text: 'var(--cg-text)',
+  				'text-muted': 'var(--cg-text-muted)',
+  				'text-subtle': 'var(--cg-text-subtle)',
+  				accent: 'var(--cg-accent)',
+  				'accent-hov': 'var(--cg-accent-hov)',
+  				'accent-soft': 'var(--cg-accent-soft)',
+  				'accent-fg': 'var(--cg-accent-fg)',
+  				'accent-text': 'var(--cg-accent-text)',
+  				danger: 'var(--cg-danger)',
+  				'danger-hov': 'var(--cg-danger-hov)',
+  				'danger-fg': 'var(--cg-danger-fg)',
+  				'danger-soft': 'var(--cg-danger-soft)',
+  				'danger-border': 'var(--cg-danger-border)',
+  				'danger-text': 'var(--cg-danger-text)',
+  			},
   			sidebar: {
   				DEFAULT: 'hsl(var(--sidebar-background))',
   				foreground: 'hsl(var(--sidebar-foreground))',
@@ -72,6 +94,9 @@ const config: Config = {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
+  		},
+  		boxShadow: {
+  			'cg-lg': 'var(--cg-shadow-lg)',
   		},
   		keyframes: {
   			'accordion-down': {
