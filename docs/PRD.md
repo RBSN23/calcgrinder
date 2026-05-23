@@ -51,7 +51,7 @@ and cloning.
 | P0 (MVP) | Editor — Grid + Builder Two-Panel Split              | Deployed |
 | P0 (MVP) | Cell Authoring & Section Management                  | Deployed |
 | P0 (MVP) | Calculator Lifecycle — Publish, Sharing, Token Regen | Deployed |
-| P0 (MVP) | Visitor View — Calculator Interface                  | Planned  |
+| P0 (MVP) | Visitor View — Calculator Interface                  | Deployed |
 | P0 (MVP) | Scenarios — Save, Load, Share                        | Roadmap  |
 | P0 (MVP) | Soft-Delete & Trash Recovery                         | Roadmap  |
 | P0 (MVP) | Settings Page                                        | Roadmap  |

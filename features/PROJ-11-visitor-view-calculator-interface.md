@@ -1,8 +1,8 @@
 # PROJ-11: Visitor View — Calculator Interface
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-23
-**Last Updated:** 2026-05-23
+**Last Updated:** 2026-05-24
 
 ## Dependencies
 - **PROJ-6** Calculator Theme System — provides the runtime
@@ -1627,4 +1627,37 @@ published calculator to point at:
   visitor surface.
 
 ## Deployment
-_To be added by /deploy_
+
+- **Deployed:** 2026-05-24
+- **Production URL:** https://calcgrinder.vercel.app
+- **Visitor entrypoint:** https://calcgrinder.vercel.app/c/&lt;token&gt;
+- **Commit:** `a135127` (feat) + deploy bookkeeping commit
+- **Git tag:** `v1.11.0-PROJ-11`
+
+### Pre-deployment checks
+- `npm run build` — pass (Next.js 16.1.1 / Turbopack; 15/15 static pages generated)
+- `npm run lint` — pass (5 pre-existing warnings, 0 errors; none in PROJ-11 code)
+- Vitest unit tests — pass per QA (615 tests including PROJ-11 unit suites)
+- Playwright E2E — pass per QA (14 cases × 2 projects)
+- No secrets in tree; Upstash env vars left blank in `.env.local.example`
+- QA Approval: 32/33 ACs passed, 0 critical/high bugs (BUG-L1 + BUG-L2 deferred)
+
+### Production environment
+- `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` — set in Vercel production env (rate limiter active)
+- All existing PROJ-1..PROJ-10 env vars unchanged
+- Supabase migration `20260526000000_public_calculator_rpc.sql` already applied to Cloud (`supabase migration list --linked` confirms Local = Remote)
+
+### Post-deployment smoke
+- `GET /c/<unknown-token>` → 404 ✓
+- `GET /c/<script-injection>` → 404 (no 500, no leak) ✓
+- Response headers on 404: `cache-control: no-store`, `x-frame-options: DENY`,
+  `x-content-type-options: nosniff`, HSTS, `referrer-policy: origin-when-cross-origin` ✓
+- 200 / 410 / 429 paths verified during QA on localhost; production manual verification by the deployer.
+
+### Deferred polish (tracked, non-blocking)
+- **BUG-L1** — strip `owner_id` from the client-visible RPC payload until PROJ-12 needs it.
+- **BUG-L2** — collapse duplicate `<meta name="robots">` on the 404 route.
+- **AC not exercised E2E** — Input min/max validation visual (inherited from PROJ-9; underlying widget behaviour passing).
+
+### Rollback plan
+Vercel Dashboard → Deployments → promote the previous (PROJ-10) deployment to Production. The PROJ-11 migration is additive (only adds the `fn_get_public_calculator` RPC); leaving it in place after a rollback is harmless — the old build will simply not call it.

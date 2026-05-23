@@ -25,7 +25,7 @@
 | PROJ-8  | Editor — Grid + Builder Two-Panel Split              | P0       | PROJ-4, PROJ-5, PROJ-6, PROJ-7        | Deployed | [PROJ-8](PROJ-8-editor-grid-builder-two-panel-split.md) | 2026-05-23 |
 | PROJ-9  | Cell Authoring & Section Management                  | P0       | PROJ-6, PROJ-7, PROJ-8                | Deployed | [PROJ-9](PROJ-9-cell-authoring-and-section-management.md) | 2026-05-23 |
 | PROJ-10 | Calculator Lifecycle — Publish, Sharing, Token Regen | P0       | PROJ-5, PROJ-8, PROJ-9                | Deployed | [PROJ-10](PROJ-10-calculator-lifecycle-publish-sharing-token-regen.md) | 2026-05-22 |
-| PROJ-11 | Visitor View — Calculator Interface                  | P0       | PROJ-6, PROJ-7, PROJ-9, PROJ-10       | Approved | [PROJ-11](PROJ-11-visitor-view-calculator-interface.md) | 2026-05-22 |
+| PROJ-11 | Visitor View — Calculator Interface                  | P0       | PROJ-6, PROJ-7, PROJ-9, PROJ-10       | Deployed | [PROJ-11](PROJ-11-visitor-view-calculator-interface.md) | 2026-05-22 |
 | PROJ-12 | Scenarios — Save, Load, Share                        | P0       | PROJ-11                               | Roadmap | —    | 2026-05-22 |
 | PROJ-13 | Soft-Delete & Trash Recovery                         | P0       | PROJ-5, PROJ-10                       | Roadmap | —    | 2026-05-22 |
 | PROJ-14 | Settings Page                                        | P0       | PROJ-3, PROJ-6                        | Roadmap | —    | 2026-05-22 |
