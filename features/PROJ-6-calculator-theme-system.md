@@ -1,6 +1,6 @@
 # PROJ-6: Calculator Theme System
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-23
 **Last Updated:** 2026-05-23
 
@@ -657,4 +657,41 @@ No new npm installs.
 - **Recommendation:** Approve and proceed to `/deploy`.
 
 ## Deployment
-_To be added by /deploy_
+
+**Deployed:** 2026-05-23
+**Production URL:** https://calcgrinder.vercel.app
+**Deployed commit:** `7f3ca4f feat(PROJ-6): Implement Calculator Theme System` (rode to
+production with the subsequent `e0f99ea deploy(PROJ-7)` push — Vercel auto-deployed
+the tip of `main`, which already contained the PROJ-6 changes).
+
+### Pre-deployment checks
+- `npm run lint` — 0 errors (4 pre-existing PROJ-7 unused-import warnings, not
+  blocking).
+- `npm run build` — succeeds. All 15 routes generated; no new build warnings
+  introduced by PROJ-6.
+- QA Engineer approval (see `## QA Test Results` above): 9 / 9 acceptance criteria
+  passed, 8 / 8 edge cases handled, 0 bugs found, security audit clean.
+- 268 / 268 unit tests passing (81 new for PROJ-6); 36 / 38 E2E tests passing
+  (the 2 skips are pre-existing Mobile Safari opt-outs unrelated to PROJ-6).
+- Working tree clean before deploy; local `main` in sync with `origin/main`.
+- No new env vars required by PROJ-6 — theme system is pure static data + helpers.
+- No database migrations — PROJ-6 has no Supabase surface.
+
+### Post-deployment verification
+- Production root URL (https://calcgrinder.vercel.app) returns `HTTP/2 307` →
+  `/auth/login` (expected auth gate from PROJ-3).
+- `Link: rel=preload` headers carry the two Geist `.woff2` files from
+  `/_next/static/media/`, confirming `next/font/google` self-hosting wired by
+  PROJ-6 is live in production.
+- Security headers present (HSTS `max-age=31536000; includeSubDomains`,
+  `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy: origin-when-cross-origin`).
+- No Vercel build errors; the deployment status is **Ready**.
+- Theme tokens are downstream-consumer code only in v1 — no visible PROJ-6
+  surface until PROJ-8 (Editor) and PROJ-11 (Visitor View) ship; verification at
+  this stage is limited to the font-loading path and the absence of regressions
+  in the existing `/auth/*` and `/dashboard` routes (covered by the
+  passing E2E suite pre-deploy).
+
+### Git tag
+`v1.6.0-PROJ-6` — created and pushed at deploy bookkeeping time.
