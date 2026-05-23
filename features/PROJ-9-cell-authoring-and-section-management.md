@@ -2194,3 +2194,35 @@ Updated rename-route mock in `src/app/api/cells/[id]/route.test.ts`
 to feed an `updated_at` from each `UPDATE … RETURNING` and
 asserts the LAST rewrite's `updated_at` wins as
 `calculator_updated_at`.
+
+## Known Issues — Deferred to v1 polish
+
+These were identified during post-deploy smoke testing and intentionally deferred to the final polish cycle before v1 release. None block subsequent features.
+
+### Behavioural
+
+- **KI-1. Grid column order mirrors Builder reorder.** When a cell is drag-reordered in the Builder, the Grid column order updates in lockstep. The spec calls for Grid display_order to be independent of Builder display_order (per the data-model-vs-presentation separation — Grid is data-model authoring, Builder is presentation). Currently a single `display_order` column on `cells` serves both. Future fix: introduce a second `grid_display_order` column (or a separate Grid ordering helper that defaults to creation order). Touchpoints: `cells` table schema, GridPanel rendering, drag-reorder logic.
+
+- **KI-2. Add-cell latency: ~2-3 seconds from click to visible cell.** Both Grid column and Builder card appear with noticeable delay. Causes likely: server round-trip + sequential `RETURNING` query + client state dispatch + engine re-eval + scroll-into-view animation. Should be near-instant with optimistic update (the row data is fully knowable client-side from the existing `addCell` defaults). Future fix: dispatch the new cell into local state optimistically before the POST resolves, then reconcile the server-assigned ID on response. Same pattern as `patchCell`'s optimistic update.
+
+### Visual / UX from post-deploy smoke test (still pending)
+
+- **KI-3. App-theme leaks into Calculator-Theme preview.** When the App switches to Dark mode (via user profile menu), the Builder preview's background also goes dark — should be isolated per PROJ-6 AC "App-theme isolation".
+
+- **KI-4. Title shrinks during edit-in-place.** EditableText doesn't use the active theme's hero typography while in edit mode — the input field is smaller than the rendered title. Per Architecture Decision: "title becomes an inline `<input>` styled with the active calculator theme's hero typography (matching font, size, weight, colour)."
+
+- **KI-5. Hover-overlay placement on cell cards.** The edit-icon and Input/Output pill overlap each other on hover; spec calls for affordances "without layout shift" and clear non-overlapping placement.
+
+- **KI-6. Header and Grid frame not sticky on scroll.** When scrolling the Builder canvas, the top-bar and Grid panel both scroll out of view. Sticky positioning would improve usability for calculators with many cells.
+
+- **KI-7. Cross-section drop-zones don't activate visually.** Spec calls cross-section drag explicitly out-of-scope (Edge Cases), but the current UX is silent snap-back. Should show explicit feedback ("Cross-section moves aren't supported yet" toast on first attempt).
+
+- **KI-8. Tablet/Mobile icons in viewport-picker are not the right metaphor.** Should be device silhouettes or clear size indicators, not the current abstract icons.
+
+### UX revisions deferred to `/refine PROJ-9` (later)
+
+- **KI-9. Settings block too tall.** The kebab-expanded data-model panel takes too much vertical space. Visibility and Kind should be toggles (Hidden on/off; Input/Output toggle), not Selects with dropdown chrome. Also: the per-cell kebab should be cell-ops (add left/right, delete, duplicate) rather than settings-expand; settings access via a separate grid-wide toggle showing all cells' settings simultaneously rather than one-at-a-time.
+
+### Cross-feature gap (PROJ-5)
+
+- **KI-10. Created calculators don't appear in the Dashboard.** PROJ-5 wires hide-when-empty on My Calculators but the renderer was never wired up (only Presets render). Will be closed in PROJ-10 (Calculator Lifecycle, which introduces published-state) or a dedicated dashboard-hookup step before then.
