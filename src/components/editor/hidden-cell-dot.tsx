@@ -9,6 +9,7 @@
 
 import * as React from 'react';
 
+import { useIsBuilder } from '@/components/calculator';
 import type { CellRow } from '@/lib/cells/types';
 import { useEditor } from '@/lib/editor/EditorProvider';
 import { cn } from '@/lib/utils';
@@ -19,6 +20,12 @@ interface HiddenCellDotProps {
 }
 
 export function HiddenCellDot({ cell, accent }: HiddenCellDotProps) {
+  const isBuilder = useIsBuilder();
+  if (!isBuilder) return null;
+  return <HiddenCellDotInner cell={cell} accent={accent} />;
+}
+
+function HiddenCellDotInner({ cell, accent }: HiddenCellDotProps) {
   const { patchCell, removeCell } = useEditor();
   const [open, setOpen] = React.useState(false);
   return (

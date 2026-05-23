@@ -1,11 +1,11 @@
 'use client';
 
-// PROJ-9 — Section list (Builder canvas).
+// PROJ-9 / PROJ-11 — Section list (shared by Builder and Visitor).
 //
-// Hosts the DndContext that drives section drag-reorder. Each section
-// is a SortableItem keyed by its id; the drop event PATCHes
-// display_order via the editor store (which transactionally renumbers
-// siblings server-side).
+// In builder mode hosts the DndContext that drives section drag-reorder
+// + the "+ Add section" button. In visitor mode renders the sections in
+// `display_order` with no drag chrome and no add button. The actual
+// section body (`<SectionBlock>`) is shared.
 
 import * as React from 'react';
 
@@ -17,8 +17,13 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 
+import {
+  useCalculatorState,
+  useIsBuilder,
+} from '@/components/calculator';
 import { useEditor } from '@/lib/editor/EditorProvider';
 import type { Theme } from '@/lib/themes';
+import type { SectionRow } from '@/lib/sections/types';
 
 import { SortableItem, useEditorDndSensors } from './dnd-helpers';
 import { SectionBlock } from './section-block';
@@ -28,8 +33,34 @@ interface SectionListProps {
 }
 
 export function SectionList({ theme }: SectionListProps) {
-  const { state, addSection, patchSection } = useEditor();
-  const { sections, cells } = state;
+  const isBuilder = useIsBuilder();
+  return isBuilder ? (
+    <BuilderSectionList theme={theme} />
+  ) : (
+    <ReadOnlySectionList theme={theme} />
+  );
+}
+
+function ReadOnlySectionList({ theme }: SectionListProps) {
+  const { sections, cells } = useCalculatorState();
+  return (
+    <div className="flex flex-col gap-3">
+      {sections.map((section) => (
+        <SectionBlock
+          key={section.id}
+          section={section}
+          cells={cells.filter((c) => c.section_id === section.id)}
+          theme={theme}
+          canDelete={false}
+        />
+      ))}
+    </div>
+  );
+}
+
+function BuilderSectionList({ theme }: SectionListProps) {
+  const { sections, cells } = useCalculatorState();
+  const { addSection, patchSection } = useEditor();
   const canDelete = sections.length > 1;
 
   const sensors = useEditorDndSensors();
@@ -54,7 +85,7 @@ export function SectionList({ theme }: SectionListProps) {
     [sections, patchSection],
   );
 
-  const activeSection = activeId
+  const activeSection: SectionRow | null = activeId
     ? sections.find((s) => s.id === activeId) ?? null
     : null;
 

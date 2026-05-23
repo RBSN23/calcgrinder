@@ -1,34 +1,33 @@
 'use client';
 
-// PROJ-9 / PROJ-10 — Calculator hero with hover-edit affordance for
-// title + description. Title rename uses the checked variant that
-// surfaces `title_taken` inline (per-user uniqueness constraint
-// landed in PROJ-10); description still uses the fire-and-forget
-// path. Both commits enroll in undo / redo via the editor store.
+// PROJ-9 / PROJ-10 / PROJ-11 — Calculator hero (shared by Builder and
+// Visitor). Reads title / description / theme from the shared
+// `useCalculatorState()` context; the editable inputs are mounted only
+// when `useInteractivity() === 'builder'`. In visitor mode the hero
+// renders plain heading + paragraph elements.
 
 import * as React from 'react';
 
+import {
+  useCalculatorState,
+  useIsBuilder,
+} from '@/components/calculator';
 import { useEditor } from '@/lib/editor/EditorProvider';
 import { MAX_TITLE_LENGTH, validateTitle } from '@/lib/calculators/types';
 import { cardSurface, getTheme } from '@/lib/themes';
 
 import { EditableText } from './editable-text';
 
-interface CalculatorHeroProps {
-  themeId: string;
-  title: string;
-}
-
 const TITLE_TAKEN_MESSAGE = 'A calculator with this title already exists.';
 const TITLE_REQUIRED_MESSAGE = 'Title is required.';
 const TITLE_TOO_LONG_MESSAGE = `Titles can be at most ${MAX_TITLE_LENGTH} characters.`;
 
-export function CalculatorHero({ themeId, title }: CalculatorHeroProps) {
-  const { state, renameCalculatorChecked, setDescription } = useEditor();
-  const theme = getTheme(themeId);
+export function CalculatorHero() {
+  const { calculator } = useCalculatorState();
+  const theme = getTheme(calculator.theme_id);
   const heroSurface = cardSurface(theme, 'hero');
   const heroColor = theme.cardTints?.heroFg ?? theme.ink;
-  const description = state.calculator.description;
+  const isBuilder = useIsBuilder();
 
   return (
     <header
@@ -39,6 +38,85 @@ export function CalculatorHero({ themeId, title }: CalculatorHeroProps) {
       }}
       className="flex w-full flex-col gap-2"
     >
+      {isBuilder ? (
+        <BuilderHeroEditors heroColor={heroColor} themeUppercase={theme.uppercase} themeFont={theme.font} />
+      ) : (
+        <VisitorHeroDisplay
+          title={calculator.title}
+          description={calculator.description}
+          heroColor={heroColor}
+          themeUppercase={theme.uppercase}
+          themeFont={theme.font}
+        />
+      )}
+    </header>
+  );
+}
+
+interface VisitorHeroDisplayProps {
+  title: string;
+  description: string;
+  heroColor: string;
+  themeUppercase: boolean | undefined;
+  themeFont: string;
+}
+
+function VisitorHeroDisplay({
+  title,
+  description,
+  heroColor,
+  themeUppercase,
+  themeFont,
+}: VisitorHeroDisplayProps) {
+  return (
+    <>
+      <h1
+        style={{
+          color: heroColor,
+          fontFamily: themeFont,
+          fontSize: 28,
+          fontWeight: 700,
+          letterSpacing: themeUppercase ? 1 : -0.4,
+          textTransform: themeUppercase ? 'uppercase' : 'none',
+          lineHeight: 1.15,
+        }}
+      >
+        {title}
+      </h1>
+      {description ? (
+        <p
+          style={{
+            color: heroColor,
+            fontFamily: themeFont,
+            fontSize: 14,
+            lineHeight: 1.45,
+            opacity: 0.85,
+            whiteSpace: 'pre-wrap',
+          }}
+        >
+          {description}
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+interface BuilderHeroEditorsProps {
+  heroColor: string;
+  themeUppercase: boolean | undefined;
+  themeFont: string;
+}
+
+function BuilderHeroEditors({
+  heroColor,
+  themeUppercase,
+  themeFont,
+}: BuilderHeroEditorsProps) {
+  const { state, renameCalculatorChecked, setDescription } = useEditor();
+  const title = state.calculator.title;
+  const description = state.calculator.description;
+  return (
+    <>
       <EditableText
         value={title}
         placeholder="Untitled calculator"
@@ -64,11 +142,11 @@ export function CalculatorHero({ themeId, title }: CalculatorHeroProps) {
           <h1
             style={{
               color: heroColor,
-              fontFamily: theme.font,
+              fontFamily: themeFont,
               fontSize: 28,
               fontWeight: 700,
-              letterSpacing: theme.uppercase ? 1 : -0.4,
-              textTransform: theme.uppercase ? 'uppercase' : 'none',
+              letterSpacing: themeUppercase ? 1 : -0.4,
+              textTransform: themeUppercase ? 'uppercase' : 'none',
               lineHeight: 1.15,
               opacity: isPlaceholder ? 0.5 : 1,
             }}
@@ -88,7 +166,7 @@ export function CalculatorHero({ themeId, title }: CalculatorHeroProps) {
           <p
             style={{
               color: heroColor,
-              fontFamily: theme.font,
+              fontFamily: themeFont,
               fontSize: 14,
               lineHeight: 1.45,
               opacity: isPlaceholder ? 0.5 : 0.85,
@@ -101,6 +179,6 @@ export function CalculatorHero({ themeId, title }: CalculatorHeroProps) {
         )}
         inputClassName="w-full text-sm"
       />
-    </header>
+    </>
   );
 }

@@ -6,6 +6,9 @@
 // migration lands; until then the editor uses this local type as the
 // single source of truth.
 
+import type { CellRow } from '@/lib/cells/types';
+import type { SectionRow } from '@/lib/sections/types';
+
 export const MAX_TITLE_LENGTH = 100;
 
 export const DEFAULT_TITLE = 'Untitled calculator';
@@ -22,6 +25,54 @@ export interface CalculatorRow {
   published: boolean;
   public_token: string;
 }
+
+// PROJ-11 — Public calculator shape served by the SECURITY DEFINER RPC
+// `fn_get_public_calculator(p_token)`. Sections carry their cells already;
+// the visitor surface does not fan out additional fetches.
+//
+// Sections lose `calculator_id`, `created_at`, `updated_at` (not needed for
+// the read-only render). Cells lose `calculator_id`, `section_id`,
+// `created_at`, `updated_at` (same reason — the section already groups
+// them, and ordering is stable via `display_order`).
+
+export type PublicSectionCell = Omit<
+  CellRow,
+  'calculator_id' | 'section_id' | 'created_at' | 'updated_at'
+>;
+
+export type PublicSection = Omit<
+  SectionRow,
+  'calculator_id' | 'created_at' | 'updated_at'
+> & {
+  cells: PublicSectionCell[];
+};
+
+/**
+ * What `fetchPublicCalculator(token)` returns. Discriminated on `status`
+ * so the page / route handler can branch on 200 vs 410 cleanly. `null` is
+ * never returned for a "found-but-soft-deleted" calculator; instead the
+ * fetcher surfaces `status: 'gone'` so the route handler can return 410.
+ *
+ *   - 'ok'   → render the calculator at /c/<token>
+ *   - 'gone' → soft-deleted; route handler responds 410
+ *   - null   → no row matches the token; page responds 404
+ */
+export interface PublicCalculator {
+  id: string;
+  owner_id: string;
+  title: string;
+  description: string;
+  theme_id: string;
+  public_token: string;
+  published: boolean;
+  updated_at: string;
+  sections: PublicSection[];
+}
+
+export type PublicCalculatorFetchResult =
+  | { status: 'ok'; calculator: PublicCalculator }
+  | { status: 'gone'; soft_delete_at: string }
+  | null;
 
 export type TitleValidation =
   | { ok: true; value: string }

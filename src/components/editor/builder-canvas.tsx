@@ -1,25 +1,36 @@
 'use client';
 
-// PROJ-8 / PROJ-9 — Builder canvas (themed preview area).
+// PROJ-8 / PROJ-9 / PROJ-11 — Builder canvas.
 //
-// PROJ-8 owned the chrome (hero, viewport-constrained surface, fallback
-// theme banner). PROJ-9 fills the body with section + cell rendering.
+// PROJ-8 owned the chrome (viewport picker constraint, fallback theme
+// banner, aria region label). PROJ-9 filled the body with section +
+// cell rendering. PROJ-11 extracted the body into a shared
+// `<CalculatorRenderer>` consumed by both the Builder and the Visitor
+// surface; this canvas now wraps that renderer with builder-specific
+// chrome (viewport wrapper + fallback banner) and the builder context
+// providers (`InteractivityProvider mode="builder"` +
+// `BuilderCalculatorStateAdapter`).
 
 import * as React from 'react';
 
+import {
+  CalculatorRenderer,
+  InteractivityProvider,
+} from '@/components/calculator';
 import { EmptyOrErrorState } from '@/components/shell';
 import { useEditor } from '@/lib/editor/EditorProvider';
 import { getTheme, getThemeIds } from '@/lib/themes';
 
-import { CalculatorHero } from './calculator-hero';
-import { SectionList } from './section-list';
+import { BuilderCalculatorStateAdapter } from './builder-calculator-state-adapter';
 import { viewportMaxWidth } from './viewport-picker';
 
 export function BuilderCanvas() {
   const { state } = useEditor();
-  const { calculator, viewportMode, sections } = state;
-  const theme = getTheme(calculator.theme_id);
+  const { calculator, viewportMode } = state;
   const isFallback = !getThemeIds().includes(calculator.theme_id as never);
+  // The renderer itself reads theme_id from the calculator-state context;
+  // we only need `getTheme` here for the future fallback banner.
+  void getTheme(calculator.theme_id);
 
   return (
     <div
@@ -27,34 +38,18 @@ export function BuilderCanvas() {
       aria-label="Calculator preview"
       className="flex-1 overflow-auto bg-cg-bg"
     >
-      <div className="mx-auto flex h-full flex-col gap-3 p-6" style={{ maxWidth: viewportMaxWidth(viewportMode) }}>
+      <div
+        className="mx-auto flex h-full flex-col gap-3 p-6"
+        style={{ maxWidth: viewportMaxWidth(viewportMode) }}
+      >
         {isFallback ? <FallbackThemeBanner /> : null}
-        <div
-          style={{
-            background: theme.bg,
-            color: theme.text,
-            fontFamily: theme.font,
-            borderRadius: theme.radius,
-            border: `1px solid ${theme.border}`,
-            padding: theme.padding,
-          }}
-          className="flex flex-col gap-4"
-        >
-          <CalculatorHero themeId={calculator.theme_id} title={calculator.title} />
-          {sections.length > 0 ? <SectionList theme={theme} /> : <EmptyBuilder />}
-        </div>
+        <InteractivityProvider mode="builder">
+          <BuilderCalculatorStateAdapter>
+            <CalculatorRenderer />
+          </BuilderCalculatorStateAdapter>
+        </InteractivityProvider>
       </div>
     </div>
-  );
-}
-
-function EmptyBuilder() {
-  return (
-    <EmptyOrErrorState
-      variant="empty"
-      title="Add a section to get started"
-      body="Use the “Add” button in the Builder toolbar to create your first section."
-    />
   );
 }
 

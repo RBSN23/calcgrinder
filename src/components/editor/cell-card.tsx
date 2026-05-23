@@ -1,18 +1,26 @@
 'use client';
 
-// PROJ-9 — Cell card (Builder preview).
+// PROJ-9 / PROJ-11 — Cell card (shared by Builder and Visitor).
 //
 // Renders one visible cell: label, description, input widget (for
-// Inputs) or computed value (for Outputs), error states, KPI emphasis
-// (best-effort), card-level visuals. The visual-presentation panel
-// (CellVisualPanel) opens from the hover edit-icon.
+// Inputs) or computed value (for Outputs), error states, card-level
+// visuals. The hover-pencil edit affordance + visual panel + drag
+// handle render ONLY in builder mode — gated by `useInteractivity()`.
 
 import * as React from 'react';
 
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  useCalculatorState,
+  useIsBuilder,
+} from '@/components/calculator';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import type { CellRow } from '@/lib/cells/types';
 import { useEditor } from '@/lib/editor/EditorProvider';
-import { useEvaluationContext } from '@/lib/editor/EvaluationContext';
 import { cardSurface, labelTextStyle, numberStyle, type Theme } from '@/lib/themes';
 import { cn } from '@/lib/utils';
 import { isEmpty } from '@/lib/formula';
@@ -29,9 +37,8 @@ interface CellCardProps {
 }
 
 export function CellCard({ cell, theme, dragHandleProps, isDragging }: CellCardProps) {
-  const { patchCell, removeCell } = useEditor();
-  const { getResult, inputs, setInput } = useEvaluationContext();
-  const [panelOpen, setPanelOpen] = React.useState(false);
+  const { getResult, inputs, setInput } = useCalculatorState();
+  const isBuilder = useIsBuilder();
 
   const result = getResult(cell.name);
   const tintKind = cell.kind === 'output' ? 'results' : 'inputs';
@@ -71,8 +78,7 @@ export function CellCard({ cell, theme, dragHandleProps, isDragging }: CellCardP
       style={cardStyle}
       data-cell-id={cell.id}
     >
-      {/* Drag-handle in the top-left, only visible on hover */}
-      {dragHandleProps ? (
+      {isBuilder && dragHandleProps ? (
         <div className="pointer-events-none absolute left-1.5 top-1.5 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
           <DragHandle
             ariaLabel={`Reorder cell: ${cell.label || cell.name}`}
@@ -80,21 +86,11 @@ export function CellCard({ cell, theme, dragHandleProps, isDragging }: CellCardP
           />
         </div>
       ) : null}
-      {/* Hover affordances */}
-      <div className="pointer-events-none absolute right-2 top-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
-        <button
-          type="button"
-          aria-label="Edit cell appearance"
-          onClick={() => setPanelOpen((v) => !v)}
-          className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-cg-surface/90 text-cg-text-muted shadow-sm ring-1 ring-cg-border hover:text-cg-text"
-        >
-          <PencilIcon />
-        </button>
-      </div>
+      {isBuilder ? <CellEditAffordance cell={cell} theme={theme} /> : null}
 
       <div className="flex items-baseline justify-between gap-2">
         <span style={labelTextStyle(theme, theme.muted)}>{cell.label || cell.name}</span>
-        <CellKindPill kind={cell.kind} />
+        {isBuilder ? <CellKindPill kind={cell.kind} /> : null}
       </div>
 
       {cell.description && cell.description_render === 'caption' ? (
@@ -133,7 +129,30 @@ export function CellCard({ cell, theme, dragHandleProps, isDragging }: CellCardP
           </Tooltip>
         </TooltipProvider>
       ) : null}
+    </div>
+  );
+}
 
+interface CellEditAffordanceProps {
+  cell: CellRow;
+  theme: Theme;
+}
+
+function CellEditAffordance({ cell, theme }: CellEditAffordanceProps) {
+  const { patchCell, removeCell } = useEditor();
+  const [panelOpen, setPanelOpen] = React.useState(false);
+  return (
+    <>
+      <div className="pointer-events-none absolute right-2 top-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+        <button
+          type="button"
+          aria-label="Edit cell appearance"
+          onClick={() => setPanelOpen((v) => !v)}
+          className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-cg-surface/90 text-cg-text-muted shadow-sm ring-1 ring-cg-border hover:text-cg-text"
+        >
+          <PencilIcon />
+        </button>
+      </div>
       {panelOpen ? (
         <CellVisualPanel
           cell={cell}
@@ -146,7 +165,7 @@ export function CellCard({ cell, theme, dragHandleProps, isDragging }: CellCardP
           }}
         />
       ) : null}
-    </div>
+    </>
   );
 }
 

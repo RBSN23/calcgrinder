@@ -1,8 +1,13 @@
 'use client';
 
-// PROJ-9 — Section block: header, toolbar, layout-pattern grid, hidden
-// dots, empty placeholder. Hosts a nested DndContext for cell
-// drag-reorder within the section.
+// PROJ-9 / PROJ-11 — Section block (shared by Builder and Visitor).
+//
+// In builder mode renders the full edit surface: drag handle, editable
+// title + description, layout-pattern picker, options dropdown, drop
+// placeholder, hidden-cell dot row, nested cell-DnD. In visitor mode
+// renders only the section title + optional description + cell grid;
+// hidden cells produce zero output (no dot), no toolbar, no empty
+// placeholder.
 
 import * as React from 'react';
 
@@ -14,6 +19,10 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 
+import {
+  useCalculatorState,
+  useIsBuilder,
+} from '@/components/calculator';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,9 +48,11 @@ interface SectionBlockProps {
   section: SectionRow;
   cells: CellRow[];
   theme: Theme;
-  /** True when the section can be deleted (i.e. not the only section). */
+  /** True when the section can be deleted (i.e. not the only section).
+   * Visitor mode passes `false` (no delete affordance). */
   canDelete: boolean;
-  /** Drag-handle props from the parent SortableItem (section reorder). */
+  /** Drag-handle props from the parent SortableItem (section reorder).
+   * Visitor mode passes `undefined`. */
   dragHandleProps?: React.HTMLAttributes<HTMLElement>;
   isDragging?: boolean;
 }
@@ -54,9 +65,7 @@ export function SectionBlock({
   dragHandleProps,
   isDragging,
 }: SectionBlockProps) {
-  const { patchSection, removeSection, addCell } = useEditor();
-  const [confirmOpen, setConfirmOpen] = React.useState(false);
-
+  const isBuilder = useIsBuilder();
   const { pattern, fellBack } = resolveLayoutPattern(theme.layoutPatterns, section.layout_pattern_id);
 
   const visibleCells = React.useMemo(
@@ -72,101 +81,39 @@ export function SectionBlock({
     <section
       data-section-id={section.id}
       className={cn(
-        'group/section relative flex flex-col gap-2 rounded-md border border-dashed border-transparent p-2 transition-colors hover:border-cg-border',
-        isDragging && 'border-cg-accent/40 bg-cg-surface',
+        'relative flex flex-col gap-2 p-2',
+        isBuilder &&
+          'group/section rounded-md border border-dashed border-transparent transition-colors hover:border-cg-border',
+        isBuilder && isDragging && 'border-cg-accent/40 bg-cg-surface',
       )}
     >
       <header className="flex items-start gap-2">
-        <div className="opacity-0 transition-opacity group-hover/section:opacity-100">
-          {dragHandleProps ? (
-            <DragHandle ariaLabel={`Reorder section: ${section.title}`} {...dragHandleProps} />
-          ) : null}
-        </div>
+        {isBuilder ? (
+          <div className="opacity-0 transition-opacity group-hover/section:opacity-100">
+            {dragHandleProps ? (
+              <DragHandle ariaLabel={`Reorder section: ${section.title}`} {...dragHandleProps} />
+            ) : null}
+          </div>
+        ) : null}
         <div className="min-w-0 flex-1">
-          <EditableText
-            value={section.title}
-            ariaLabel="Section title"
-            maxLength={MAX_SECTION_TITLE_LENGTH}
-            validate={(next) => ({ ok: validateSectionTitle(next).ok })}
-            onCommit={async (next) => {
-              await patchSection(section.id, { title: next });
-            }}
-            renderResting={({ displayValue }) => (
-              <h2
-                style={{
-                  fontFamily: theme.font,
-                  fontSize: 16,
-                  fontWeight: 700,
-                  color: theme.ink,
-                }}
-              >
-                {displayValue}
-              </h2>
-            )}
-            inputClassName="w-full font-bold"
-          />
-          <EditableText
-            value={section.description}
-            placeholder="Add a description"
-            ariaLabel="Section description"
-            multiline
-            onCommit={async (next) => {
-              await patchSection(section.id, { description: next });
-            }}
-            renderResting={({ displayValue, isPlaceholder }) => (
-              <p
-                className={cn(
-                  'text-[12.5px] leading-snug',
-                  isPlaceholder && 'italic opacity-60',
-                )}
-                style={{ color: theme.muted, whiteSpace: 'pre-wrap' }}
-              >
-                {displayValue}
-              </p>
-            )}
-            inputClassName="w-full text-[12.5px]"
-            showHoverAffordance={false}
-          />
+          {isBuilder ? (
+            <BuilderSectionTitle section={section} theme={theme} />
+          ) : (
+            <ReadOnlySectionTitle section={section} theme={theme} />
+          )}
         </div>
-        <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover/section:opacity-100">
-          <LayoutPatternPicker
-            patterns={theme.layoutPatterns}
-            activeId={pattern.id}
-            onPick={(id) => patchSection(section.id, { layout_pattern_id: id })}
+        {isBuilder ? (
+          <SectionToolbar
+            section={section}
+            cells={cells}
+            theme={theme}
+            canDelete={canDelete}
+            activePatternId={pattern.id}
           />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                aria-label="Section options"
-                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-cg-text-muted hover:bg-cg-surface-2"
-              >
-                <DotsVerticalIcon />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-cg-surface">
-              <DropdownMenuItem
-                disabled={!canDelete}
-                onSelect={(e) => {
-                  e.preventDefault();
-                  if (!canDelete) return;
-                  if (cells.length === 0) {
-                    void removeSection(section.id);
-                  } else {
-                    setConfirmOpen(true);
-                  }
-                }}
-                className="text-red-600 focus:bg-red-50 focus:text-red-700"
-                title={!canDelete ? 'A calculator must have at least one section.' : undefined}
-              >
-                Delete section
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        ) : null}
       </header>
 
-      {fellBack ? (
+      {isBuilder && fellBack ? (
         <EmptyOrErrorState
           variant="error"
           framed={false}
@@ -176,7 +123,7 @@ export function SectionBlock({
       ) : null}
 
       {cells.length === 0 ? (
-        <EmptySectionPlaceholder onAdd={() => addCell(section.id)} />
+        isBuilder ? <BuilderEmptySectionPlaceholder sectionId={section.id} /> : null
       ) : (
         <LayoutPatternGrid
           sectionId={section.id}
@@ -186,7 +133,150 @@ export function SectionBlock({
           theme={theme}
         />
       )}
+    </section>
+  );
+}
 
+interface ReadOnlySectionTitleProps {
+  section: SectionRow;
+  theme: Theme;
+}
+
+function ReadOnlySectionTitle({ section, theme }: ReadOnlySectionTitleProps) {
+  return (
+    <>
+      <h2
+        style={{
+          fontFamily: theme.font,
+          fontSize: 16,
+          fontWeight: 700,
+          color: theme.ink,
+        }}
+      >
+        {section.title}
+      </h2>
+      {section.description ? (
+        <p
+          className="text-[12.5px] leading-snug"
+          style={{ color: theme.muted, whiteSpace: 'pre-wrap' }}
+        >
+          {section.description}
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+interface BuilderSectionTitleProps {
+  section: SectionRow;
+  theme: Theme;
+}
+
+function BuilderSectionTitle({ section, theme }: BuilderSectionTitleProps) {
+  const { patchSection } = useEditor();
+  return (
+    <>
+      <EditableText
+        value={section.title}
+        ariaLabel="Section title"
+        maxLength={MAX_SECTION_TITLE_LENGTH}
+        validate={(next) => ({ ok: validateSectionTitle(next).ok })}
+        onCommit={async (next) => {
+          await patchSection(section.id, { title: next });
+        }}
+        renderResting={({ displayValue }) => (
+          <h2
+            style={{
+              fontFamily: theme.font,
+              fontSize: 16,
+              fontWeight: 700,
+              color: theme.ink,
+            }}
+          >
+            {displayValue}
+          </h2>
+        )}
+        inputClassName="w-full font-bold"
+      />
+      <EditableText
+        value={section.description}
+        placeholder="Add a description"
+        ariaLabel="Section description"
+        multiline
+        onCommit={async (next) => {
+          await patchSection(section.id, { description: next });
+        }}
+        renderResting={({ displayValue, isPlaceholder }) => (
+          <p
+            className={cn(
+              'text-[12.5px] leading-snug',
+              isPlaceholder && 'italic opacity-60',
+            )}
+            style={{ color: theme.muted, whiteSpace: 'pre-wrap' }}
+          >
+            {displayValue}
+          </p>
+        )}
+        inputClassName="w-full text-[12.5px]"
+        showHoverAffordance={false}
+      />
+    </>
+  );
+}
+
+interface SectionToolbarProps {
+  section: SectionRow;
+  cells: CellRow[];
+  theme: Theme;
+  canDelete: boolean;
+  activePatternId: string;
+}
+
+function SectionToolbar({
+  section,
+  cells,
+  theme,
+  canDelete,
+  activePatternId,
+}: SectionToolbarProps) {
+  const { patchSection, removeSection } = useEditor();
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
+  return (
+    <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover/section:opacity-100">
+      <LayoutPatternPicker
+        patterns={theme.layoutPatterns}
+        activeId={activePatternId}
+        onPick={(id) => patchSection(section.id, { layout_pattern_id: id })}
+      />
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label="Section options"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-cg-text-muted hover:bg-cg-surface-2"
+          >
+            <DotsVerticalIcon />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="bg-cg-surface">
+          <DropdownMenuItem
+            disabled={!canDelete}
+            onSelect={(e) => {
+              e.preventDefault();
+              if (!canDelete) return;
+              if (cells.length === 0) {
+                void removeSection(section.id);
+              } else {
+                setConfirmOpen(true);
+              }
+            }}
+            className="text-red-600 focus:bg-red-50 focus:text-red-700"
+            title={!canDelete ? 'A calculator must have at least one section.' : undefined}
+          >
+            Delete section
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <DestructiveConfirmSheet
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
@@ -194,7 +284,20 @@ export function SectionBlock({
         description={`Its ${cells.length} element${cells.length === 1 ? '' : 's'} will be removed too.`}
         onConfirm={() => removeSection(section.id, { confirmDeleteWithChildren: true })}
       />
-    </section>
+    </div>
+  );
+}
+
+function BuilderEmptySectionPlaceholder({ sectionId }: { sectionId: string }) {
+  const { addCell } = useEditor();
+  return (
+    <button
+      type="button"
+      onClick={() => addCell(sectionId)}
+      className="flex w-full items-center justify-center rounded-md border border-dashed border-cg-border bg-cg-surface/40 px-4 py-6 text-[12.5px] text-cg-text-muted transition-colors hover:bg-cg-surface-2"
+    >
+      Drop elements here, or use + Add
+    </button>
   );
 }
 
@@ -213,7 +316,72 @@ function LayoutPatternGrid({
   hiddenCells,
   theme,
 }: LayoutPatternGridProps) {
-  const { state, patchCell } = useEditor();
+  const isBuilder = useIsBuilder();
+  return (
+    <div className="flex flex-col gap-2">
+      {isBuilder ? (
+        <BuilderLayoutGrid
+          sectionId={sectionId}
+          columnSpans={columnSpans}
+          visibleCells={visibleCells}
+          theme={theme}
+        />
+      ) : (
+        <ReadOnlyLayoutGrid
+          columnSpans={columnSpans}
+          visibleCells={visibleCells}
+          theme={theme}
+        />
+      )}
+      {isBuilder && hiddenCells.length > 0 ? (
+        <div className="-mt-1 flex flex-wrap items-center justify-center gap-1.5">
+          {hiddenCells.map((c) => (
+            <HiddenCellDot key={c.id} cell={c} accent={theme.accent} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+interface ReadOnlyLayoutGridProps {
+  columnSpans: number[];
+  visibleCells: CellRow[];
+  theme: Theme;
+}
+
+function ReadOnlyLayoutGrid({
+  columnSpans,
+  visibleCells,
+  theme,
+}: ReadOnlyLayoutGridProps) {
+  const template = columnSpans.map((s) => `${s}fr`).join(' ');
+  return (
+    <div className="grid w-full gap-3" style={{ gridTemplateColumns: template }}>
+      {visibleCells.map((cell) => (
+        <div key={cell.id} className="min-w-0">
+          <CellCard cell={cell} theme={theme} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+interface BuilderLayoutGridProps {
+  sectionId: string;
+  columnSpans: number[];
+  visibleCells: CellRow[];
+  theme: Theme;
+}
+
+function BuilderLayoutGrid({
+  sectionId,
+  columnSpans,
+  visibleCells,
+  theme,
+}: BuilderLayoutGridProps) {
+  const { cells: allCells } = useCalculatorState();
+  const { patchCell } = useEditor();
   const toast = useEditorToast();
   const template = columnSpans.map((s) => `${s}fr`).join(' ');
 
@@ -236,7 +404,7 @@ function LayoutPatternGrid({
       // Defensive: cross-section drops are nominally impossible (each
       // section is its own SortableContext), but if a stray id leaks
       // surface the spec-mandated toast and abort.
-      const targetSectionId = state.cells.find((c) => c.id === over.id)?.section_id;
+      const targetSectionId = allCells.find((c) => c.id === over.id)?.section_id;
       if (targetSectionId && targetSectionId !== sectionId) {
         toast("Cross-section moves aren't supported yet.");
         return;
@@ -250,7 +418,7 @@ function LayoutPatternGrid({
       // entry so a single Cmd-Z restores the prior order.
       void patchCell(active.id as string, { display_order: newIndex });
     },
-    [visibleCells, sectionId, state.cells, patchCell, toast],
+    [visibleCells, sectionId, allCells, patchCell, toast],
   );
 
   const activeCell = activeId
@@ -258,60 +426,39 @@ function LayoutPatternGrid({
     : null;
 
   return (
-    <div className="flex flex-col gap-2">
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={(e) => setActiveId(e.active.id as string)}
-        onDragCancel={() => setActiveId(null)}
-        onDragEnd={handleDragEnd}
-      >
-        <SortableContext items={orderedIds} strategy={rectSortingStrategy}>
-          <div className="grid w-full gap-3" style={{ gridTemplateColumns: template }}>
-            {visibleCells.map((cell) => (
-              <SortableItem key={cell.id} id={cell.id}>
-                {({ setNodeRef, style, dragHandleProps, isDragging }) => (
-                  <div ref={setNodeRef} style={style} className="min-w-0">
-                    <CellCard
-                      cell={cell}
-                      theme={theme}
-                      dragHandleProps={dragHandleProps}
-                      isDragging={isDragging}
-                    />
-                  </div>
-                )}
-              </SortableItem>
-            ))}
-          </div>
-        </SortableContext>
-        <DragOverlay>
-          {activeCell ? (
-            <div className="rounded-md border border-cg-accent/40 bg-cg-surface p-3 shadow-lg">
-              <p className="text-[12px] font-medium text-cg-text">{activeCell.label || activeCell.name}</p>
-            </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
-      {hiddenCells.length > 0 ? (
-        <div className="-mt-1 flex flex-wrap items-center justify-center gap-1.5">
-          {hiddenCells.map((c) => (
-            <HiddenCellDot key={c.id} cell={c} accent={theme.accent} />
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={(e) => setActiveId(e.active.id as string)}
+      onDragCancel={() => setActiveId(null)}
+      onDragEnd={handleDragEnd}
+    >
+      <SortableContext items={orderedIds} strategy={rectSortingStrategy}>
+        <div className="grid w-full gap-3" style={{ gridTemplateColumns: template }}>
+          {visibleCells.map((cell) => (
+            <SortableItem key={cell.id} id={cell.id}>
+              {({ setNodeRef, style, dragHandleProps, isDragging }) => (
+                <div ref={setNodeRef} style={style} className="min-w-0">
+                  <CellCard
+                    cell={cell}
+                    theme={theme}
+                    dragHandleProps={dragHandleProps}
+                    isDragging={isDragging}
+                  />
+                </div>
+              )}
+            </SortableItem>
           ))}
         </div>
-      ) : null}
-    </div>
-  );
-}
-
-function EmptySectionPlaceholder({ onAdd }: { onAdd: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onAdd}
-      className="flex w-full items-center justify-center rounded-md border border-dashed border-cg-border bg-cg-surface/40 px-4 py-6 text-[12.5px] text-cg-text-muted transition-colors hover:bg-cg-surface-2"
-    >
-      Drop elements here, or use + Add
-    </button>
+      </SortableContext>
+      <DragOverlay>
+        {activeCell ? (
+          <div className="rounded-md border border-cg-accent/40 bg-cg-surface p-3 shadow-lg">
+            <p className="text-[12px] font-medium text-cg-text">{activeCell.label || activeCell.name}</p>
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   );
 }
 

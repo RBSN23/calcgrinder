@@ -314,6 +314,21 @@ export type Database = {
           updated_at: string
         }[]
       }
+      fn_get_public_calculator: {
+        Args: { p_token: string }
+        Returns: {
+          description: string
+          id: string
+          owner_id: string
+          public_token: string
+          published: boolean
+          sections: Json
+          soft_delete_at: string
+          theme_id: string
+          title: string
+          updated_at: string
+        }[]
+      }
       gen_calculator_public_token: { Args: never; Returns: string }
       is_sysadmin: { Args: { uid: string }; Returns: boolean }
     }
