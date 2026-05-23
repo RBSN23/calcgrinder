@@ -1102,6 +1102,7 @@ _None — all interview questions resolved in the Decision Log._
 | Delete-confirm body omits the "N scenarios will become orphan" line in PROJ-10 (option A) | PROJ-12 owns the `scenarios` table; in PROJ-10's reality every calculator has 0 scenarios, so "0 scenarios will become orphan" reads weird. PROJ-12 extends the same `<DeleteCalcSheet>` to query the count and append the line conditionally. | 2026-05-23 |
 | Delete-confirm body renders `RETENTION_PERIOD_DAYS` from the env var (not hardcoded "30") | The PRD documents the env var as configurable; copy must respect deployer-set values so a 60-day deployer's UI doesn't say "30 days". | 2026-05-23 |
 | Public-view / Preview / Copy URL ship live in PROJ-10, accepting a brief 404 window until PROJ-11 deploys | PROJ-10 → PROJ-11 is sequential per the canonical build order; the 404 window is brief; the icon-button code is small; PROJ-11 lights up the destination. The alternative (gating the UI on PROJ-11) added cross-feature coordination for marginal benefit. | 2026-05-23 |
+| BUG-L1 (hero rename stale-path silently collapses input with old title) deferred to v1 polish | QA flagged this as Low / cosmetic ("Acceptable as-is for v1"). The user already sees the store-toasted error, and the input collapses with the old title — the behaviour is internally consistent, just not the strictest possible UX. Tracked in the Known Issues block below; closed in a later `/refine PROJ-10` pass before v1 release. | 2026-05-23 |
 
 ### Technical Decisions
 
@@ -1793,3 +1794,11 @@ migration 20260525000000 already pushed and `supabase migration list
 
 ## Deployment
 _To be added by /deploy_
+
+## Known Issues — Deferred to v1 polish
+
+These were identified during the QA cycle and intentionally deferred to the final polish cycle before v1 release. None block subsequent features.
+
+### Behavioural
+
+- **KI-1. Hero rename stale-path silently swallows the error code.** When `renameCalculatorChecked` returns `{ ok: false }` without one of the three validation codes (`title_taken` / `title_required` / `title_too_long`) — i.e. a stale-write 409 or a network error — the hero returns `{ ok: true }` to `EditableText` so the input collapses; the store has already toasted the error. The user sees the toast but the input collapses with the *old* title, where a stricter UX would keep the input open so the user sees their rejected text. Internally consistent, but a reader of the code might expect the input to stay open on stale. Touchpoints: `src/components/editor/calculator-hero.tsx:60-61`, `EditorProvider.tsx` `renameCalculatorChecked`. Future fix: surface the stale/unknown failure to the `EditableText` caller so the input stays open and the rejected text is preserved; or, alternatively, document the silent-collapse behaviour explicitly with a code comment. Originally tracked in the QA Test Results section as **BUG-L1** (Low / cosmetic — "Acceptable as-is for v1" per QA).
