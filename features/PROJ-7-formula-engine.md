@@ -1,6 +1,6 @@
 # PROJ-7: Formula Engine
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-23
 **Last Updated:** 2026-05-23
 
@@ -1102,4 +1102,44 @@ helpers that PROJ-8 / 9 / 10 / 11 will consume.
 > Next step: Run `/deploy` to deploy this feature.
 
 ## Deployment
-_To be added by /deploy_
+
+**Production URL:** https://calcgrinder.vercel.app
+**Deployed:** 2026-05-23
+**Deploy commit:** aee0ca0 (`feat(PROJ-7): Implement Formula Engine`)
+**Vercel deployment state:** success
+
+### Pre-deployment checks
+- `npm run build` — succeeds (Next.js 16.1.1, 15 routes prerendered, no
+  PROJ-7-related warnings).
+- `npm run lint` — 0 errors, 4 pre-existing unused-import warnings;
+  fixed 2 `prefer-const` errors in `functions/string.ts` before commit.
+- `npm test -- --run src/lib/formula` — 150 / 150 passing in ~2.2 s.
+- Full project test suite — 418 / 418 passing.
+- QA approved (no Critical / High / Medium bugs; one Low
+  defense-in-depth note documented in spec).
+
+### Post-deployment verification
+- Vercel commit-status check on `aee0ca0`: state `success` ("Deployment
+  has completed").
+- `GET /` → HTTP 307 (middleware redirect to /auth/login when
+  unauthenticated — matches PROJ-4 behaviour).
+- `GET /auth/login` → HTTP 200.
+- `GET /dashboard` → HTTP 307 (auth-gated redirect — expected).
+
+### What deployed vs. what didn't ship
+PROJ-7 ships a pure-TypeScript library with no UI, no API route, no
+DB touchpoint, and no env-var requirement. The engine is tree-
+shaken out of routes that don't consume it; visible production
+behaviour is unchanged for end users. Consumers (PROJ-8 Editor,
+PROJ-9 Cell Authoring, PROJ-10 Publish gate, PROJ-11 Visitor View)
+will exercise the engine in their own deploys.
+
+### Operational notes
+- No new env vars added in Vercel.
+- No new Supabase migrations.
+- No new cron jobs.
+- No new dependencies (engine adds zero runtime packages).
+
+### Tag
+`v1.7.0-PROJ-7` — Deploy Formula Engine
+
