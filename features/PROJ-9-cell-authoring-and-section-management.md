@@ -1,6 +1,6 @@
 # PROJ-9: Cell Authoring & Section Management
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-23
 **Last Updated:** 2026-05-23
 
@@ -2040,4 +2040,29 @@ Recommended next step: run `/deploy PROJ-9`. The deploy must include:
 
 
 ## Deployment
-_To be added by /deploy_
+
+- **Production URL:** https://calcgrinder.vercel.app
+- **Deployed:** 2026-05-23
+- **Commit:** `9cf6518` (feat) — auto-deployed by Vercel on push to `main`
+- **Migration:** `20260524120000_sections_and_cells.sql` applied to
+  the linked Supabase Cloud project ahead of deploy (verified by
+  `supabase migration list --linked`). Types regenerated into
+  `src/lib/supabase/types.ts`.
+- **Pre-deploy checks:** `npm run lint` clean (0 errors, 4 pre-
+  existing warnings in `src/lib/formula/`), `npm run build`
+  succeeds, all 16 routes generated including the four new
+  PROJ-9 API routes (`/api/calculators/[id]/sections`,
+  `/api/sections/[id]`, `/api/sections/[id]/cells`,
+  `/api/cells/[id]`).
+- **Post-deploy verification:** Editor route renders the new
+  section + cell pipeline on a freshly created calculator
+  (default Section 1 backfilled), +Add Cell creates an Input
+  cell server-side and pulses it into view, rename rewrites
+  dependent formulas in a single PATCH, hidden-cell dot +
+  toolbar pill behave per spec.
+- **Forward-compat hooks landed:** `display_emphasis = tabular`
+  enum value persisted (renderer ships in PROJ-17), polymorphic
+  `display_element` dispatch in `<SectionBlock>` ready for
+  chart/text-block registration (PROJ-15 / PROJ-16), Builder
+  hover-discoverability pattern reused by PROJ-11's visitor
+  renderer.
