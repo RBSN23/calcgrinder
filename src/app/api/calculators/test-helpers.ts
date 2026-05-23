@@ -18,16 +18,28 @@ export const ROW_FIXTURE = {
 export interface QueryResult {
   data: unknown;
   error: unknown;
+  count?: number | null;
 }
 
 export interface MockBuilder {
   insert: Mock;
   update: Mock;
+  delete: Mock;
   select: Mock;
   eq: Mock;
+  neq: Mock;
+  gt: Mock;
+  lt: Mock;
+  in: Mock;
   is: Mock;
+  order: Mock;
+  limit: Mock;
   single: Mock;
   maybeSingle: Mock;
+  then: (
+    onFulfilled?: (value: QueryResult) => unknown,
+    onRejected?: (reason: unknown) => unknown,
+  ) => Promise<unknown>;
 }
 
 export interface MockSupabase {
@@ -63,11 +75,24 @@ export function makeSupabaseMock(opts: {
       const builder: MockBuilder = {
         insert: vi.fn(() => builder),
         update: vi.fn(() => builder),
+        delete: vi.fn(() => builder),
         select: vi.fn(() => builder),
         eq: vi.fn(() => builder),
+        neq: vi.fn(() => builder),
+        gt: vi.fn(() => builder),
+        lt: vi.fn(() => builder),
+        in: vi.fn(() => builder),
         is: vi.fn(() => builder),
+        order: vi.fn(() => builder),
+        limit: vi.fn(() => builder),
         single: vi.fn(async () => result),
         maybeSingle: vi.fn(async () => result),
+        // Thenable: lets routes `await builder` after a chain that
+        // doesn't end in single/maybeSingle (e.g. `.select(...).eq(...)`
+        // returning a list, or count: 'exact' / head: true reads).
+        then(onFulfilled, onRejected) {
+          return Promise.resolve(result).then(onFulfilled, onRejected);
+        },
       };
       builders.push(builder);
       mock._lastBuilder = builder;

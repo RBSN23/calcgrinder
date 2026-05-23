@@ -1,3 +1,4 @@
+import { SINGLE_COLUMN_PATTERN } from './layout-patterns';
 import type { Theme } from './types';
 
 export const terminal: Theme = {
@@ -35,4 +36,5 @@ export const terminal: Theme = {
   cols3: '1fr 1fr 1.5fr',
   headerH: 60,
   cardTints: null,
+  layoutPatterns: [SINGLE_COLUMN_PATTERN],
 };

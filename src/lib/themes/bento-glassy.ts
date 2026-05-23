@@ -1,3 +1,10 @@
+import {
+  ONE_THIRD_TWO_THIRDS_PATTERN,
+  SINGLE_COLUMN_PATTERN,
+  THREE_COLUMN_PATTERN,
+  TWO_COLUMN_PATTERN,
+  TWO_THIRDS_ONE_THIRD_PATTERN,
+} from './layout-patterns';
 import type { Theme } from './types';
 
 export const bentoGlassy: Theme = {
@@ -40,4 +47,11 @@ export const bentoGlassy: Theme = {
     hero: 'rgba(26,26,46,0.78)',
     heroFg: '#FFFFFF',
   },
+  layoutPatterns: [
+    SINGLE_COLUMN_PATTERN,
+    TWO_COLUMN_PATTERN,
+    THREE_COLUMN_PATTERN,
+    TWO_THIRDS_ONE_THIRD_PATTERN,
+    ONE_THIRD_TWO_THIRDS_PATTERN,
+  ],
 };

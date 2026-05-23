@@ -358,7 +358,7 @@ test.describe('PROJ-8 — Editor shell', () => {
     }
   });
 
-  test('Builder toolbar shows Undo · Redo · ViewportPicker · "+ Add" with all options disabled', async ({
+  test('Builder toolbar shows Undo · Redo · ViewportPicker · "+ Add" with Cell+Section enabled (PROJ-9), Chart+Text disabled', async ({
     page,
     isMobile,
   }) => {
@@ -381,8 +381,14 @@ test.describe('PROJ-8 — Editor shell', () => {
 
       const addButton = toolbar.getByRole('button', { name: /add element/i });
       await addButton.click();
-      // All four options visible-but-disabled in PROJ-8.
-      for (const label of ['Cell', 'Chart', 'Text block', 'Section']) {
+      // PROJ-9 flips Cell + Section from disabled to enabled.
+      for (const label of ['Cell', 'Section']) {
+        const opt = page.getByRole('menuitem', { name: new RegExp(`^${label}`, 'i') });
+        await expect(opt).toBeVisible();
+        await expect(opt).toBeEnabled();
+      }
+      // Chart + Text block stay disabled with v1.1 tooltips.
+      for (const label of ['Chart', 'Text block']) {
         const opt = page.getByRole('menuitem', { name: new RegExp(label, 'i') });
         await expect(opt).toBeVisible();
         await expect(opt).toBeDisabled();

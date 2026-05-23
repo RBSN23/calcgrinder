@@ -4,14 +4,16 @@
 // every "do" callback with a synchronous dispatch so the reducer remains
 // trivially testable. Async PATCH plumbing lives in the provider, not here.
 //
-// Three slices share a single reducer:
+// Slices share a single reducer:
 //   - calculator: { id, title, description, theme_id, updated_at }
 //   - undo/redo : { past, future } of inverse operation descriptors
 //   - layout    : { gridHeight, gridCollapsed, viewportMode, gridDrawerOpen }
-//
-// PROJ-9 will add a cell slice alongside these three with no reshuffle.
+//   - sections  : SectionRow[] (PROJ-9)
+//   - cells     : CellRow[]    (PROJ-9)
 
 import type { CalculatorRow } from '@/lib/calculators/types';
+import type { CellRow } from '@/lib/cells/types';
+import type { SectionRow } from '@/lib/sections/types';
 
 /**
  * One enrolled history entry. The provider is responsible for running
@@ -40,6 +42,8 @@ export interface EditorState {
   gridDrawerOpen: boolean;
   /** Set to true after a 409 stale-write. Disables further commits until reload. */
   stale: boolean;
+  sections: SectionRow[];
+  cells: CellRow[];
 }
 
 export const DEFAULT_GRID_HEIGHT = 164;
@@ -61,9 +65,19 @@ export type EditorAction =
   | { type: 'TOGGLE_GRID_COLLAPSED' }
   | { type: 'SET_VIEWPORT'; mode: ViewportMode }
   | { type: 'SET_DRAWER_OPEN'; open: boolean }
-  | { type: 'MARK_STALE' };
+  | { type: 'MARK_STALE' }
+  | { type: 'SET_SECTIONS'; sections: SectionRow[] }
+  | { type: 'SET_CELLS'; cells: CellRow[] }
+  | { type: 'UPSERT_SECTION'; section: SectionRow }
+  | { type: 'REMOVE_SECTION'; id: string }
+  | { type: 'UPSERT_CELL'; cell: CellRow }
+  | { type: 'UPSERT_CELLS'; cells: CellRow[] }
+  | { type: 'REMOVE_CELL'; id: string };
 
-export function initialEditorState(row: CalculatorRow): EditorState {
+export function initialEditorState(
+  row: CalculatorRow,
+  opts: { sections?: SectionRow[]; cells?: CellRow[] } = {},
+): EditorState {
   return {
     calculator: row,
     past: [],
@@ -74,6 +88,8 @@ export function initialEditorState(row: CalculatorRow): EditorState {
     viewportMode: 'desktop',
     gridDrawerOpen: false,
     stale: false,
+    sections: opts.sections ?? [],
+    cells: opts.cells ?? [],
   };
 }
 
@@ -172,7 +188,73 @@ export function editorReducer(
     case 'MARK_STALE':
       // Once stale, freeze the history so undo cannot replay against a 409 server.
       return { ...state, stale: true, past: [], future: [] };
+    case 'SET_SECTIONS':
+      return { ...state, sections: sortSections(action.sections) };
+    case 'SET_CELLS':
+      return { ...state, cells: sortCells(action.cells) };
+    case 'UPSERT_SECTION': {
+      const idx = state.sections.findIndex((s) => s.id === action.section.id);
+      const next =
+        idx === -1
+          ? [...state.sections, action.section]
+          : state.sections.map((s) => (s.id === action.section.id ? action.section : s));
+      return { ...state, sections: sortSections(next) };
+    }
+    case 'REMOVE_SECTION':
+      return {
+        ...state,
+        sections: state.sections.filter((s) => s.id !== action.id),
+        cells: state.cells.filter((c) => c.section_id !== action.id),
+      };
+    case 'UPSERT_CELL': {
+      const idx = state.cells.findIndex((c) => c.id === action.cell.id);
+      const next =
+        idx === -1
+          ? [...state.cells, action.cell]
+          : state.cells.map((c) => (c.id === action.cell.id ? action.cell : c));
+      return { ...state, cells: sortCells(next) };
+    }
+    case 'UPSERT_CELLS': {
+      const byId = new Map(action.cells.map((c) => [c.id, c]));
+      const merged = state.cells.map((c) => byId.get(c.id) ?? c);
+      const newOnes = action.cells.filter(
+        (c) => !state.cells.some((existing) => existing.id === c.id),
+      );
+      return { ...state, cells: sortCells([...merged, ...newOnes]) };
+    }
+    case 'REMOVE_CELL':
+      return { ...state, cells: state.cells.filter((c) => c.id !== action.id) };
     default:
       return state;
   }
+}
+
+function sortSections(rows: SectionRow[]): SectionRow[] {
+  return [...rows].sort((a, b) => a.display_order - b.display_order);
+}
+
+function sortCells(rows: CellRow[]): CellRow[] {
+  // Primary key is section_id (UUID string compare), secondary is
+  // display_order within a section. This is NOT the same order as
+  // section.display_order then cell.display_order — the reducer
+  // intentionally has no access to the sections slice (sortCells must
+  // run on a single slice in isolation).
+  //
+  // Every cross-section consumer re-sorts or filters per section
+  // before rendering, so the in-store order isn't user-visible:
+  //   - GridPanel + GridDrawerToggle re-sort via a section_id →
+  //     section.display_order map.
+  //   - SectionList + SectionBlock filter by section_id and use the
+  //     within-section display_order (which IS correct here).
+  //   - useEvaluation maps each cell by name; order-insensitive.
+  // The only consumer that walks state.cells cross-section without a
+  // re-sort is HiddenCellsPill's popover list, and its sort order is
+  // an explicit Open Question in PROJ-9's spec (defer to feedback).
+  // If a future consumer needs section-then-cell display_order it
+  // must select-and-sort with `state.sections` in hand.
+  return [...rows].sort((a, b) => {
+    if (a.section_id < b.section_id) return -1;
+    if (a.section_id > b.section_id) return 1;
+    return a.display_order - b.display_order;
+  });
 }

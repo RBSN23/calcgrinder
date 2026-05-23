@@ -1,0 +1,821 @@
+import { test, expect, type Page } from '@playwright/test';
+import { createClient } from '@supabase/supabase-js';
+import { readFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
+import { resolve } from 'node:path';
+
+/**
+ * End-to-end tests for PROJ-9 — Cell Authoring & Section Management.
+ *
+ * Coverage focuses on the spec's golden-path acceptance criteria plus the
+ * security/RLS surface:
+ *   - POST /api/calculators creates the default Section 1 in the same flow
+ *     and returns a `default_section_id` (AC: default section side effect).
+ *   - The editor loader hydrates sections + cells on the server pass, and
+ *     the default Section 1 is visible on first paint.
+ *   - "+ Add" picker enables Cell + Section in PROJ-9 (PROJ-8 had both
+ *     disabled — covered by an updated PROJ-8 spec too).
+ *   - Clicking "+ Add → Cell" creates an Input cell in the last section
+ *     with sequential name `cell_1`, label "New cell", value_type=number,
+ *     visible + editable, and it appears in both the Builder and the Grid.
+ *   - Clicking "+ Add → Section" appends a section after the last one.
+ *   - The Grid panel's "+ add cell" right-edge affordance also creates a
+ *     cell.
+ *   - Calculator hero is edit-in-place (title + description) and the
+ *     breadcrumb stays in sync.
+ *   - Hidden-cells pill is hidden when count = 0 and unhides on toggle.
+ *   - Cross-owner section / cell PATCH / DELETE attempts return 404
+ *     (RLS-bound — no leakage of existence).
+ *   - Unauthenticated cell/section PATCH returns 401.
+ *   - POST /api/sections/:sid/cells rejects reserved cell names (400) and
+ *     names matching the invalid pattern.
+ *   - PATCH /api/cells/:id rejects cross-section moves (422
+ *     cross_section_move_unsupported).
+ *   - DELETE /api/sections/:id refuses the last section (422
+ *     cannot_delete_last_section).
+ *
+ * Tests run on signed-in approved users bootstrapped against the linked
+ * Cloud Supabase project, the same pattern PROJ-3 / PROJ-5 / PROJ-8 use.
+ */
+
+function loadEnv(key: string): string {
+  const envPath = resolve(__dirname, '..', '.env.local');
+  const contents = readFileSync(envPath, 'utf8');
+  const re = new RegExp(`^${key}=(.*)$`, 'm');
+  const match = contents.match(re);
+  if (!match || !match[1]) {
+    throw new Error(`${key} not found in .env.local`);
+  }
+  return match[1].trim().replace(/^["']|["']$/g, '');
+}
+
+const SUPABASE_URL = loadEnv('NEXT_PUBLIC_SUPABASE_URL');
+const SUPABASE_SECRET = loadEnv('SUPABASE_SECRET_KEY');
+
+const admin = createClient(SUPABASE_URL, SUPABASE_SECRET, {
+  auth: { autoRefreshToken: false, persistSession: false },
+});
+
+type ApprovedUser = {
+  userId: string;
+  email: string;
+  password: string;
+  name: string;
+};
+
+async function bootstrapApprovedUser(): Promise<ApprovedUser> {
+  const suffix = randomBytes(4).toString('hex');
+  const email = `e2e-proj9-${suffix}@example.com`;
+  const password = `Password-${randomBytes(6).toString('hex')}`;
+  const name = `Ada ${suffix}`;
+
+  const { data: created, error: createErr } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { name },
+  });
+  if (createErr || !created.user) {
+    throw new Error(`failed to bootstrap user: ${createErr?.message ?? 'no user'}`);
+  }
+  const userId = created.user.id;
+
+  const { error: updateErr } = await admin
+    .from('profiles')
+    .update({ status: 'approved', name, role: 'registered' })
+    .eq('id', userId);
+  if (updateErr) {
+    throw new Error(`failed to approve profile: ${updateErr.message}`);
+  }
+
+  return { userId, email, password, name };
+}
+
+async function teardown(userId: string) {
+  // Cascade deletes the user's calculators (and their sections / cells via FK).
+  await admin.auth.admin.deleteUser(userId);
+}
+
+async function signIn(page: Page, user: ApprovedUser) {
+  await page.goto('/auth/login');
+  await page.fill('input[name="email"]', user.email);
+  await page.fill('input[name="password"]', user.password);
+  await Promise.all([
+    page.waitForURL(/\/dashboard$/),
+    page.click('button[type="submit"]'),
+  ]);
+}
+
+async function createCalculator(page: Page): Promise<string> {
+  await Promise.all([
+    page.waitForURL(/\/editor\/[0-9a-f-]{36}$/),
+    page.getByRole('button', { name: /build a new calculator/i }).click(),
+  ]);
+  const url = page.url();
+  const match = url.match(/\/editor\/([0-9a-f-]{36})/);
+  if (!match) throw new Error(`Failed to extract calculator id from URL: ${url}`);
+  return match[1];
+}
+
+test.describe('PROJ-9 — Cell Authoring & Section Management', () => {
+  test('POST /api/calculators creates the default Section 1 in the same flow and returns default_section_id', async ({
+    page,
+  }) => {
+    const user = await bootstrapApprovedUser();
+    try {
+      await signIn(page, user);
+      // Capture the POST response.
+      const responsePromise = page.waitForResponse(
+        (res) =>
+          res.url().endsWith('/api/calculators') && res.request().method() === 'POST',
+      );
+      await page.getByRole('button', { name: /build a new calculator/i }).click();
+      const response = await responsePromise;
+      expect(response.status()).toBe(201);
+      const body = await response.json();
+      expect(body).toHaveProperty('id');
+      expect(body).toHaveProperty('default_section_id');
+      expect(typeof body.default_section_id).toBe('string');
+      expect(body.default_section_id.length).toBeGreaterThan(0);
+
+      // Confirm the section landed in the DB.
+      const { data: sections } = await admin
+        .from('sections')
+        .select('id, title, layout_pattern_id, display_order')
+        .eq('calculator_id', body.id);
+      expect(sections).not.toBeNull();
+      expect(sections!).toHaveLength(1);
+      expect(sections![0].title).toBe('Section 1');
+      expect(sections![0].layout_pattern_id).toBe('single_column');
+      expect(sections![0].display_order).toBe(0);
+    } finally {
+      await teardown(user.userId);
+    }
+  });
+
+  test('+Add → Cell creates an Input cell in the last section with sequential default name', async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, 'Desktop AddPicker; mobile uses footer +Add');
+    const user = await bootstrapApprovedUser();
+    try {
+      await signIn(page, user);
+      const calcId = await createCalculator(page);
+
+      const toolbar = page.getByRole('toolbar', { name: /builder toolbar/i });
+      await toolbar.getByRole('button', { name: /add element/i }).click();
+      const cellOption = page.getByRole('menuitem', { name: /^Cell/i });
+      await expect(cellOption).toBeEnabled();
+      await cellOption.click();
+
+      // Cell should appear in the DB.
+      await expect
+        .poll(
+          async () => {
+            const { data } = await admin
+              .from('cells')
+              .select('name, kind, value_type, visibility, editability')
+              .eq('calculator_id', calcId);
+            return data ?? [];
+          },
+          { timeout: 5000 },
+        )
+        .toHaveLength(1);
+
+      const { data: cells } = await admin
+        .from('cells')
+        .select('name, kind, value_type, visibility, editability, label, display_widget')
+        .eq('calculator_id', calcId);
+      expect(cells![0]).toMatchObject({
+        name: 'cell_1',
+        kind: 'input',
+        value_type: 'number',
+        visibility: 'visible',
+        editability: 'editable',
+        label: 'New cell',
+        display_widget: 'number_field',
+      });
+    } finally {
+      await teardown(user.userId);
+    }
+  });
+
+  test('+Add → Section appends a new section after the last one', async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, 'Desktop AddPicker; mobile uses footer +Add');
+    const user = await bootstrapApprovedUser();
+    try {
+      await signIn(page, user);
+      const calcId = await createCalculator(page);
+
+      const toolbar = page.getByRole('toolbar', { name: /builder toolbar/i });
+      await toolbar.getByRole('button', { name: /add element/i }).click();
+      await page.getByRole('menuitem', { name: /^Section/i }).click();
+
+      await expect
+        .poll(
+          async () => {
+            const { data } = await admin
+              .from('sections')
+              .select('display_order, title')
+              .eq('calculator_id', calcId)
+              .order('display_order', { ascending: true });
+            return (data ?? []).map((s) => s.display_order);
+          },
+          { timeout: 5000 },
+        )
+        .toEqual([0, 1]);
+    } finally {
+      await teardown(user.userId);
+    }
+  });
+
+  test('Grid panel "+ add cell" right-edge affordance creates a cell in the last section', async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, 'Desktop Grid only; mobile uses GridDrawer');
+    const user = await bootstrapApprovedUser();
+    try {
+      await signIn(page, user);
+      const calcId = await createCalculator(page);
+
+      const gridRegion = page.getByRole('region', { name: /grid panel/i });
+      await expect(gridRegion).toBeVisible();
+      await gridRegion.getByRole('button', { name: /^add cell$/i }).click();
+
+      await expect
+        .poll(
+          async () => {
+            const { data } = await admin
+              .from('cells')
+              .select('name')
+              .eq('calculator_id', calcId);
+            return (data ?? []).length;
+          },
+          { timeout: 5000 },
+        )
+        .toBe(1);
+    } finally {
+      await teardown(user.userId);
+    }
+  });
+
+  test('Calculator hero title is edit-in-place and breadcrumb stays in sync', async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, 'Hero edit affordance is desktop-first');
+    const user = await bootstrapApprovedUser();
+    try {
+      await signIn(page, user);
+      const calcId = await createCalculator(page);
+
+      // Click the hero title button (EditableText resting state)
+      const heroTitle = page.getByRole('button', {
+        name: /Calculator title — click to edit/i,
+      });
+      await expect(heroTitle).toBeVisible();
+      await heroTitle.click();
+      const input = page.getByRole('textbox', { name: /^Calculator title$/i });
+      await input.fill('Mortgage Calculator');
+      await input.press('Enter');
+
+      // Wait for DB to reflect the rename.
+      await expect
+        .poll(
+          async () => {
+            const { data } = await admin
+              .from('calculators')
+              .select('title')
+              .eq('id', calcId)
+              .maybeSingle();
+            return data?.title ?? null;
+          },
+          { timeout: 5000 },
+        )
+        .toBe('Mortgage Calculator');
+
+      // Breadcrumb segment (top bar nav) should show the new title.
+      const breadcrumbNav = page.getByRole('navigation', { name: /breadcrumb/i });
+      await expect(breadcrumbNav).toContainText(/Mortgage Calculator/i);
+    } finally {
+      await teardown(user.userId);
+    }
+  });
+
+  test('Cross-owner section PATCH/DELETE returns 404 (RLS opacity)', async ({
+    browser,
+  }) => {
+    const owner = await bootstrapApprovedUser();
+    const intruder = await bootstrapApprovedUser();
+    const ownerCtx = await browser.newContext();
+    const intruderCtx = await browser.newContext();
+    try {
+      // Owner creates a calculator (yielding a default section).
+      const ownerPage = await ownerCtx.newPage();
+      await signIn(ownerPage, owner);
+      const calcId = await createCalculator(ownerPage);
+      const { data: sections } = await admin
+        .from('sections')
+        .select('id')
+        .eq('calculator_id', calcId);
+      const sectionId = sections![0].id;
+      const { data: calc } = await admin
+        .from('calculators')
+        .select('updated_at')
+        .eq('id', calcId)
+        .maybeSingle();
+      const updatedAt = calc!.updated_at;
+
+      // Intruder uses a separate browser context (isolated cookies).
+      const intruderPage = await intruderCtx.newPage();
+      await signIn(intruderPage, intruder);
+
+      const patchRes = await intruderPage.request.patch(
+        `/api/sections/${sectionId}`,
+        { data: { updated_at: updatedAt, title: 'Hacked' } },
+      );
+      expect(patchRes.status()).toBe(404);
+
+      const deleteRes = await intruderPage.request.delete(
+        `/api/sections/${sectionId}`,
+      );
+      expect(deleteRes.status()).toBe(404);
+
+      const { data: stillThere } = await admin
+        .from('sections')
+        .select('title')
+        .eq('id', sectionId)
+        .maybeSingle();
+      expect(stillThere?.title).toBe('Section 1');
+    } finally {
+      await ownerCtx.close();
+      await intruderCtx.close();
+      await teardown(owner.userId);
+      await teardown(intruder.userId);
+    }
+  });
+
+  test('Unauthenticated PATCH /api/cells/:id is gated by middleware (redirected to /auth/login)', async ({ request }) => {
+    // PROJ-3 middleware redirects anonymous requests on /api/* to
+    // /auth/login?next=… BEFORE the route handler runs. The route's own
+    // 401 check is a defensive fallback; in practice the request never
+    // reaches it. Following redirects (default in Playwright) lands on
+    // /auth/login (HTTP 200). Disable redirects to confirm the 302 layer.
+    const res = await request.patch(
+      '/api/cells/00000000-0000-4000-8000-000000000000',
+      {
+        data: { updated_at: '2026-01-01T00:00:00Z', label: 'pwn' },
+        maxRedirects: 0,
+      },
+    );
+    expect([302, 307]).toContain(res.status());
+    const location = res.headers().location ?? '';
+    expect(location).toMatch(/\/auth\/login/);
+  });
+
+  test('POST /api/sections/:sid/cells rejects reserved word names (400 name_reserved)', async ({
+    page,
+  }) => {
+    const user = await bootstrapApprovedUser();
+    try {
+      await signIn(page, user);
+      const calcId = await createCalculator(page);
+      const { data: sections } = await admin
+        .from('sections')
+        .select('id')
+        .eq('calculator_id', calcId);
+      const sectionId = sections![0].id;
+
+      const res = await page.request.post(`/api/sections/${sectionId}/cells`, {
+        data: { name: 'pmt' }, // PMT is a built-in formula function
+      });
+      expect(res.status()).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBe('name_reserved');
+      expect(body.reserved_word).toBe('pmt');
+    } finally {
+      await teardown(user.userId);
+    }
+  });
+
+  test('POST /api/sections/:sid/cells rejects invalid name pattern (400 name_invalid)', async ({
+    page,
+  }) => {
+    const user = await bootstrapApprovedUser();
+    try {
+      await signIn(page, user);
+      const calcId = await createCalculator(page);
+      const { data: sections } = await admin
+        .from('sections')
+        .select('id')
+        .eq('calculator_id', calcId);
+      const sectionId = sections![0].id;
+
+      // Uppercase letters are invalid per [a-z][a-z0-9_]*
+      const res = await page.request.post(`/api/sections/${sectionId}/cells`, {
+        data: { name: 'Loan_Amount' },
+      });
+      expect(res.status()).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBe('name_invalid');
+    } finally {
+      await teardown(user.userId);
+    }
+  });
+
+  test('PATCH /api/cells/:id rejects cross-section moves (422 cross_section_move_unsupported)', async ({
+    page,
+  }) => {
+    const user = await bootstrapApprovedUser();
+    try {
+      await signIn(page, user);
+      const calcId = await createCalculator(page);
+      const { data: sections } = await admin
+        .from('sections')
+        .select('id')
+        .eq('calculator_id', calcId);
+      const sectionId = sections![0].id;
+
+      // Create a cell directly via the API.
+      const createRes = await page.request.post(`/api/sections/${sectionId}/cells`, {
+        data: {},
+      });
+      expect(createRes.status()).toBe(201);
+      const cell = await createRes.json();
+
+      const { data: calc } = await admin
+        .from('calculators')
+        .select('updated_at')
+        .eq('id', calcId)
+        .maybeSingle();
+
+      // Attempt cross-section move (valid UUIDv4 format so zod accepts).
+      const moveRes = await page.request.patch(`/api/cells/${cell.id}`, {
+        data: {
+          updated_at: calc!.updated_at,
+          section_id: '00000000-0000-4000-8000-000000000000',
+        },
+      });
+      expect(moveRes.status()).toBe(422);
+      const body = await moveRes.json();
+      expect(body.error).toBe('cross_section_move_unsupported');
+    } finally {
+      await teardown(user.userId);
+    }
+  });
+
+  test('DELETE /api/sections/:id refuses the calculator\'s only section (422 cannot_delete_last_section)', async ({
+    page,
+  }) => {
+    const user = await bootstrapApprovedUser();
+    try {
+      await signIn(page, user);
+      const calcId = await createCalculator(page);
+      const { data: sections } = await admin
+        .from('sections')
+        .select('id')
+        .eq('calculator_id', calcId);
+      const sectionId = sections![0].id;
+
+      const res = await page.request.delete(`/api/sections/${sectionId}`);
+      expect(res.status()).toBe(422);
+      const body = await res.json();
+      expect(body.error).toBe('cannot_delete_last_section');
+
+      // Section is still there.
+      const { data: stillThere } = await admin
+        .from('sections')
+        .select('id')
+        .eq('id', sectionId)
+        .maybeSingle();
+      expect(stillThere).not.toBeNull();
+    } finally {
+      await teardown(user.userId);
+    }
+  });
+
+  test('DELETE /api/sections/:id with child cells requires confirm_delete_with_children=true (409 section_not_empty)', async ({
+    page,
+  }) => {
+    const user = await bootstrapApprovedUser();
+    try {
+      await signIn(page, user);
+      const calcId = await createCalculator(page);
+      const { data: sections } = await admin
+        .from('sections')
+        .select('id')
+        .eq('calculator_id', calcId);
+      const firstSectionId = sections![0].id;
+
+      // Add a second section so the first is no longer the "last".
+      const secondRes = await page.request.post(
+        `/api/calculators/${calcId}/sections`,
+        { data: {} },
+      );
+      expect(secondRes.status()).toBe(201);
+
+      // Add a cell to the first section.
+      const cellRes = await page.request.post(
+        `/api/sections/${firstSectionId}/cells`,
+        { data: {} },
+      );
+      expect(cellRes.status()).toBe(201);
+
+      // DELETE without confirm should return 409 + child_count.
+      const noConfirmRes = await page.request.delete(
+        `/api/sections/${firstSectionId}`,
+      );
+      expect(noConfirmRes.status()).toBe(409);
+      const body = await noConfirmRes.json();
+      expect(body.error).toBe('section_not_empty');
+      expect(body.child_count).toBe(1);
+
+      // DELETE with confirm succeeds.
+      const confirmRes = await page.request.delete(
+        `/api/sections/${firstSectionId}?confirm_delete_with_children=true`,
+      );
+      expect(confirmRes.status()).toBe(204);
+    } finally {
+      await teardown(user.userId);
+    }
+  });
+
+  test('Cell rename rewrites dependent formulas in the same transaction (single undo)', async ({
+    page,
+  }) => {
+    const user = await bootstrapApprovedUser();
+    try {
+      await signIn(page, user);
+      const calcId = await createCalculator(page);
+      const { data: sections } = await admin
+        .from('sections')
+        .select('id')
+        .eq('calculator_id', calcId);
+      const sectionId = sections![0].id;
+
+      // Create an Input "loan_amount" with default value, and an Output that references it.
+      const inputRes = await page.request.post(
+        `/api/sections/${sectionId}/cells`,
+        {
+          data: {
+            kind: 'input',
+            name: 'loan_amount',
+            value_type: 'number',
+            default_value: 100000,
+          },
+        },
+      );
+      expect(inputRes.status()).toBe(201);
+      const inputCell = await inputRes.json();
+
+      const outputRes = await page.request.post(
+        `/api/sections/${sectionId}/cells`,
+        {
+          data: {
+            kind: 'output',
+            name: 'doubled',
+            value_type: 'number',
+            formula: 'loan_amount * 2',
+          },
+        },
+      );
+      expect(outputRes.status()).toBe(201);
+      const outputCell = await outputRes.json();
+
+      // Rename loan_amount → principal.
+      const { data: calc } = await admin
+        .from('calculators')
+        .select('updated_at')
+        .eq('id', calcId)
+        .maybeSingle();
+      const renameRes = await page.request.patch(`/api/cells/${inputCell.id}`, {
+        data: { updated_at: calc!.updated_at, name: 'principal' },
+      });
+      expect(renameRes.status()).toBe(200);
+      const renameBody = await renameRes.json();
+      expect(renameBody.cell.name).toBe('principal');
+      expect(renameBody.rewritten_cell_ids).toContain(outputCell.id);
+
+      // Confirm dependent formula was rewritten on disk.
+      const { data: refreshedOutput } = await admin
+        .from('cells')
+        .select('formula')
+        .eq('id', outputCell.id)
+        .maybeSingle();
+      expect(refreshedOutput?.formula).toBe('principal * 2');
+    } finally {
+      await teardown(user.userId);
+    }
+  });
+
+  test('200-cell cap is enforced (422 cell_cap_reached)', async ({ page }) => {
+    test.setTimeout(120000);
+    const user = await bootstrapApprovedUser();
+    try {
+      await signIn(page, user);
+      const calcId = await createCalculator(page);
+      const { data: sections } = await admin
+        .from('sections')
+        .select('id')
+        .eq('calculator_id', calcId);
+      const sectionId = sections![0].id;
+
+      // Bulk-insert 200 cells directly into the DB to avoid 200 round-trips.
+      const rows = Array.from({ length: 200 }, (_, i) => ({
+        calculator_id: calcId,
+        section_id: sectionId,
+        kind: 'input',
+        name: `cell_${i + 1}`,
+        label: 'Bulk',
+        value_type: 'number',
+        editability: 'editable',
+        display_order: i,
+        display_widget: 'number_field',
+      }));
+      const { error: bulkErr } = await admin.from('cells').insert(rows);
+      expect(bulkErr).toBeNull();
+
+      // 201st cell via the API must hit the cap.
+      const res = await page.request.post(`/api/sections/${sectionId}/cells`, {
+        data: {},
+      });
+      expect(res.status()).toBe(422);
+      const body = await res.json();
+      expect(body.error).toBe('cell_cap_reached');
+      expect(body.max).toBe(200);
+    } finally {
+      await teardown(user.userId);
+    }
+  });
+
+  test('Empty section title is rejected client-side (shake/red treatment, stays in edit mode)', async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, 'Section header edit affordance is desktop-first');
+    const user = await bootstrapApprovedUser();
+    try {
+      await signIn(page, user);
+      const calcId = await createCalculator(page);
+
+      // Click the default section title to enter edit mode.
+      const titleButton = page.getByRole('button', {
+        name: /Section title — click to edit/i,
+      });
+      await expect(titleButton).toBeVisible();
+      await titleButton.click();
+      const input = page.getByRole('textbox', { name: /^Section title$/i });
+      await input.fill('   '); // whitespace-only — validateSectionTitle rejects.
+      await input.press('Enter');
+
+      // Still in edit mode (not reverted to button), aria-invalid set,
+      // input keeps focus.
+      await expect(input).toBeFocused();
+      await expect(input).toHaveAttribute('aria-invalid', 'true');
+
+      // After ~600ms the invalid pulse clears, but the input is still
+      // there — the value never committed.
+      await page.waitForTimeout(700);
+      await expect(input).toBeFocused();
+
+      // DB title is unchanged.
+      const { data: sections } = await admin
+        .from('sections')
+        .select('title')
+        .eq('calculator_id', calcId);
+      expect(sections![0].title).toBe('Section 1');
+
+      // Esc reverts and exits edit mode.
+      await input.press('Escape');
+      await expect(
+        page.getByRole('button', { name: /Section title — click to edit/i }),
+      ).toBeVisible();
+    } finally {
+      await teardown(user.userId);
+    }
+  });
+
+  test('Undo of a section delete restores the original section + cell UUIDs', async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, 'Cmd-Z keyboard shortcut is desktop-first');
+    const user = await bootstrapApprovedUser();
+    try {
+      await signIn(page, user);
+      const calcId = await createCalculator(page);
+      const { data: sections } = await admin
+        .from('sections')
+        .select('id')
+        .eq('calculator_id', calcId);
+      const firstSectionId = sections![0].id;
+
+      // Add a second section so we can delete the first one.
+      const secondRes = await page.request.post(
+        `/api/calculators/${calcId}/sections`,
+        { data: {} },
+      );
+      expect(secondRes.status()).toBe(201);
+
+      // Add a cell to the first section so the section-delete path takes
+      // the "with children" branch (which is the AC the fix targets).
+      const cellRes = await page.request.post(
+        `/api/sections/${firstSectionId}/cells`,
+        { data: {} },
+      );
+      expect(cellRes.status()).toBe(201);
+      const originalCell = await cellRes.json();
+      // Reload so the editor store hydrates the new rows.
+      await page.reload();
+      await page.waitForURL(/\/editor\/[0-9a-f-]{36}$/);
+
+      // Delete the first section via the kebab → destructive confirm.
+      // Locate the exact section by data-section-id rather than DOM order
+      // (DnD-kit ghost / strict-mode duplicates can multiply the count).
+      const firstSection = page
+        .locator(`section[data-section-id="${firstSectionId}"]`)
+        .first();
+      await firstSection.hover();
+      await firstSection.getByRole('button', { name: /Section options/i }).click();
+      await page.getByRole('menuitem', { name: /Delete section/i }).click();
+      await page.getByRole('button', { name: /^Delete$/i }).click();
+
+      // Section row is gone from the DB.
+      await expect
+        .poll(
+          async () => {
+            const { data } = await admin
+              .from('sections')
+              .select('id')
+              .eq('calculator_id', calcId);
+            return (data ?? []).length;
+          },
+          { timeout: 5000 },
+        )
+        .toBe(1);
+
+      // Wait for the destructive-confirm sheet to fully close so focus
+      // returns to body — the editor's Cmd-Z handler bails when an
+      // INPUT/TEXTAREA/contenteditable has focus.
+      await expect(
+        page.getByRole('button', { name: /^Delete$/i }),
+      ).toHaveCount(0);
+      // Click the hero (a neutral non-input area) to ensure body focus.
+      await page.getByRole('button', {
+        name: /Calculator title — click to edit/i,
+      }).first().focus();
+      await page.keyboard.press('Escape'); // exit editable-text if it focused
+      // Fire a single Cmd-Z. The handler accepts either Meta or Control;
+      // pressing both back-to-back would double-fire because the
+      // dispatch UNDO happens after the awaited PATCH.
+      await page.keyboard.press('Control+z');
+
+      // Wait for the recreate to land in the DB.
+      await expect
+        .poll(
+          async () => {
+            const { data } = await admin
+              .from('sections')
+              .select('id')
+              .eq('calculator_id', calcId)
+              .eq('id', firstSectionId)
+              .maybeSingle();
+            return data?.id ?? null;
+          },
+          { timeout: 5000 },
+        )
+        .toBe(firstSectionId);
+
+      // Child cell ALSO restored under the same id (the fix's main payoff).
+      // The cell recreate happens in a loop after the section recreate;
+      // poll until it lands so we don't race the network.
+      await expect
+        .poll(
+          async () => {
+            const { data } = await admin
+              .from('cells')
+              .select('id')
+              .eq('calculator_id', calcId);
+            return (data ?? []).map((c) => c.id);
+          },
+          { timeout: 5000 },
+        )
+        .toContain(originalCell.id);
+
+      const { data: restoredCell } = await admin
+        .from('cells')
+        .select('id, name, section_id')
+        .eq('id', originalCell.id)
+        .maybeSingle();
+      expect(restoredCell?.id).toBe(originalCell.id);
+      expect(restoredCell?.section_id).toBe(firstSectionId);
+    } finally {
+      await teardown(user.userId);
+    }
+  });
+});

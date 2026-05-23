@@ -1,10 +1,9 @@
 'use client';
 
-// PROJ-8 — Builder canvas (themed preview area).
+// PROJ-8 / PROJ-9 — Builder canvas (themed preview area).
 //
-// Wraps the calculator hero, the polymorphic slot renderer (empty in PROJ-8),
-// and the "Add cells to get started" empty-state card. Constrained by the
-// session-scoped viewport mode from the editor reducer.
+// PROJ-8 owned the chrome (hero, viewport-constrained surface, fallback
+// theme banner). PROJ-9 fills the body with section + cell rendering.
 
 import * as React from 'react';
 
@@ -13,14 +12,12 @@ import { useEditor } from '@/lib/editor/EditorProvider';
 import { getTheme, getThemeIds } from '@/lib/themes';
 
 import { CalculatorHero } from './calculator-hero';
-import { SlotRenderer, type DisplayElement } from './slot-renderer';
+import { SectionList } from './section-list';
 import { viewportMaxWidth } from './viewport-picker';
-
-const EMPTY_ELEMENTS: DisplayElement[] = [];
 
 export function BuilderCanvas() {
   const { state } = useEditor();
-  const { calculator, viewportMode } = state;
+  const { calculator, viewportMode, sections } = state;
   const theme = getTheme(calculator.theme_id);
   const isFallback = !getThemeIds().includes(calculator.theme_id as never);
 
@@ -44,8 +41,7 @@ export function BuilderCanvas() {
           className="flex flex-col gap-4"
         >
           <CalculatorHero themeId={calculator.theme_id} title={calculator.title} />
-          <SlotRenderer elements={EMPTY_ELEMENTS} />
-          <EmptyBuilder />
+          {sections.length > 0 ? <SectionList theme={theme} /> : <EmptyBuilder />}
         </div>
       </div>
     </div>
@@ -56,8 +52,8 @@ function EmptyBuilder() {
   return (
     <EmptyOrErrorState
       variant="empty"
-      title="Add cells to get started"
-      body="This calculator has no cells yet. Use the “Add” button in the Builder toolbar to add the first input."
+      title="Add a section to get started"
+      body="Use the “Add” button in the Builder toolbar to create your first section."
     />
   );
 }

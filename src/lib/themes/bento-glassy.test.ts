@@ -44,6 +44,7 @@ describe('bentoGlassy theme tokens', () => {
         hero: 'rgba(26,26,46,0.78)',
         heroFg: '#FFFFFF',
       },
+      layoutPatterns: bentoGlassy.layoutPatterns,
     });
   });
 });

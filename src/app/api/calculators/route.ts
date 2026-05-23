@@ -1,13 +1,27 @@
-// PROJ-8 — POST /api/calculators
+// PROJ-8 + PROJ-9 — POST /api/calculators
 //
 // Owner-only create endpoint. Always creates a row with the calculator
-// defaults (title="Untitled calculator", description="", theme_id="calcgrinder")
-// and returns the public CalculatorRow shape (no owner_id, no
-// soft_delete_at) — matching what the client helpers consume.
+// defaults (title="Untitled calculator", description="",
+// theme_id="calcgrinder") AND a default first section in one atomic
+// flow. Returns the public CalculatorRow shape augmented with
+// `default_section_id` so the client can scroll into the default
+// section on first paint.
+//
+// "Atomic" here is best-effort at the API layer: if the section insert
+// fails, we delete the just-inserted calculator before returning 500.
+// Supabase doesn't expose multi-table transactions through its REST
+// client; a stored procedure would let us wrap both inserts in a real
+// transaction, but the failure mode (a calculator row with no
+// sections) is already handled by the editor loader's first-load
+// backfill (PROJ-9), so the consolation cleanup keeps the unhappy
+// path simple.
 
 import { NextResponse } from 'next/server';
 
 import { createClient } from '@/lib/supabase/server';
+import {
+  DEFAULT_SECTION_TITLE,
+} from '@/lib/sections/types';
 
 export const runtime = 'nodejs';
 
@@ -21,16 +35,56 @@ export async function POST(): Promise<Response> {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
-  const { data, error } = await supabase
+  const { data: calculator, error: calcErr } = await supabase
     .from('calculators')
     .insert({ owner_id: user.id })
     .select('id, title, description, theme_id, updated_at')
     .single();
 
-  if (error || !data) {
-    console.error('POST /api/calculators: insert failed', error);
+  if (calcErr || !calculator) {
+    console.error('POST /api/calculators: insert failed', calcErr);
     return NextResponse.json({ error: 'create_failed' }, { status: 500 });
   }
 
-  return NextResponse.json(data, { status: 201 });
+  const { data: section, error: sectionErr } = await supabase
+    .from('sections')
+    .insert({
+      calculator_id: calculator.id,
+      title: DEFAULT_SECTION_TITLE,
+      description: '',
+      layout_pattern_id: 'single_column',
+      display_order: 0,
+    })
+    .select('id, updated_at')
+    .single();
+
+  if (sectionErr || !section) {
+    console.error(
+      'POST /api/calculators: default section insert failed',
+      sectionErr,
+    );
+    // Best-effort rollback so the editor doesn't load a sectionless row
+    // (the backfill would also catch it, but cleaning up keeps state
+    // consistent for callers that retry).
+    await supabase.from('calculators').delete().eq('id', calculator.id);
+    return NextResponse.json({ error: 'create_failed' }, { status: 500 });
+  }
+
+  // The section insert bumped calculators.updated_at via the
+  // parent-bump trigger — re-read it so the client's optimistic
+  // concurrency token matches the row's true state.
+  const { data: refreshed } = await supabase
+    .from('calculators')
+    .select('updated_at')
+    .eq('id', calculator.id)
+    .maybeSingle();
+
+  return NextResponse.json(
+    {
+      ...calculator,
+      updated_at: refreshed?.updated_at ?? calculator.updated_at,
+      default_section_id: section.id,
+    },
+    { status: 201 },
+  );
 }

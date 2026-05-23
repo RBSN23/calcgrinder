@@ -1,15 +1,18 @@
 'use client';
 
-// PROJ-8 — Editor body (desktop + mobile variants in one tree).
+// PROJ-8 / PROJ-9 — Editor body (desktop + mobile variants in one tree).
 //
 // Mounts inside the EditorProvider. Registers slot content into the
 // AppShell's top-bar slot registry, and renders the two-panel split on
-// desktop / builder-first stack on mobile.
+// desktop / builder-first stack on mobile. PROJ-9 wraps the body in
+// the EvaluationProvider so cell cards + grid columns can read the
+// shared live engine output.
 
 import * as React from 'react';
 
 import { useRegisterTopBarSlots } from '@/components/shell/top-bar-slots';
 import { useEditor } from '@/lib/editor/EditorProvider';
+import { EvaluationProvider } from '@/lib/editor/EvaluationContext';
 
 import { BuilderCanvas } from './builder-canvas';
 import { BuilderToolbar } from './builder-toolbar';
@@ -54,7 +57,7 @@ export function EditorBody() {
   useRegisterTopBarSlots(slots);
 
   return (
-    <>
+    <EvaluationProvider>
       {/* Desktop two-panel layout */}
       <div
         ref={containerRef}
@@ -77,6 +80,6 @@ export function EditorBody() {
         <BuilderCanvas />
         <MobileFooterNav />
       </div>
-    </>
+    </EvaluationProvider>
   );
 }

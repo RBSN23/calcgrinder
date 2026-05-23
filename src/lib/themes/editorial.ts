@@ -1,3 +1,7 @@
+import {
+  SINGLE_COLUMN_PATTERN,
+  TWO_THIRDS_ONE_THIRD_PATTERN,
+} from './layout-patterns';
 import type { Theme } from './types';
 
 export const editorial: Theme = {
@@ -32,4 +36,5 @@ export const editorial: Theme = {
   cols3: '1fr 1fr 1.55fr',
   headerH: 68,
   cardTints: null,
+  layoutPatterns: [SINGLE_COLUMN_PATTERN, TWO_THIRDS_ONE_THIRD_PATTERN],
 };

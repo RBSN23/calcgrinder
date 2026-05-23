@@ -1,14 +1,13 @@
 'use client';
 
-// PROJ-8 — Mobile editor footer nav.
+// PROJ-9 — Mobile editor footer nav.
 //
 // Spec-mandated layout: undo/redo group (left) · Grid drawer toggle (centre) ·
-// "+ Add cell" button (right). The right slot is the +Add affordance instead
-// of Preview because Preview ships with PROJ-10.
+// "+ Add cell" button (right). The +Add affordance is enabled in PROJ-9.
 
 import * as React from 'react';
 
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useEditor } from '@/lib/editor/EditorProvider';
 
 import { Icons } from '../shell/icons';
 
@@ -16,6 +15,17 @@ import { GridDrawerToggle } from './grid-drawer-toggle';
 import { UndoRedoButtons } from './undo-redo-buttons';
 
 export function MobileFooterNav() {
+  const { state, addCell, addSection } = useEditor();
+  const handleAddCell = () => {
+    const last = state.sections[state.sections.length - 1];
+    if (last) {
+      void addCell(last.id);
+    } else {
+      void addSection().then((section) => {
+        if (section) void addCell(section.id);
+      });
+    }
+  };
   return (
     <nav
       aria-label="Editor actions"
@@ -25,23 +35,14 @@ export function MobileFooterNav() {
       <span className="flex-1" />
       <GridDrawerToggle />
       <span className="flex-1" />
-      <TooltipProvider delayDuration={150}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="inline-flex">
-              <button
-                type="button"
-                aria-label="Add cell"
-                disabled
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-cg-accent text-cg-accent-fg opacity-60"
-              >
-                <Icons.Plus size={16} />
-              </button>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent side="top">Cell authoring ships next.</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <button
+        type="button"
+        aria-label="Add cell"
+        onClick={handleAddCell}
+        className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-cg-accent text-cg-accent-fg"
+      >
+        <Icons.Plus size={16} />
+      </button>
     </nav>
   );
 }

@@ -72,6 +72,123 @@ export type Database = {
         }
         Relationships: []
       }
+      cells: {
+        Row: {
+          calculator_id: string
+          card_accent: string
+          card_background_tint: string
+          card_border: string
+          card_size_hint: string
+          created_at: string
+          currency_code: string | null
+          default_value: Json | null
+          description: string
+          description_render: string
+          display_emphasis: string
+          display_format: string
+          display_order: number
+          display_widget: string | null
+          editability: string
+          formula: string | null
+          id: string
+          kind: string
+          label: string
+          name: string
+          numeric_max: number | null
+          numeric_min: number | null
+          numeric_step: number | null
+          section_id: string
+          select_options: Json | null
+          text_colour: string
+          text_size: string
+          unit: string | null
+          updated_at: string
+          value_type: string
+          visibility: string
+        }
+        Insert: {
+          calculator_id: string
+          card_accent?: string
+          card_background_tint?: string
+          card_border?: string
+          card_size_hint?: string
+          created_at?: string
+          currency_code?: string | null
+          default_value?: Json | null
+          description?: string
+          description_render?: string
+          display_emphasis?: string
+          display_format?: string
+          display_order: number
+          display_widget?: string | null
+          editability: string
+          formula?: string | null
+          id?: string
+          kind: string
+          label?: string
+          name: string
+          numeric_max?: number | null
+          numeric_min?: number | null
+          numeric_step?: number | null
+          section_id: string
+          select_options?: Json | null
+          text_colour?: string
+          text_size?: string
+          unit?: string | null
+          updated_at?: string
+          value_type: string
+          visibility?: string
+        }
+        Update: {
+          calculator_id?: string
+          card_accent?: string
+          card_background_tint?: string
+          card_border?: string
+          card_size_hint?: string
+          created_at?: string
+          currency_code?: string | null
+          default_value?: Json | null
+          description?: string
+          description_render?: string
+          display_emphasis?: string
+          display_format?: string
+          display_order?: number
+          display_widget?: string | null
+          editability?: string
+          formula?: string | null
+          id?: string
+          kind?: string
+          label?: string
+          name?: string
+          numeric_max?: number | null
+          numeric_min?: number | null
+          numeric_step?: number | null
+          section_id?: string
+          select_options?: Json | null
+          text_colour?: string
+          text_size?: string
+          unit?: string | null
+          updated_at?: string
+          value_type?: string
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cells_calculator_id_fkey"
+            columns: ["calculator_id"]
+            isOneToOne: false
+            referencedRelation: "calculators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cells_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -104,6 +221,47 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      sections: {
+        Row: {
+          calculator_id: string
+          created_at: string
+          description: string
+          display_order: number
+          id: string
+          layout_pattern_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          calculator_id: string
+          created_at?: string
+          description?: string
+          display_order: number
+          id?: string
+          layout_pattern_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          calculator_id?: string
+          created_at?: string
+          description?: string
+          display_order?: number
+          id?: string
+          layout_pattern_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sections_calculator_id_fkey"
+            columns: ["calculator_id"]
+            isOneToOne: false
+            referencedRelation: "calculators"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       signup_approvals: {
         Row: {

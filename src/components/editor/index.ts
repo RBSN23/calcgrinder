@@ -1,4 +1,4 @@
-// PROJ-8 — Public barrel for editor primitives.
+// PROJ-8 / PROJ-9 — Public barrel for editor primitives.
 
 export { EditorBody } from './editor-body';
 export { BuilderCanvas, FallbackThemeBanner } from './builder-canvas';
@@ -18,3 +18,16 @@ export {
 } from './slot-renderer';
 export { MobileFooterNav } from './mobile-footer-nav';
 export { GridDrawerToggle } from './grid-drawer-toggle';
+export { SectionList } from './section-list';
+export { SectionBlock } from './section-block';
+export { CellCard } from './cell-card';
+export { CellVisualPanel } from './cell-visual-panel';
+export { CellDataModelPanel } from './cell-data-model-panel';
+export { CellInputWidget } from './cell-input-widget';
+export { HiddenCellDot } from './hidden-cell-dot';
+export { HiddenCellsPill } from './hidden-cells-pill';
+export { LayoutPatternPicker } from './layout-pattern-picker';
+export { DestructiveConfirmSheet } from './destructive-confirm-sheet';
+export { EditableText } from './editable-text';
+export { GridColumn } from './grid-column';
+export { DragHandle, SortableItem, useEditorDndSensors } from './dnd-helpers';

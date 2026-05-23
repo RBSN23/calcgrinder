@@ -12,6 +12,7 @@ export {
 export { getFunctionCatalogue } from './catalogue';
 export { RESERVED_WORDS } from './functions';
 export { MAX_CELLS, MAX_FORMULA_LEN, MAX_ARRAY_ROWS } from './limits';
+export { rewriteFormulaReference } from './rewrite';
 export { EMPTY, isEmpty, isDate, makeDate } from './values';
 
 export type {

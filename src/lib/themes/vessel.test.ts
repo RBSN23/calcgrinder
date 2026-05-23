@@ -37,6 +37,14 @@ describe('vessel theme tokens', () => {
       cols3: '1fr 1fr 1.5fr',
       headerH: 64,
       cardTints: null,
+      layoutPatterns: vessel.layoutPatterns,
     });
+  });
+
+  it('publishes single_column and two_column', () => {
+    expect(vessel.layoutPatterns.map((p) => p.id)).toEqual([
+      'single_column',
+      'two_column',
+    ]);
   });
 });

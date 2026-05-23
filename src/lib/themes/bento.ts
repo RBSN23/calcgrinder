@@ -1,3 +1,10 @@
+import {
+  ONE_THIRD_TWO_THIRDS_PATTERN,
+  SINGLE_COLUMN_PATTERN,
+  THREE_COLUMN_PATTERN,
+  TWO_COLUMN_PATTERN,
+  TWO_THIRDS_ONE_THIRD_PATTERN,
+} from './layout-patterns';
 import type { Theme } from './types';
 
 export const bento: Theme = {
@@ -40,4 +47,11 @@ export const bento: Theme = {
     hero: '#1A1A2E',
     heroFg: '#FFF8E7',
   },
+  layoutPatterns: [
+    SINGLE_COLUMN_PATTERN,
+    TWO_COLUMN_PATTERN,
+    THREE_COLUMN_PATTERN,
+    TWO_THIRDS_ONE_THIRD_PATTERN,
+    ONE_THIRD_TWO_THIRDS_PATTERN,
+  ],
 };

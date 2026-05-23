@@ -1,12 +1,11 @@
 'use client';
 
-// PROJ-8 — Grid panel scaffold (desktop).
+// PROJ-8 / PROJ-9 — Grid panel.
 //
-// PROJ-8 owns the chrome: header strip with a chevron-collapse, an empty
-// element-listing area, and the height/collapsed wiring from the editor
-// reducer. PROJ-9 will fill the body with cell columns + the data-model
-// expand. The header always shows "0 cells" because the cells array is
-// empty in PROJ-8.
+// PROJ-8 owns the chrome (header strip with chevron-collapse +
+// height/collapsed wiring). PROJ-9 fills the body with one column per
+// cell (in section-then-`display_order` order), each column rendering
+// header + data row + optional kebab-expand data-model panel.
 
 import * as React from 'react';
 
@@ -15,9 +14,33 @@ import { cn } from '@/lib/utils';
 
 import { Icons } from '../shell/icons';
 
+import { GridColumn } from './grid-column';
+
 export function GridPanel() {
-  const { state, dispatch } = useEditor();
-  const { gridHeight, gridCollapsed } = state;
+  const { state, dispatch, addSection, addCell } = useEditor();
+  const { gridHeight, gridCollapsed, sections, cells } = state;
+
+  // Use section-then-display_order to lay columns out
+  const orderedCells = React.useMemo(() => {
+    const bySection = new Map(sections.map((s) => [s.id, s.display_order]));
+    return [...cells].sort((a, b) => {
+      const sa = bySection.get(a.section_id) ?? 0;
+      const sb = bySection.get(b.section_id) ?? 0;
+      if (sa !== sb) return sa - sb;
+      return a.display_order - b.display_order;
+    });
+  }, [cells, sections]);
+
+  const handleAddCell = React.useCallback(() => {
+    const last = sections[sections.length - 1];
+    if (last) {
+      void addCell(last.id);
+    } else {
+      void addSection().then((section) => {
+        if (section) void addCell(section.id);
+      });
+    }
+  }, [sections, addCell, addSection]);
 
   return (
     <section
@@ -47,14 +70,31 @@ export function GridPanel() {
           Grid
         </h2>
         <span className="rounded-full border border-cg-border bg-cg-surface-2 px-[7px] py-[1px] font-mono text-[10.5px] font-medium text-cg-text-muted">
-          0
+          {orderedCells.length}
         </span>
         <span className="flex-1" />
+        <button
+          type="button"
+          aria-label="Add cell"
+          onClick={handleAddCell}
+          className="inline-flex h-7 items-center gap-1 rounded-md border border-dashed border-cg-border bg-cg-surface px-2 text-[12px] text-cg-text-muted hover:bg-cg-surface-2"
+        >
+          <Icons.Plus size={12} />
+          add cell
+        </button>
       </header>
       {!gridCollapsed ? (
-        <div className="flex flex-1 items-center justify-center bg-cg-bg px-4 text-[12.5px] text-cg-text-subtle">
-          No cells yet — use “Add” in the Builder to create the first cell.
-        </div>
+        orderedCells.length === 0 ? (
+          <div className="flex flex-1 items-center justify-center bg-cg-bg px-4 text-[12.5px] text-cg-text-subtle">
+            No cells yet — use “+ add cell” to create the first cell.
+          </div>
+        ) : (
+          <div className="flex flex-1 overflow-auto bg-cg-bg">
+            {orderedCells.map((cell) => (
+              <GridColumn key={cell.id} cell={cell} />
+            ))}
+          </div>
+        )
       ) : null}
     </section>
   );
