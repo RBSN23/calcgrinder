@@ -41,6 +41,7 @@ export {
   listScenariosForCalculator,
   listMyScenarios,
   migrateScenarios,
+  bulkDeleteOrphanScenarios,
 } from './client';
 export type {
   CreateScenarioBody,
@@ -48,4 +49,5 @@ export type {
   ShareScenarioResponse,
   MigrateScenariosBatchEntry,
   MigrateScenariosResponse,
+  BulkDeleteOrphansResponse,
 } from './client';

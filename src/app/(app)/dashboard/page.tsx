@@ -14,12 +14,19 @@ import {
   MyScenariosSection,
   NewCalculatorHero,
   Section,
+  TrashSection,
   WelcomeLine,
 } from '@/components/dashboard';
 import { EmptyOrErrorState, Icons } from '@/components/shell';
 import { getCurrentProfile } from '@/lib/auth/getCurrentProfile';
-import { listMyCalculators } from '@/lib/calculators/server';
-import { listMyScenariosWithCalc } from '@/lib/scenarios/server';
+import {
+  listMyCalculators,
+  listMySoftDeletedCalculators,
+} from '@/lib/calculators/server';
+import {
+  countMyOrphanScenarios,
+  listMyScenariosWithCalc,
+} from '@/lib/scenarios/server';
 
 export const metadata = {
   title: 'Dashboard · Calcgrinder',
@@ -35,14 +42,21 @@ export default async function DashboardPage() {
   if (!current) redirect('/auth/login');
 
   const role = (current.profile.role as 'registered' | 'sysadmin') ?? 'registered';
-  const [myCalculators, myScenarios] = await Promise.all([
-    listMyCalculators(),
-    listMyScenariosWithCalc(),
-  ]);
-  const retentionPeriodDays = parseInt(
+  const [myCalculators, myScenarios, trashedCalculators, orphanCount] =
+    await Promise.all([
+      listMyCalculators(),
+      listMyScenariosWithCalc(),
+      listMySoftDeletedCalculators(),
+      countMyOrphanScenarios(),
+    ]);
+  const retentionPeriodDaysRaw = parseInt(
     process.env.RETENTION_PERIOD_DAYS ?? '30',
     10,
   );
+  const retentionPeriodDays =
+    Number.isFinite(retentionPeriodDaysRaw) && retentionPeriodDaysRaw > 0
+      ? retentionPeriodDaysRaw
+      : 30;
 
   return (
     <div className="mx-auto flex max-w-[960px] flex-col gap-[18px] px-4 pb-8 pt-5 md:max-w-[960px] md:gap-7 md:px-8 md:pb-12 md:pt-8">
@@ -55,7 +69,7 @@ export default async function DashboardPage() {
           1. My Calculators  (PROJ-10) — wired below
           2. My Scenarios    (PROJ-12)
           3. Presets         (PROJ-5 / PROJ-18)
-          4. Trash           (PROJ-13)
+          4. Trash           (PROJ-13) — wired below
           5. User Calculators (PROJ-19, sysadmin-only)
         Sections hide when their data is empty. Presets is the
         exception — its empty state is the call-to-action surface for
@@ -64,13 +78,12 @@ export default async function DashboardPage() {
       <div className="flex flex-col gap-3">
         <MyCalculatorsSection
           calculators={myCalculators}
-          retentionPeriodDays={
-            Number.isFinite(retentionPeriodDays) && retentionPeriodDays > 0
-              ? retentionPeriodDays
-              : 30
-          }
+          retentionPeriodDays={retentionPeriodDays}
         />
-        <MyScenariosSection scenarios={myScenarios} />
+        <MyScenariosSection
+          scenarios={myScenarios}
+          orphanCount={orphanCount}
+        />
         <Section title="Presets" count={0} defaultExpanded>
           <EmptyOrErrorState
             variant="empty"
@@ -80,6 +93,10 @@ export default async function DashboardPage() {
             body="Curated calculators will appear here once a sysadmin publishes one."
           />
         </Section>
+        <TrashSection
+          calculators={trashedCalculators}
+          retentionPeriodDays={retentionPeriodDays}
+        />
       </div>
     </div>
   );

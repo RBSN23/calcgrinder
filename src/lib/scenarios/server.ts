@@ -33,6 +33,24 @@ export async function listMyScenariosWithCalc(): Promise<ScenarioRowWithCalc[]> 
     .filter((r): r is ScenarioRowWithCalc => r !== null);
 }
 
+/**
+ * PROJ-13 — count of the current user's orphan scenarios for the
+ * dashboard banner. An orphan is a scenario whose parent calculator
+ * was hard-deleted (the FK `ON DELETE SET NULL` from PROJ-12 makes
+ * `calculator_id` NULL in that case). Soft-deleted parents are still
+ * recoverable and do NOT count as orphans per the spec.
+ * RLS scopes by `owner_id = auth.uid()` automatically.
+ */
+export async function countMyOrphanScenarios(): Promise<number> {
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from('scenarios')
+    .select('id', { count: 'exact', head: true })
+    .is('calculator_id', null);
+  if (error) return 0;
+  return count ?? 0;
+}
+
 function normalise(row: Record<string, unknown>): ScenarioRowWithCalc | null {
   const id = typeof row.id === 'string' ? row.id : null;
   const owner_id = typeof row.owner_id === 'string' ? row.owner_id : null;

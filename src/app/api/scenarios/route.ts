@@ -195,3 +195,49 @@ function isUuid(s: string): boolean {
     s,
   );
 }
+
+/**
+ * PROJ-13 — DELETE /api/scenarios?orphans=1
+ *
+ * Bulk-deletes every orphan scenario owned by the caller. An orphan
+ * is a scenario whose parent calculator has been hard-deleted; the
+ * FK `ON DELETE SET NULL` from PROJ-12 leaves `calculator_id = NULL`
+ * in that case.
+ *
+ * Owner-scoped via `owner_id = auth.uid()` in the DELETE statement;
+ * RLS is the second line of defence. Returns the count of rows that
+ * were removed so the dashboard can toast the user.
+ *
+ * The `?orphans=1` query flag is required — calling DELETE without
+ * it returns 400, so an accidental call can't wipe a user's entire
+ * scenarios table.
+ */
+export async function DELETE(req: Request): Promise<Response> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
+
+  const orphans = new URL(req.url).searchParams.get('orphans');
+  if (orphans !== '1') {
+    return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
+  }
+
+  const { data, error: deleteErr } = await supabase
+    .from('scenarios')
+    .delete()
+    .eq('owner_id', user.id)
+    .is('calculator_id', null)
+    .select('id');
+
+  if (deleteErr) {
+    console.error('DELETE /api/scenarios?orphans=1: delete failed', deleteErr);
+    return NextResponse.json({ error: 'bulk_delete_failed' }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, deleted: data?.length ?? 0 });
+}

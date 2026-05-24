@@ -18,6 +18,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { MAX_TITLE_LENGTH, validateTitle } from '@/lib/calculators/types';
 
@@ -228,6 +229,76 @@ export async function DELETE(req: Request, { params }: Ctx): Promise<Response> {
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   }
   const { updated_at: staleUpdatedAt } = parsed.data;
+
+  const hard = new URL(req.url).searchParams.get('hard') === 'true';
+
+  // PROJ-13 — `?hard=true` is the Delete-permanently path. Two-step
+  // gate: the row MUST already be in Trash (soft_delete_at IS NOT
+  // NULL). Active rows return 400 not_in_trash so a hand-crafted API
+  // call can't skip the Move-to-Trash step.
+  if (hard) {
+    const { data: current, error: readErr } = await supabase
+      .from('calculators')
+      .select('updated_at, soft_delete_at')
+      .eq('id', id)
+      .maybeSingle();
+    if (readErr) {
+      console.error(
+        `DELETE /api/calculators/${id}?hard=true: read failed`,
+        readErr,
+      );
+      return NextResponse.json({ error: 'read_failed' }, { status: 500 });
+    }
+    if (!current) {
+      return NextResponse.json({ error: 'not_found' }, { status: 404 });
+    }
+    if (current.soft_delete_at === null) {
+      return NextResponse.json({ error: 'not_in_trash' }, { status: 400 });
+    }
+    if (current.updated_at !== staleUpdatedAt) {
+      return NextResponse.json(
+        { error: 'stale', server_updated_at: current.updated_at },
+        { status: 409 },
+      );
+    }
+
+    // Count orphans-to-be BEFORE the DELETE — once the FK SET NULL
+    // fires, scenarios.calculator_id is NULL and we can no longer
+    // attribute them to this calculator. The cross-owner count uses
+    // the admin client (the calculator owner already proved their
+    // ownership above; we expose only the aggregate integer).
+    const admin = createAdminClient();
+    const { count: orphanCount } = await admin
+      .from('scenarios')
+      .select('id', { count: 'exact', head: true })
+      .eq('calculator_id', id);
+
+    // PROJ-13 BUG-H1 fix — the user-scoped client cannot DELETE from
+    // calculators because the PROJ-1 migration grants only
+    // SELECT/INSERT/UPDATE to `authenticated` (hard-delete was
+    // intentionally reserved for the admin path). Reuse the admin
+    // client created for the orphan count; ownership has already been
+    // proven by the user-scoped SELECT above, so this stays
+    // owner-scoped in practice.
+    const { error: deleteErr } = await admin
+      .from('calculators')
+      .delete()
+      .eq('id', id)
+      .not('soft_delete_at', 'is', null);
+
+    if (deleteErr) {
+      console.error(
+        `DELETE /api/calculators/${id}?hard=true: delete failed`,
+        deleteErr,
+      );
+      return NextResponse.json({ error: 'delete_failed' }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      purged_orphan_count: orphanCount ?? 0,
+    });
+  }
 
   // Stale-checked soft-delete. NOW() bumps via DB; the trigger refreshes
   // updated_at to the new timestamp.

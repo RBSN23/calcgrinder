@@ -99,6 +99,47 @@ export async function listMyCalculators(): Promise<CalculatorRow[]> {
   }));
 }
 
+/**
+ * PROJ-13 — current user's soft-deleted calculators for the Trash
+ * section. Ordered `soft_delete_at DESC` (most recently deleted first)
+ * via `idx_calculators_owner_soft_delete`. RLS scopes by owner.
+ * Returns the lifecycle-row shape with `soft_delete_at` so the card
+ * can compute the "Deleted N days ago · Purges in M days" footer.
+ */
+export interface TrashedCalculatorRow extends CalculatorRow {
+  soft_delete_at: string;
+}
+
+const TRASH_ROW_COLUMNS = `${ROW_COLUMNS}, soft_delete_at` as const;
+
+export async function listMySoftDeletedCalculators(): Promise<
+  TrashedCalculatorRow[]
+> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('calculators')
+    .select(TRASH_ROW_COLUMNS)
+    .not('soft_delete_at', 'is', null)
+    .order('soft_delete_at', { ascending: false })
+    .limit(100);
+  if (error || !data) return [];
+  return data
+    .map((row): TrashedCalculatorRow | null => {
+      if (typeof row.soft_delete_at !== 'string') return null;
+      return {
+        id: row.id,
+        title: row.title,
+        description: row.description,
+        theme_id: row.theme_id,
+        updated_at: row.updated_at,
+        published: row.published,
+        public_token: row.public_token,
+        soft_delete_at: row.soft_delete_at,
+      };
+    })
+    .filter((r): r is TrashedCalculatorRow => r !== null);
+}
+
 export async function getCalculatorForEditor(
   id: string,
 ): Promise<CalculatorRow | null> {

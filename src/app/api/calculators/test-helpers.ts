@@ -35,6 +35,7 @@ export interface MockBuilder {
   lt: Mock;
   in: Mock;
   is: Mock;
+  not: Mock;
   order: Mock;
   limit: Mock;
   single: Mock;
@@ -86,6 +87,7 @@ export function makeSupabaseMock(opts: {
         lt: vi.fn(() => builder),
         in: vi.fn(() => builder),
         is: vi.fn(() => builder),
+        not: vi.fn(() => builder),
         order: vi.fn(() => builder),
         limit: vi.fn(() => builder),
         single: vi.fn(async () => result),

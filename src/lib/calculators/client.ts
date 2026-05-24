@@ -142,3 +142,68 @@ export async function softDeleteCalculator(
   if (!res.ok) throw await parseError(res);
   return (await res.json()) as SoftDeleteResponse;
 }
+
+// PROJ-13 — restore a soft-deleted calculator. The server preserves
+// `published` and `public_token`; if the original title collides with
+// an active row, the response carries the auto-resolved title and
+// `renamed: true` so the caller can toast the rename.
+export interface RestoreResponse extends CalculatorRow {
+  renamed: boolean;
+}
+
+export async function restoreCalculator(
+  id: string,
+  updatedAt: string,
+): Promise<RestoreResponse> {
+  const res = await fetch(
+    `/api/calculators/${encodeURIComponent(id)}/restore`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ updated_at: updatedAt }),
+    },
+  );
+  if (!res.ok) throw await parseError(res);
+  return (await res.json()) as RestoreResponse;
+}
+
+// PROJ-13 — hard-delete (Delete permanently). Sends DELETE with
+// `?hard=true`; the row must already be in Trash (`soft_delete_at IS
+// NOT NULL`), otherwise the server returns 400 not_in_trash.
+export interface HardDeleteResponse {
+  ok: true;
+  purged_orphan_count: number;
+}
+
+export async function hardDeleteCalculator(
+  id: string,
+  updatedAt: string,
+): Promise<HardDeleteResponse> {
+  const res = await fetch(
+    `/api/calculators/${encodeURIComponent(id)}?hard=true`,
+    {
+      method: 'DELETE',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ updated_at: updatedAt }),
+    },
+  );
+  if (!res.ok) throw await parseError(res);
+  return (await res.json()) as HardDeleteResponse;
+}
+
+// PROJ-13 — orphan-scenarios count for the Delete-permanently confirm
+// sheet. Returns the total number of scenarios pointing at this
+// calculator, regardless of who owns them.
+export interface ScenariosCountResponse {
+  count: number;
+}
+
+export async function getScenariosCount(
+  id: string,
+): Promise<ScenariosCountResponse> {
+  const res = await fetch(
+    `/api/calculators/${encodeURIComponent(id)}/scenarios-count`,
+  );
+  if (!res.ok) throw await parseError(res);
+  return (await res.json()) as ScenariosCountResponse;
+}

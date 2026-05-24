@@ -163,6 +163,13 @@ export const Icons = {
   Bookmark: makeIcon(
     <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />,
   ),
+  // PROJ-13 — Counter-clockwise rotate — Restore from Trash kebab.
+  RotateCcw: makeIcon(
+    <>
+      <path d="M3 12a9 9 0 109-9 9.5 9.5 0 00-6.7 2.8L3 8" />
+      <path d="M3 3v5h5" />
+    </>,
+  ),
 };
 
 export type IconName = keyof typeof Icons;

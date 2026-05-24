@@ -20,3 +20,19 @@ export {
   type MyScenariosSectionProps,
 } from './my-scenarios-section';
 export { ScenarioRow } from './scenario-row';
+export {
+  TrashSection,
+  type TrashSectionProps,
+} from './trash-section';
+export {
+  TrashCalcCard,
+  type TrashCalcCardProps,
+} from './trash-calc-card';
+export {
+  DeletePermanentlySheet,
+  type DeletePermanentlySheetProps,
+} from './delete-permanently-sheet';
+export {
+  OrphanScenariosBanner,
+  type OrphanScenariosBannerProps,
+} from './orphan-scenarios-banner';

@@ -135,3 +135,19 @@ export async function migrateScenarios(
   if (!res.ok) throw await parseError(res);
   return (await res.json()) as MigrateScenariosResponse;
 }
+
+// PROJ-13 — bulk-delete every orphan scenario (parent calculator
+// hard-deleted) owned by the caller. Returns the count of rows that
+// were removed.
+export interface BulkDeleteOrphansResponse {
+  ok: true;
+  deleted: number;
+}
+
+export async function bulkDeleteOrphanScenarios(): Promise<BulkDeleteOrphansResponse> {
+  const res = await fetch('/api/scenarios?orphans=1', {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw await parseError(res);
+  return (await res.json()) as BulkDeleteOrphansResponse;
+}

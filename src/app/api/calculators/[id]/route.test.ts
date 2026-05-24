@@ -3,8 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
 }));
+vi.mock('@/lib/supabase/admin', () => ({
+  createAdminClient: vi.fn(),
+}));
 
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 import { DELETE, GET, PATCH } from './route';
 import {
@@ -15,6 +19,17 @@ import {
 } from '../test-helpers';
 
 const mockCreateClient = vi.mocked(createClient);
+const mockCreateAdminClient = vi.mocked(createAdminClient);
+
+// The admin client used by the ?hard=true branch now drives BOTH the
+// orphan COUNT and the DELETE FROM calculators (post BUG-H1 fix —
+// PROJ-1's RLS reserves DELETE for the admin path). Reuse the generic
+// supabase mock; it queues one result per `.from()` call.
+function makeAdminMock(opts: {
+  fromResults: Array<{ data?: unknown; error?: unknown; count?: number | null }>;
+}) {
+  return makeSupabaseMock({ user: null, fromResults: opts.fromResults });
+}
 
 const CALC_ID = ROW_FIXTURE.id;
 const STALE_AT = ROW_FIXTURE.updated_at;
@@ -32,8 +47,8 @@ function patchRequest(body: unknown | string): Request {
   });
 }
 
-function deleteRequest(body: unknown | string): Request {
-  return new Request(`http://localhost:3000/api/calculators/${CALC_ID}`, {
+function deleteRequest(body: unknown | string, query = ''): Request {
+  return new Request(`http://localhost:3000/api/calculators/${CALC_ID}${query}`, {
     method: 'DELETE',
     headers: { 'content-type': 'application/json' },
     body: typeof body === 'string' ? body : JSON.stringify(body),
@@ -453,5 +468,257 @@ describe('DELETE /api/calculators/:id', () => {
 
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: 'not_found' });
+  });
+});
+
+// PROJ-13 — extended DELETE coverage for the `?hard=true` permanent-
+// delete branch. The handler reads the row first (state + ownership
+// gate), runs an admin-client COUNT to attribute orphans-to-be, and
+// only then issues the real DELETE FROM. Active rows are blocked with
+// 400 not_in_trash so a hand-crafted API call can't skip Move-to-Trash.
+describe('DELETE /api/calculators/:id?hard=true', () => {
+  beforeEach(() => {
+    mockCreateClient.mockReset();
+    mockCreateAdminClient.mockReset();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const HARD = '?hard=true';
+
+  it('returns 401 when no user is signed in', async () => {
+    installSupabaseMock(
+      mockCreateClient,
+      makeSupabaseMock({ user: null, fromResults: [] }),
+    );
+
+    const res = await DELETE(
+      deleteRequest({ updated_at: STALE_AT }, HARD),
+      ctx(),
+    );
+
+    expect(res.status).toBe(401);
+    expect(mockCreateAdminClient).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when the row does not exist (RLS opacity)', async () => {
+    installSupabaseMock(
+      mockCreateClient,
+      makeSupabaseMock({
+        user: USER_FIXTURE,
+        fromResults: [{ data: null, error: null }],
+      }),
+    );
+
+    const res = await DELETE(
+      deleteRequest({ updated_at: STALE_AT }, HARD),
+      ctx(),
+    );
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: 'not_found' });
+    expect(mockCreateAdminClient).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 not_in_trash when the row is active (soft_delete_at is NULL)', async () => {
+    installSupabaseMock(
+      mockCreateClient,
+      makeSupabaseMock({
+        user: USER_FIXTURE,
+        fromResults: [
+          {
+            data: { updated_at: STALE_AT, soft_delete_at: null },
+            error: null,
+          },
+        ],
+      }),
+    );
+
+    const res = await DELETE(
+      deleteRequest({ updated_at: STALE_AT }, HARD),
+      ctx(),
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'not_in_trash' });
+    expect(mockCreateAdminClient).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 stale with server_updated_at when the client token is out of date', async () => {
+    installSupabaseMock(
+      mockCreateClient,
+      makeSupabaseMock({
+        user: USER_FIXTURE,
+        fromResults: [
+          {
+            data: {
+              updated_at: FRESH_AT,
+              soft_delete_at: '2026-05-23T09:00:00.000Z',
+            },
+            error: null,
+          },
+        ],
+      }),
+    );
+
+    const res = await DELETE(
+      deleteRequest({ updated_at: STALE_AT }, HARD),
+      ctx(),
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: 'stale',
+      server_updated_at: FRESH_AT,
+    });
+    expect(mockCreateAdminClient).not.toHaveBeenCalled();
+  });
+
+  it('returns 200 with the purged_orphan_count when the row is trashed and current', async () => {
+    const supabase = makeSupabaseMock({
+      user: USER_FIXTURE,
+      fromResults: [
+        // Read for state + stale check (the user-scoped client only
+        // ever performs this single SELECT; the DELETE itself goes
+        // through the admin client per BUG-H1 fix).
+        {
+          data: {
+            updated_at: STALE_AT,
+            soft_delete_at: '2026-05-23T09:00:00.000Z',
+          },
+          error: null,
+        },
+      ],
+    });
+    installSupabaseMock(mockCreateClient, supabase);
+    const admin = makeAdminMock({
+      fromResults: [
+        // 1) COUNT scenarios attached to the calculator (cross-owner)
+        { data: [], error: null, count: 4 },
+        // 2) DELETE FROM calculators (admin path)
+        { data: null, error: null },
+      ],
+    });
+    mockCreateAdminClient.mockReturnValue(
+      admin as unknown as ReturnType<typeof createAdminClient>,
+    );
+
+    const res = await DELETE(
+      deleteRequest({ updated_at: STALE_AT }, HARD),
+      ctx(),
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      ok: true,
+      purged_orphan_count: 4,
+    });
+    // Admin client did the cross-owner count on scenarios, then the
+    // actual DELETE on calculators.
+    expect(admin.from).toHaveBeenNthCalledWith(1, 'scenarios');
+    expect(admin.from).toHaveBeenNthCalledWith(2, 'calculators');
+    expect(admin._builders[0]!.select).toHaveBeenCalledWith('id', {
+      count: 'exact',
+      head: true,
+    });
+    expect(admin._builders[1]!.delete).toHaveBeenCalled();
+    expect(admin._builders[1]!.eq).toHaveBeenCalledWith('id', CALC_ID);
+    expect(admin._builders[1]!.not).toHaveBeenCalledWith(
+      'soft_delete_at',
+      'is',
+      null,
+    );
+    // The user-scoped client must NOT have issued a DELETE — RLS would
+    // reject it (BUG-H1 regression guard).
+    expect(supabase._builders[0]!.delete).not.toHaveBeenCalled();
+  });
+
+  it('returns 200 with purged_orphan_count=0 when no scenarios reference the calculator', async () => {
+    installSupabaseMock(
+      mockCreateClient,
+      makeSupabaseMock({
+        user: USER_FIXTURE,
+        fromResults: [
+          {
+            data: {
+              updated_at: STALE_AT,
+              soft_delete_at: '2026-05-23T09:00:00.000Z',
+            },
+            error: null,
+          },
+        ],
+      }),
+    );
+    mockCreateAdminClient.mockReturnValue(
+      makeAdminMock({
+        fromResults: [
+          { data: [], error: null, count: null }, // COUNT → null
+          { data: null, error: null },             // DELETE OK
+        ],
+      }) as unknown as ReturnType<typeof createAdminClient>,
+    );
+
+    const res = await DELETE(
+      deleteRequest({ updated_at: STALE_AT }, HARD),
+      ctx(),
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      ok: true,
+      purged_orphan_count: 0,
+    });
+  });
+
+  it('returns 500 delete_failed when the DELETE statement errors', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    installSupabaseMock(
+      mockCreateClient,
+      makeSupabaseMock({
+        user: USER_FIXTURE,
+        fromResults: [
+          {
+            data: {
+              updated_at: STALE_AT,
+              soft_delete_at: '2026-05-23T09:00:00.000Z',
+            },
+            error: null,
+          },
+        ],
+      }),
+    );
+    mockCreateAdminClient.mockReturnValue(
+      makeAdminMock({
+        fromResults: [
+          { data: [], error: null, count: 1 },              // COUNT OK
+          { data: null, error: { message: 'kaboom' } },      // DELETE errors
+        ],
+      }) as unknown as ReturnType<typeof createAdminClient>,
+    );
+
+    const res = await DELETE(
+      deleteRequest({ updated_at: STALE_AT }, HARD),
+      ctx(),
+    );
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: 'delete_failed' });
+    expect(errorSpy).toHaveBeenCalled();
+  });
+
+  it('still soft-deletes (PROJ-10 contract) when ?hard=true is absent', async () => {
+    const supabase = makeSupabaseMock({
+      user: USER_FIXTURE,
+      fromResults: [{ data: { updated_at: FRESH_AT }, error: null }],
+    });
+    installSupabaseMock(mockCreateClient, supabase);
+
+    const res = await DELETE(deleteRequest({ updated_at: STALE_AT }), ctx());
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ updated_at: FRESH_AT });
+    // No admin client involvement on the soft-delete path.
+    expect(mockCreateAdminClient).not.toHaveBeenCalled();
   });
 });

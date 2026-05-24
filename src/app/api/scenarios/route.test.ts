@@ -15,7 +15,7 @@ vi.mock('@/lib/rate-limit', () => ({
 import { createClient } from '@/lib/supabase/server';
 import { checkScenarioWrite } from '@/lib/rate-limit';
 
-import { GET, POST } from './route';
+import { DELETE, GET, POST } from './route';
 import {
   CALCULATOR_ID,
   SCENARIO_ROW,
@@ -351,6 +351,114 @@ describe('POST /api/scenarios', () => {
     );
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: 'create_failed' });
+    expect(errorSpy).toHaveBeenCalled();
+  });
+});
+
+// PROJ-13 — DELETE /api/scenarios?orphans=1: bulk-cleanup of orphan
+// scenarios for the caller. The query flag is required so a stray
+// DELETE can't wipe a user's entire scenarios table.
+function deleteRequest(query = ''): Request {
+  return new Request(`http://localhost:3000/api/scenarios${query}`, {
+    method: 'DELETE',
+  });
+}
+
+describe('DELETE /api/scenarios?orphans=1', () => {
+  beforeEach(() => {
+    mockCreateClient.mockReset();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('returns 401 when no user is signed in', async () => {
+    installSupabaseMock(mockCreateClient, makeSupabaseMock({ user: null }));
+
+    const res = await DELETE(deleteRequest('?orphans=1'));
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: 'unauthorized' });
+  });
+
+  it('returns 400 invalid_request when ?orphans=1 is missing', async () => {
+    installSupabaseMock(
+      mockCreateClient,
+      makeSupabaseMock({ user: USER_FIXTURE }),
+    );
+
+    const res = await DELETE(deleteRequest());
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'invalid_request' });
+  });
+
+  it('returns 400 invalid_request when orphans is set to a different value', async () => {
+    installSupabaseMock(
+      mockCreateClient,
+      makeSupabaseMock({ user: USER_FIXTURE }),
+    );
+
+    const res = await DELETE(deleteRequest('?orphans=true'));
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'invalid_request' });
+  });
+
+  it('returns 200 with deleted=0 when the caller has no orphans', async () => {
+    const supabase = makeSupabaseMock({
+      user: USER_FIXTURE,
+      fromResults: [{ data: [], error: null }],
+    });
+    installSupabaseMock(mockCreateClient, supabase);
+
+    const res = await DELETE(deleteRequest('?orphans=1'));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, deleted: 0 });
+  });
+
+  it('returns 200 with the deleted count and scopes the DELETE to the caller and to orphans only', async () => {
+    const deletedIds = [
+      { id: '11111111-aaaa-bbbb-cccc-111111111111' },
+      { id: '22222222-aaaa-bbbb-cccc-222222222222' },
+      { id: '33333333-aaaa-bbbb-cccc-333333333333' },
+    ];
+    const supabase = makeSupabaseMock({
+      user: USER_FIXTURE,
+      fromResults: [{ data: deletedIds, error: null }],
+    });
+    installSupabaseMock(mockCreateClient, supabase);
+
+    const res = await DELETE(deleteRequest('?orphans=1'));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, deleted: deletedIds.length });
+
+    const builder = supabase._builders[0]!;
+    expect(builder.delete).toHaveBeenCalled();
+    // Owner scoping — the bulk delete must never touch another user's
+    // orphans.
+    expect(builder.eq).toHaveBeenCalledWith('owner_id', USER_FIXTURE.id);
+    // Orphan filter — only rows whose parent calculator is hard-deleted
+    // (calculator_id IS NULL per PROJ-12's ON DELETE SET NULL).
+    expect(builder.is).toHaveBeenCalledWith('calculator_id', null);
+  });
+
+  it('returns 500 bulk_delete_failed when the DELETE statement errors', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    installSupabaseMock(
+      mockCreateClient,
+      makeSupabaseMock({
+        user: USER_FIXTURE,
+        fromResults: [{ data: null, error: { message: 'db down' } }],
+      }),
+    );
+
+    const res = await DELETE(deleteRequest('?orphans=1'));
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: 'bulk_delete_failed' });
     expect(errorSpy).toHaveBeenCalled();
   });
 });
