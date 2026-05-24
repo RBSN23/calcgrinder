@@ -1,8 +1,53 @@
 # PROJ-15: Charts
 
-## Status: Approved (with documented Known Issue — see KI-1)
+## Status: Deployed (with documented Known Issue — see KI-1)
 **Created:** 2026-05-24
-**Last Updated:** 2026-05-24 (BUG-C4 fixed; BUG-C5 deferred as Known Issue KI-1)
+**Last Updated:** 2026-05-24 (deployed to production at https://calcgrinder.vercel.app)
+
+## Deployment
+
+- **Production URL:** https://calcgrinder.vercel.app
+- **Deployed:** 2026-05-24
+- **Feat commit:** b1f863b
+- **Tag:** v1.15.0-PROJ-15
+- **Migrations applied to Cloud** (verified via
+  `npx supabase migration list --linked` — local + remote match):
+  - `20260529000000_charts.sql`
+  - `20260530000000_public_calculator_charts.sql`
+  - `20260530000001_scenario_charts.sql`
+- **Env-var changes:** none — charts introduce no new config.
+- **Vercel auto-deploy:** triggered by push of `b1f863b` to
+  `main`; build went live within ~1 min.
+
+**Post-deploy smoke probes against the live URL:**
+
+```
+GET /auth/login              → 200
+GET /dashboard (unauth)      → 307 /auth/login
+GET / (unauth)               → 307 /auth/login
+GET /c/nonexistent-token     → 404
+```
+
+**Pre-deploy test-instrumentation fix bundled into the feat
+commit:** `tests/PROJ-15-charts.spec.ts:194` (BUG-C2 — editor
+bundle hydrates seeded chart on initial render) was failing
+on the Mobile Safari Playwright project because `EditorBody`
+renders both a desktop (`hidden md:flex`) and a mobile
+(`md:hidden`) tree, and `.first()` on `[data-chart-id]` /
+`getByText` resolved to the hidden desktop instance. Selectors
+switched to `:visible` filtering; product behaviour is
+unchanged. PROJ-15 E2E suite now passes 6 / 6 across Chromium +
+Mobile Safari (with the 2 correct skips on the desktop-only
++Add toolbar test).
+
+**KI-1 carried into production:** the two public RPC
+migrations shipped here dropped PROJ-14's owner
+`status='approved'` JOIN. Impact in the current single-
+deployer context is zero (no `pending_deletion` accounts in
+the wild, unguessable visitor token). The dormant gate at
+`tests/PROJ-14-settings.spec.ts:593` stays red until the next
+backend-touching feature bundles the JOIN restoration; that
+test turns green and KI-1 closes at that point.
 
 ## Known Issues (carried into deploy)
 

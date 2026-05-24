@@ -55,7 +55,7 @@ and cloning.
 | P0 (MVP) | Scenarios — Save, Load, Share                        | Deployed |
 | P0 (MVP) | Soft-Delete & Trash Recovery                         | Deployed |
 | P0 (MVP) | Settings Page                                        | Deployed |
-| P1       | Charts (12-type vocabulary)                          | Planned  |
+| P1       | Charts (12-type vocabulary)                          | Deployed |
 | P1       | Text Blocks (Markdown)                               | Roadmap  |
 | P1       | Tabular Output Cells                                 | Roadmap  |
 | P1       | Cloning & Preset Discoverability                     | Roadmap  |
