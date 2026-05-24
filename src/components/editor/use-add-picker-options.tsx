@@ -12,12 +12,13 @@ import * as React from 'react';
 
 import { MAX_CHARTS } from '@/lib/charts/limits';
 import { useEditor } from '@/lib/editor/EditorProvider';
+import { MAX_TEXT_BLOCKS } from '@/lib/text-blocks/limits';
 
 import { type AddPickerOption } from './add-picker';
 import { Icons } from '../shell/icons';
 
 export function useAddPickerOptions(): AddPickerOption[] {
-  const { state, addSection, addCell, addChart } = useEditor();
+  const { state, addSection, addCell, addChart, addTextBlock } = useEditor();
 
   const handleAddCell = React.useCallback(() => {
     const last = state.sections[state.sections.length - 1];
@@ -41,11 +42,23 @@ export function useAddPickerOptions(): AddPickerOption[] {
     }
   }, [state.sections, addChart, addSection]);
 
+  const handleAddTextBlock = React.useCallback(() => {
+    const last = state.sections[state.sections.length - 1];
+    if (last) {
+      void addTextBlock(last.id);
+    } else {
+      void addSection().then((section) => {
+        if (section) void addTextBlock(section.id);
+      });
+    }
+  }, [state.sections, addTextBlock, addSection]);
+
   const handleAddSection = React.useCallback(() => {
     void addSection();
   }, [addSection]);
 
   const atChartCap = state.charts.length >= MAX_CHARTS;
+  const atTextBlockCap = state.text_blocks.length >= MAX_TEXT_BLOCKS;
 
   return React.useMemo<AddPickerOption[]>(
     () => [
@@ -73,8 +86,11 @@ export function useAddPickerOptions(): AddPickerOption[] {
         label: 'Text block',
         subtitle: 'Write Markdown content',
         icon: <Icons.Menu size={14} />,
-        disabled: true,
-        tooltipWhenDisabled: 'Text blocks ship in v1.1.',
+        disabled: atTextBlockCap,
+        tooltipWhenDisabled: atTextBlockCap
+          ? `Limit of ${MAX_TEXT_BLOCKS} text blocks reached.`
+          : undefined,
+        onSelect: atTextBlockCap ? undefined : handleAddTextBlock,
       },
       {
         id: 'section',
@@ -85,6 +101,13 @@ export function useAddPickerOptions(): AddPickerOption[] {
         onSelect: handleAddSection,
       },
     ],
-    [handleAddCell, handleAddChart, handleAddSection, atChartCap],
+    [
+      handleAddCell,
+      handleAddChart,
+      handleAddTextBlock,
+      handleAddSection,
+      atChartCap,
+      atTextBlockCap,
+    ],
   );
 }

@@ -9,6 +9,7 @@
 import type { CellRow } from '@/lib/cells/types';
 import type { ChartRow } from '@/lib/charts/types';
 import type { SectionRow } from '@/lib/sections/types';
+import type { TextBlockRow } from '@/lib/text-blocks/types';
 
 export const MAX_TITLE_LENGTH = 100;
 
@@ -49,12 +50,20 @@ export type PublicSectionChart = Omit<
   'calculator_id' | 'section_id' | 'created_at' | 'updated_at'
 >;
 
+// PROJ-16 — Text blocks ride along with their parent section in the
+// visitor RPC payload. Same omit shape as cells and charts.
+export type PublicSectionTextBlock = Omit<
+  TextBlockRow,
+  'calculator_id' | 'section_id' | 'created_at' | 'updated_at'
+>;
+
 export type PublicSection = Omit<
   SectionRow,
   'calculator_id' | 'created_at' | 'updated_at'
 > & {
   cells: PublicSectionCell[];
   charts: PublicSectionChart[];
+  text_blocks: PublicSectionTextBlock[];
 };
 
 /**

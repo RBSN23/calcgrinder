@@ -1269,6 +1269,15 @@ the deferred work.
   **RESOLVED 2026-05-24** — caption row below each pair by
   default, auto-fallback to hover-tooltip when per-pair width
   drops below legibility threshold. See Technical Decisions.
+- [ ] **Chart picker UX for scalar-only Output cells** — most
+  common bar/pie use case (chart 3-5 KPIs side-by-side)
+  currently requires authoring a MAP-formula wrapper cell.
+  Decision deferred: add LIST() variadic helper to PROJ-7
+  (clean but leaves a hidden helper cell in the grid) vs.
+  let chart picker accept multiple scalar cells directly
+  (better UX, breaks "series cells return arrays" invariant).
+  Re-evaluate on next formula-engine or chart-configurator
+  touch.
 
 ## Decision Log
 

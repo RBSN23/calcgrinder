@@ -143,6 +143,7 @@ describe('fetchPublicCalculator', () => {
               }),
             ],
             charts: [],
+            text_blocks: [],
           },
         ],
       },

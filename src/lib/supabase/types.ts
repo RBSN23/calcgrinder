@@ -442,6 +442,69 @@ export type Database = {
         }
         Relationships: []
       }
+      text_blocks: {
+        Row: {
+          body: string
+          calculator_id: string
+          card_accent: string
+          card_background_tint: string
+          card_border: string
+          card_size_hint: string
+          created_at: string
+          display_order: number
+          id: string
+          section_id: string
+          text_colour: string
+          text_size: string
+          updated_at: string
+        }
+        Insert: {
+          body?: string
+          calculator_id: string
+          card_accent?: string
+          card_background_tint?: string
+          card_border?: string
+          card_size_hint?: string
+          created_at?: string
+          display_order: number
+          id?: string
+          section_id: string
+          text_colour?: string
+          text_size?: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          calculator_id?: string
+          card_accent?: string
+          card_background_tint?: string
+          card_border?: string
+          card_size_hint?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          section_id?: string
+          text_colour?: string
+          text_size?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "text_blocks_calculator_id_fkey"
+            columns: ["calculator_id"]
+            isOneToOne: false
+            referencedRelation: "calculators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "text_blocks_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

@@ -17,10 +17,12 @@ import type {
   PublicSection,
   PublicSectionCell,
   PublicSectionChart,
+  PublicSectionTextBlock,
 } from '@/lib/calculators/types';
 import type { CellRow } from '@/lib/cells/types';
 import type { ChartRow } from '@/lib/charts/types';
 import type { SectionRow } from '@/lib/sections/types';
+import type { TextBlockRow } from '@/lib/text-blocks/types';
 import {
   evaluateCalculator,
   type Cell as EngineCell,
@@ -57,6 +59,13 @@ export function VisitorCalculatorStateAdapter({
       ),
     [calculator.id, calculator.sections],
   );
+  const textBlocks = React.useMemo<TextBlockRow[]>(
+    () =>
+      calculator.sections.flatMap((s) =>
+        (s.text_blocks ?? []).map((t) => toTextBlockRow(t, calculator.id, s.id)),
+      ),
+    [calculator.id, calculator.sections],
+  );
 
   const { inputs, setInput } = useVisitorInputStore();
 
@@ -85,12 +94,23 @@ export function VisitorCalculatorStateAdapter({
       sections,
       cells,
       charts,
+      text_blocks: textBlocks,
       inputs,
       setInput,
       results,
       getResult,
     }),
-    [calculator, sections, cells, charts, inputs, setInput, results, getResult],
+    [
+      calculator,
+      sections,
+      cells,
+      charts,
+      textBlocks,
+      inputs,
+      setInput,
+      results,
+      getResult,
+    ],
   );
 
   return (
@@ -132,6 +152,20 @@ function toChartRow(
 ): ChartRow {
   return {
     ...chart,
+    calculator_id,
+    section_id,
+    created_at: EMPTY_TIMESTAMP,
+    updated_at: EMPTY_TIMESTAMP,
+  };
+}
+
+function toTextBlockRow(
+  textBlock: PublicSectionTextBlock,
+  calculator_id: string,
+  section_id: string,
+): TextBlockRow {
+  return {
+    ...textBlock,
     calculator_id,
     section_id,
     created_at: EMPTY_TIMESTAMP,

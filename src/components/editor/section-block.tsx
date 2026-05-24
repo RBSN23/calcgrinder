@@ -38,9 +38,11 @@ import { resolveLayoutPattern, type Theme } from '@/lib/themes';
 import { cn } from '@/lib/utils';
 
 import type { ChartRow } from '@/lib/charts/types';
+import type { TextBlockRow } from '@/lib/text-blocks/types';
 
 import { CellCard } from './cell-card';
 import { ChartCard } from './chart-card';
+import { TextBlockCard } from './text-block-card';
 import { DestructiveConfirmSheet } from './destructive-confirm-sheet';
 import { DragHandle, SortableItem, useEditorDndSensors } from './dnd-helpers';
 import { EditableText } from './editable-text';
@@ -70,7 +72,7 @@ export function SectionBlock({
 }: SectionBlockProps) {
   const isBuilder = useIsBuilder();
   const { pattern, fellBack } = resolveLayoutPattern(theme.layoutPatterns, section.layout_pattern_id);
-  const { charts } = useCalculatorState();
+  const { charts, text_blocks } = useCalculatorState();
 
   const visibleCells = React.useMemo(
     () => cells.filter((c) => c.visibility === 'visible'),
@@ -88,8 +90,19 @@ export function SectionBlock({
         .sort((a, b) => a.display_order - b.display_order),
     [charts, section.id],
   );
+  const sectionTextBlocks = React.useMemo(
+    () =>
+      text_blocks
+        .filter((t) => t.section_id === section.id)
+        .slice()
+        .sort((a, b) => a.display_order - b.display_order),
+    [text_blocks, section.id],
+  );
 
-  const hasContent = cells.length > 0 || sectionCharts.length > 0;
+  const hasContent =
+    cells.length > 0 ||
+    sectionCharts.length > 0 ||
+    sectionTextBlocks.length > 0;
 
   return (
     <section
@@ -145,11 +158,22 @@ export function SectionBlock({
           visibleCells={visibleCells}
           hiddenCells={hiddenCells}
           sectionCharts={sectionCharts}
+          sectionTextBlocks={sectionTextBlocks}
           theme={theme}
         />
       )}
     </section>
   );
+}
+
+// PROJ-16 — text-block cards default to `wide`. Same column-span rules as
+// charts: `narrow` fits one slot; `wide` / `full` span the whole row.
+function textBlockColumnSpanStyle(
+  sizeHint: TextBlockRow['card_size_hint'],
+  totalColumns: number,
+): React.CSSProperties {
+  if (sizeHint === 'narrow' || totalColumns <= 1) return {};
+  return { gridColumn: `1 / span ${totalColumns}` };
 }
 
 // PROJ-15 — `wide` and `full` chart cards span every column slot of the
@@ -333,6 +357,7 @@ interface LayoutPatternGridProps {
   visibleCells: CellRow[];
   hiddenCells: CellRow[];
   sectionCharts: ChartRow[];
+  sectionTextBlocks: TextBlockRow[];
   theme: Theme;
 }
 
@@ -342,6 +367,7 @@ function LayoutPatternGrid({
   visibleCells,
   hiddenCells,
   sectionCharts,
+  sectionTextBlocks,
   theme,
 }: LayoutPatternGridProps) {
   const isBuilder = useIsBuilder();
@@ -353,6 +379,7 @@ function LayoutPatternGrid({
           columnSpans={columnSpans}
           visibleCells={visibleCells}
           sectionCharts={sectionCharts}
+          sectionTextBlocks={sectionTextBlocks}
           theme={theme}
         />
       ) : (
@@ -360,6 +387,7 @@ function LayoutPatternGrid({
           columnSpans={columnSpans}
           visibleCells={visibleCells}
           sectionCharts={sectionCharts}
+          sectionTextBlocks={sectionTextBlocks}
           theme={theme}
         />
       )}
@@ -378,6 +406,7 @@ interface ReadOnlyLayoutGridProps {
   columnSpans: number[];
   visibleCells: CellRow[];
   sectionCharts: ChartRow[];
+  sectionTextBlocks: TextBlockRow[];
   theme: Theme;
 }
 
@@ -385,6 +414,7 @@ function ReadOnlyLayoutGrid({
   columnSpans,
   visibleCells,
   sectionCharts,
+  sectionTextBlocks,
   theme,
 }: ReadOnlyLayoutGridProps) {
   const template = columnSpans.map((s) => `${s}fr`).join(' ');
@@ -404,6 +434,15 @@ function ReadOnlyLayoutGrid({
           <ChartCard chart={chart} theme={theme} />
         </div>
       ))}
+      {sectionTextBlocks.map((tb) => (
+        <div
+          key={tb.id}
+          className="min-w-0"
+          style={textBlockColumnSpanStyle(tb.card_size_hint, columnSpans.length)}
+        >
+          <TextBlockCard textBlock={tb} theme={theme} />
+        </div>
+      ))}
     </div>
   );
 }
@@ -413,6 +452,7 @@ interface BuilderLayoutGridProps {
   columnSpans: number[];
   visibleCells: CellRow[];
   sectionCharts: ChartRow[];
+  sectionTextBlocks: TextBlockRow[];
   theme: Theme;
 }
 
@@ -421,6 +461,7 @@ function BuilderLayoutGrid({
   columnSpans,
   visibleCells,
   sectionCharts,
+  sectionTextBlocks,
   theme,
 }: BuilderLayoutGridProps) {
   const { cells: allCells } = useCalculatorState();
@@ -499,6 +540,15 @@ function BuilderLayoutGrid({
               style={chartColumnSpanStyle(chart.card_size_hint, columnSpans.length)}
             >
               <ChartCard chart={chart} theme={theme} />
+            </div>
+          ))}
+          {sectionTextBlocks.map((tb) => (
+            <div
+              key={tb.id}
+              className="min-w-0"
+              style={textBlockColumnSpanStyle(tb.card_size_hint, columnSpans.length)}
+            >
+              <TextBlockCard textBlock={tb} theme={theme} />
             </div>
           ))}
         </div>

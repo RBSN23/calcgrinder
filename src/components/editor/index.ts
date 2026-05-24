@@ -39,3 +39,6 @@ export { ChartConfigurator } from './chart-configurator';
 export { ChartGridColumn } from './chart-grid-column';
 export { ChartBrokenBindingPanel } from './chart-broken-binding-panel';
 export { registerChartSlotRenderer } from './chart-slot-registration';
+// PROJ-16 — text-block UI surface.
+export { TextBlockCard } from './text-block-card';
+export { registerTextBlockSlotRenderer } from './text-block-slot-registration';

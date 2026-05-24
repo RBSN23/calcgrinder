@@ -55,6 +55,15 @@ import {
   type PatchSectionBody,
 } from '@/lib/sections/client';
 import type { SectionRow } from '@/lib/sections/types';
+import {
+  TextBlockApiError,
+  createTextBlock as createTextBlockApi,
+  deleteTextBlock as deleteTextBlockApi,
+  patchTextBlock as patchTextBlockApi,
+  type CreateTextBlockBody,
+  type PatchTextBlockBody,
+} from '@/lib/text-blocks/client';
+import type { TextBlockRow } from '@/lib/text-blocks/types';
 
 import {
   editorReducer,
@@ -113,6 +122,16 @@ export interface EditorApi {
     body: Omit<PatchChartBody, 'updated_at'>,
   ) => Promise<ChartRow | null>;
   removeChart: (id: string) => Promise<void>;
+  // PROJ-16 — text-block mutations.
+  addTextBlock: (
+    sectionId: string,
+    body?: CreateTextBlockBody,
+  ) => Promise<TextBlockRow | null>;
+  patchTextBlock: (
+    id: string,
+    body: Omit<PatchTextBlockBody, 'updated_at'>,
+  ) => Promise<TextBlockRow | null>;
+  removeTextBlock: (id: string) => Promise<void>;
 }
 
 class EditorStore {
@@ -125,7 +144,12 @@ class EditorStore {
     initialRow: CalculatorRow,
     patchFn: PatchFn,
     toast?: ToastReporter,
-    opts: { sections?: SectionRow[]; cells?: CellRow[]; charts?: ChartRow[] } = {},
+    opts: {
+      sections?: SectionRow[];
+      cells?: CellRow[];
+      charts?: ChartRow[];
+      text_blocks?: TextBlockRow[];
+    } = {},
   ) {
     this.state = initialEditorState(initialRow, opts);
     this.patchFn = patchFn;
@@ -974,6 +998,139 @@ class EditorStore {
     });
   };
 
+  // ─── PROJ-16 text-block mutations ──────────────────────────────────────
+
+  addTextBlock = async (
+    sectionId: string,
+    body: CreateTextBlockBody = {},
+  ): Promise<TextBlockRow | null> => {
+    let createdId: string | null = null;
+    return this.recordOperation<TextBlockRow>({
+      label: 'Add text block',
+      doFn: async () => {
+        const res = await createTextBlockApi(sectionId, {
+          ...body,
+          ...(createdId ? { id: createdId } : {}),
+        });
+        createdId = res.textBlock.id;
+        this.dispatch({ type: 'UPSERT_TEXT_BLOCK', text_block: res.textBlock });
+        this.refreshCalculatorUpdatedAt(res.calculatorUpdatedAt);
+        return res.textBlock;
+      },
+      undoFn: async () => {
+        if (!createdId) return;
+        const res = await deleteTextBlockApi(createdId);
+        this.dispatch({ type: 'REMOVE_TEXT_BLOCK', id: createdId });
+        this.refreshCalculatorUpdatedAt(res.calculatorUpdatedAt);
+      },
+      errorOverride: (e) => {
+        if (
+          e instanceof TextBlockApiError &&
+          e.code === 'text_block_cap_reached'
+        ) {
+          return `${e.max ?? 30}-text-block limit reached. Delete a text block to add more.`;
+        }
+        return undefined;
+      },
+    });
+  };
+
+  patchTextBlock = async (
+    id: string,
+    body: Omit<PatchTextBlockBody, 'updated_at'>,
+  ): Promise<TextBlockRow | null> => {
+    const previous = this.state.text_blocks.find((t) => t.id === id);
+    if (!previous) return null;
+    // Optimistic paint: apply the new values immediately so the
+    // textarea / segmented buttons don't flash back to prior values
+    // during the ~500ms PATCH window.
+    const optimistic: TextBlockRow = { ...previous };
+    for (const key of Object.keys(body) as (keyof PatchTextBlockBody)[]) {
+      const next = (body as unknown as Record<string, unknown>)[key];
+      if (next === undefined) continue;
+      (optimistic as unknown as Record<string, unknown>)[key] = next;
+    }
+    let next: TextBlockRow | null = null;
+    await this.recordOperation<TextBlockRow | null>({
+      label: 'Update text block',
+      doFn: async () => {
+        this.dispatch({ type: 'UPSERT_TEXT_BLOCK', text_block: optimistic });
+        let res;
+        try {
+          res = await patchTextBlockApi(id, {
+            ...body,
+            updated_at: next?.updated_at ?? this.state.calculator.updated_at,
+          });
+        } catch (e) {
+          this.dispatch({ type: 'UPSERT_TEXT_BLOCK', text_block: previous });
+          throw e;
+        }
+        next = res.textBlock;
+        this.dispatch({ type: 'UPSERT_TEXT_BLOCK', text_block: res.textBlock });
+        this.refreshCalculatorUpdatedAt(res.calculatorUpdatedAt);
+        return res.textBlock;
+      },
+      undoFn: async () => {
+        const res = await patchTextBlockApi(id, {
+          body: previous.body,
+          card_accent: previous.card_accent,
+          card_background_tint: previous.card_background_tint,
+          card_border: previous.card_border,
+          card_size_hint: previous.card_size_hint,
+          text_size: previous.text_size,
+          text_colour: previous.text_colour,
+          display_order: previous.display_order,
+          updated_at: next?.updated_at ?? previous.updated_at,
+        });
+        this.dispatch({ type: 'UPSERT_TEXT_BLOCK', text_block: res.textBlock });
+        this.refreshCalculatorUpdatedAt(res.calculatorUpdatedAt);
+      },
+      errorOverride: (e) => {
+        if (e instanceof TextBlockApiError) {
+          if (e.code === 'body_too_large') {
+            return 'Text too long — keep your block under ~50 KB.';
+          }
+          if (e.code === 'cross_section_move_unsupported') {
+            return `Cross-section moves aren't supported yet.`;
+          }
+        }
+        return undefined;
+      },
+    });
+    return next;
+  };
+
+  removeTextBlock = async (id: string): Promise<void> => {
+    const previous = this.state.text_blocks.find((t) => t.id === id);
+    if (!previous) return;
+    await this.recordOperation<void>({
+      label: 'Delete text block',
+      doFn: async () => {
+        const res = await deleteTextBlockApi(id);
+        this.dispatch({ type: 'REMOVE_TEXT_BLOCK', id });
+        this.refreshCalculatorUpdatedAt(res.calculatorUpdatedAt);
+      },
+      undoFn: async () => {
+        const recreated = await createTextBlockApi(previous.section_id, {
+          id: previous.id,
+          body: previous.body,
+          card_accent: previous.card_accent,
+          card_background_tint: previous.card_background_tint,
+          card_border: previous.card_border,
+          card_size_hint: previous.card_size_hint,
+          text_size: previous.text_size,
+          text_colour: previous.text_colour,
+          display_order: previous.display_order,
+        });
+        this.dispatch({
+          type: 'UPSERT_TEXT_BLOCK',
+          text_block: recreated.textBlock,
+        });
+        this.refreshCalculatorUpdatedAt(recreated.calculatorUpdatedAt);
+      },
+    });
+  };
+
   undo = async (): Promise<void> => {
     if (this.state.stale) return;
     const past = this.state.past;
@@ -1075,6 +1232,9 @@ export function useEditor(): EditorApi {
     addChart: store.addChart,
     patchChart: store.patchChart,
     removeChart: store.removeChart,
+    addTextBlock: store.addTextBlock,
+    patchTextBlock: store.patchTextBlock,
+    removeTextBlock: store.removeTextBlock,
   };
 }
 
@@ -1092,10 +1252,11 @@ export interface EditorProviderProps {
   patchFn?: typeof patchCalculator;
   /** Toast callback. Defaults to sonner.toast.error in browser, no-op in SSR. */
   onError?: (message: string) => void;
-  /** Initial sections / cells / charts loaded server-side. */
+  /** Initial sections / cells / charts / text_blocks loaded server-side. */
   initialSections?: SectionRow[];
   initialCells?: CellRow[];
   initialCharts?: ChartRow[];
+  initialTextBlocks?: TextBlockRow[];
   children: React.ReactNode;
 }
 
@@ -1106,6 +1267,7 @@ export function EditorProvider({
   initialSections,
   initialCells,
   initialCharts,
+  initialTextBlocks,
   children,
 }: EditorProviderProps) {
   // Create the store once per mount. `useState`'s lazy initializer runs
@@ -1118,6 +1280,7 @@ export function EditorProvider({
         sections: initialSections,
         cells: initialCells,
         charts: initialCharts,
+        text_blocks: initialTextBlocks,
       }),
   );
 

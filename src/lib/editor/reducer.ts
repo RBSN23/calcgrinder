@@ -15,6 +15,7 @@ import type { CalculatorRow } from '@/lib/calculators/types';
 import type { CellRow } from '@/lib/cells/types';
 import type { ChartRow } from '@/lib/charts/types';
 import type { SectionRow } from '@/lib/sections/types';
+import type { TextBlockRow } from '@/lib/text-blocks/types';
 
 /**
  * One enrolled history entry. The provider is responsible for running
@@ -47,6 +48,8 @@ export interface EditorState {
   cells: CellRow[];
   // PROJ-15 — charts attached to this calculator's sections.
   charts: ChartRow[];
+  // PROJ-16 — text blocks (markdown prose) per section.
+  text_blocks: TextBlockRow[];
 }
 
 export const DEFAULT_GRID_HEIGHT = 164;
@@ -86,11 +89,20 @@ export type EditorAction =
   // PROJ-15 — chart mutations.
   | { type: 'SET_CHARTS'; charts: ChartRow[] }
   | { type: 'UPSERT_CHART'; chart: ChartRow }
-  | { type: 'REMOVE_CHART'; id: string };
+  | { type: 'REMOVE_CHART'; id: string }
+  // PROJ-16 — text-block mutations.
+  | { type: 'SET_TEXT_BLOCKS'; text_blocks: TextBlockRow[] }
+  | { type: 'UPSERT_TEXT_BLOCK'; text_block: TextBlockRow }
+  | { type: 'REMOVE_TEXT_BLOCK'; id: string };
 
 export function initialEditorState(
   row: CalculatorRow,
-  opts: { sections?: SectionRow[]; cells?: CellRow[]; charts?: ChartRow[] } = {},
+  opts: {
+    sections?: SectionRow[];
+    cells?: CellRow[];
+    charts?: ChartRow[];
+    text_blocks?: TextBlockRow[];
+  } = {},
 ): EditorState {
   return {
     calculator: row,
@@ -105,6 +117,7 @@ export function initialEditorState(
     sections: opts.sections ?? [],
     cells: opts.cells ?? [],
     charts: opts.charts ?? [],
+    text_blocks: opts.text_blocks ?? [],
   };
 }
 
@@ -247,6 +260,10 @@ export function editorReducer(
         ...state,
         sections: state.sections.filter((s) => s.id !== action.id),
         cells: state.cells.filter((c) => c.section_id !== action.id),
+        charts: state.charts.filter((c) => c.section_id !== action.id),
+        text_blocks: state.text_blocks.filter(
+          (t) => t.section_id !== action.id,
+        ),
       };
     case 'UPSERT_CELL': {
       const idx = state.cells.findIndex((c) => c.id === action.cell.id);
@@ -278,9 +295,36 @@ export function editorReducer(
     }
     case 'REMOVE_CHART':
       return { ...state, charts: state.charts.filter((c) => c.id !== action.id) };
+    case 'SET_TEXT_BLOCKS':
+      return { ...state, text_blocks: sortTextBlocks(action.text_blocks) };
+    case 'UPSERT_TEXT_BLOCK': {
+      const idx = state.text_blocks.findIndex(
+        (t) => t.id === action.text_block.id,
+      );
+      const next =
+        idx === -1
+          ? [...state.text_blocks, action.text_block]
+          : state.text_blocks.map((t) =>
+              t.id === action.text_block.id ? action.text_block : t,
+            );
+      return { ...state, text_blocks: sortTextBlocks(next) };
+    }
+    case 'REMOVE_TEXT_BLOCK':
+      return {
+        ...state,
+        text_blocks: state.text_blocks.filter((t) => t.id !== action.id),
+      };
     default:
       return state;
   }
+}
+
+function sortTextBlocks(rows: TextBlockRow[]): TextBlockRow[] {
+  return [...rows].sort((a, b) => {
+    if (a.section_id < b.section_id) return -1;
+    if (a.section_id > b.section_id) return 1;
+    return a.display_order - b.display_order;
+  });
 }
 
 function sortCharts(rows: ChartRow[]): ChartRow[] {

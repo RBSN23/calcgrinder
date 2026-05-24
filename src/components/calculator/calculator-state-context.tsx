@@ -22,6 +22,7 @@ import type { CellRow } from '@/lib/cells/types';
 import type { ChartRow } from '@/lib/charts/types';
 import type { SectionRow } from '@/lib/sections/types';
 import type { CellResult, EvaluationResult, Inputs } from '@/lib/formula';
+import type { TextBlockRow } from '@/lib/text-blocks/types';
 
 export interface CalculatorStateCalculator {
   id: string;
@@ -38,6 +39,9 @@ export interface CalculatorStateValue {
   // PROJ-15 — charts surface from both the Builder (live edit state) and the
   // visitor view (frozen at publish snapshot).
   charts: ChartRow[];
+  // PROJ-16 — text blocks share the same surface; visitor view renders the
+  // frozen body, Builder mirrors live edit state.
+  text_blocks: TextBlockRow[];
   inputs: Inputs;
   setInput: (name: string, value: unknown) => void;
   results: EvaluationResult;

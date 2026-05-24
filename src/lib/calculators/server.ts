@@ -5,6 +5,7 @@ import type { ChartRow } from '@/lib/charts/types';
 import type { SectionRow } from '@/lib/sections/types';
 import { DEFAULT_SECTION_TITLE } from '@/lib/sections/types';
 import { createClient } from '@/lib/supabase/server';
+import type { TextBlockRow } from '@/lib/text-blocks/types';
 
 import type { CalculatorRow } from './types';
 
@@ -15,6 +16,7 @@ export interface EditorBundle {
   sections: SectionRow[];
   cells: CellRow[];
   charts: ChartRow[];
+  textBlocks: TextBlockRow[];
 }
 
 /**
@@ -227,6 +229,18 @@ export async function getEditorBundle(
     .order('section_id', { ascending: true })
     .order('display_order', { ascending: true });
 
+  // PROJ-16 — text blocks ride alongside cells/charts in the editor
+  // bundle for the same reload-restore reason.
+  const { data: textBlocksRaw } = await supabase
+    .from('text_blocks')
+    .select(
+      'id, calculator_id, section_id, body, card_accent, card_background_tint, card_border, card_size_hint, text_size, text_colour, display_order, created_at, updated_at',
+    )
+    .eq('calculator_id', id)
+    .order('section_id', { ascending: true })
+    .order('display_order', { ascending: true });
+  const textBlocks = (textBlocksRaw ?? []) as unknown as TextBlockRow[];
+
   // The section backfill bumped calculators.updated_at via the
   // parent-bump trigger — refresh the token so the client doesn't
   // immediately see a 409 on its first PATCH.
@@ -245,5 +259,6 @@ export async function getEditorBundle(
     sections: (sections ?? []) as SectionRow[],
     cells: (cells ?? []) as CellRow[],
     charts: (charts ?? []) as unknown as ChartRow[],
+    textBlocks,
   };
 }

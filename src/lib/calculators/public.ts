@@ -8,6 +8,7 @@ import type {
   PublicSection,
   PublicSectionCell,
   PublicSectionChart,
+  PublicSectionTextBlock,
 } from './types';
 import { CHART_TYPES, type ChartType } from '@/lib/charts/types';
 
@@ -100,9 +101,51 @@ function normaliseSections(value: unknown): PublicSection[] {
         display_order: displayOrder,
         cells: normaliseCells(entry.cells),
         charts: normaliseCharts(entry.charts),
+        text_blocks: normaliseTextBlocks(entry.text_blocks),
       };
     })
     .filter((s): s is PublicSection => s !== null)
+    .sort((a, b) => a.display_order - b.display_order);
+}
+
+/**
+ * PROJ-16 — text blocks ride along inside each section's JSONB. Same
+ * defensive narrowing as cells / charts: drop malformed entries silently,
+ * forward valid rows with tolerant defaults. Empty body is well-formed
+ * and is forwarded as-is; the visitor renderer drops empty bodies at
+ * render time (no card, no spacer).
+ */
+function normaliseTextBlocks(value: unknown): PublicSectionTextBlock[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry): PublicSectionTextBlock | null => {
+      if (!isRecord(entry)) return null;
+      const id = stringField(entry, 'id');
+      const displayOrder = numberField(entry, 'display_order');
+      if (!id || displayOrder == null) return null;
+      return {
+        id,
+        body: stringField(entry, 'body') ?? '',
+        card_accent: stringField(entry, 'card_accent') ?? 'theme',
+        card_background_tint:
+          (stringField(entry, 'card_background_tint') ??
+            'none') as PublicSectionTextBlock['card_background_tint'],
+        card_border:
+          (stringField(entry, 'card_border') ?? 'none') as
+            PublicSectionTextBlock['card_border'],
+        card_size_hint:
+          (stringField(entry, 'card_size_hint') ?? 'wide') as
+            PublicSectionTextBlock['card_size_hint'],
+        text_size:
+          (stringField(entry, 'text_size') ?? 'm') as
+            PublicSectionTextBlock['text_size'],
+        text_colour:
+          (stringField(entry, 'text_colour') ?? 'default') as
+            PublicSectionTextBlock['text_colour'],
+        display_order: displayOrder,
+      };
+    })
+    .filter((t): t is PublicSectionTextBlock => t !== null)
     .sort((a, b) => a.display_order - b.display_order);
 }
 
