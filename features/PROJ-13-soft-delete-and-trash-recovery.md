@@ -1,8 +1,8 @@
 # PROJ-13: Soft-Delete & Trash Recovery
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-24
-**Last Updated:** 2026-05-24 (QA re-run after BUG-H1 + BUG-L1 fixes — all green)
+**Last Updated:** 2026-05-24 (deployed to production after QA approval — BUG-H1 + BUG-L1 fixed and re-verified)
 
 ## Dependencies
 
@@ -1517,4 +1517,95 @@ Red-team checklist walked, all PASS except where noted:
 - No new bugs surfaced during the re-run; no migration touched; no env var changes.
 
 ## Deployment
-_To be added by /deploy_
+
+**Date:** 2026-05-24
+**Production URL:** https://calcgrinder.vercel.app
+**Deploy commit:** `86f505c` (feat) + the deploy commit that
+follows this section (status flip + tag).
+**Git tag:** `v1.13.0-PROJ-13`
+**Deployer:** /deploy (Claude)
+
+### Pre-deployment checks
+
+- `npm run build` → clean (TypeScript + 17 static pages
+  generated; new routes `/api/calculators/[id]/restore`,
+  `/api/calculators/[id]/scenarios-count`, `/api/cron/purge`
+  listed in the Route map).
+- `npm run lint` → 0 errors, 5 pre-existing warnings
+  unrelated to PROJ-13 (formula engine + PROJ-11 leftovers).
+- `npm test` (recorded in QA section) → 704/704 pass.
+- Playwright E2E (recorded in QA section) → 30/30 pass.
+- Regression suites (PROJ-1 / PROJ-10 / PROJ-12) →
+  36/36 pass.
+- QA status: **Approved** (49/49 AC pass; BUG-H1 + BUG-L1
+  fixed and re-verified).
+- No new env vars; no new migration; no schema change.
+- `vercel.json` cron (`0 4 * * *` → `/api/cron/purge`)
+  unchanged — Vercel auto-picks up the new handler body.
+
+### Deploy flow
+
+1. `feat(PROJ-13)` commit `86f505c` pushed to `origin/main`.
+2. Vercel GitHub integration auto-built and deployed.
+3. GitHub commit-status API reported `state: "success"`,
+   description "Deployment has completed", deployment URL
+   `https://vercel.com/voidforge-projects/calcgrinder/6iXWhJLS1b1XBR6svjsZoNqwk8w3`.
+
+### Post-deployment smoke tests
+
+All performed against https://calcgrinder.vercel.app
+immediately after Vercel reported deployment-success:
+
+| Endpoint | Probe | Expected | Actual |
+|---|---|---|---|
+| `GET /api/cron/purge` (no bearer) | unauth | 401 | 401 ✓ |
+| `GET /api/cron/purge` (empty `Bearer `) | unauth | 401 | 401 ✓ |
+| `GET /api/cron/purge` (wrong bearer) | constant-time mismatch | 401 | 401 ✓ |
+| `POST /api/calculators/<uuid>/restore` | unauth | 307 → `/auth/login` | 307 ✓ |
+| `GET /api/calculators/<uuid>/scenarios-count` | unauth | 307 → `/auth/login` | 307 ✓ |
+| `DELETE /api/scenarios?orphans=1` | unauth | 307 → `/auth/login` | 307 ✓ |
+| `GET /` | unauth | 307 → `/auth/login` | 307 ✓ |
+| `GET /dashboard` | unauth | 307 → `/auth/login` | 307 ✓ |
+
+No 5xx anywhere; all auth gates fire before any handler
+side-effect; cron bearer-auth contract from PROJ-1
+preserved exactly.
+
+### Cron next-run notes
+
+The daily auto-purge cron runs at `0 4 * * *` UTC (per
+`vercel.json`). The first execution carrying the PROJ-13
+body fires on the next scheduled tick after deployment — no
+manual step required. The handler returns
+`{ ok: true, purged: <count>, retention_days: 30 }`; for the
+first few days `<count>` may be 0 if no calculators
+soft-deleted before today have aged past 30 days yet.
+
+### Rollback plan
+
+If a regression surfaces in production:
+1. Vercel Dashboard → Deployments → promote the prior
+   deployment (PROJ-12 deploy commit `0744d13`) to
+   production. Estimated time-to-rollback: < 30s.
+2. The cron picks up the rolled-back handler on its next
+   scheduled run (returning to the PROJ-1 stub's `purged: 0`
+   shape — no DB rows are touched in the stub).
+3. No schema rollback needed: PROJ-13 added no migrations.
+4. No env-var rollback needed: PROJ-13 added no env vars.
+5. Soft-deleted rows that were created since the deploy
+   remain in `calculators.soft_delete_at IS NOT NULL` — they
+   simply stop being visible in Trash UI (the rolled-back
+   build has no Trash section) but are otherwise untouched.
+
+### Production-ready essentials
+
+- Error tracking: out of scope for this deploy; see
+  `docs/production/error-tracking.md` for the standing Sentry
+  setup that already covers the production deployment.
+- Security headers: already configured in `next.config` from
+  prior deploys; no PROJ-13 changes needed.
+- Rate limiting: PROJ-13's four new routes intentionally have
+  no Upstash gate (per QA "Notes" — acceptable for v1's
+  single-deployer assumption; RLS scopes the blast radius to
+  the caller's own rows). Revisit if multi-tenant volume
+  picks up.
