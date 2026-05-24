@@ -1,8 +1,10 @@
 # PROJ-18: Cloning & Preset Discoverability
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-24
-**Last Updated:** 2026-05-25 (QA passed — 0 blocking bugs, 4 Low; migration pushed to Cloud)
+**Last Updated:** 2026-05-25 (deployed to production at https://calcgrinder.vercel.app)
+**Production URL:** https://calcgrinder.vercel.app
+**Deployed:** 2026-05-25
 
 ## Dependencies
 
