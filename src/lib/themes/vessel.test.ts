@@ -38,6 +38,7 @@ describe('vessel theme tokens', () => {
       headerH: 64,
       cardTints: null,
       layoutPatterns: vessel.layoutPatterns,
+      chartPalette: vessel.chartPalette,
     });
   });
 

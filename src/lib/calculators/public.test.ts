@@ -142,6 +142,7 @@ describe('fetchPublicCalculator', () => {
                 display_order: 0,
               }),
             ],
+            charts: [],
           },
         ],
       },
@@ -226,6 +227,114 @@ describe('fetchPublicCalculator', () => {
     if (result?.status === 'ok') {
       expect(result.calculator.sections.map((s) => s.id)).toEqual(['a', 'b']);
     }
+  });
+
+  it('forwards charts on each section, sorted by display_order, dropping malformed entries', async () => {
+    installRpc({
+      data: [
+        {
+          ...VALID_ROW,
+          sections: [
+            {
+              id: 'section-1',
+              title: 'Inputs',
+              description: '',
+              layout_pattern_id: 'single_column',
+              display_order: 0,
+              cells: [],
+              charts: [
+                {
+                  id: 'chart-b',
+                  name: 'chart_2',
+                  chart_type: 'bar',
+                  title: '',
+                  subtitle: '',
+                  bindings: { x_axis: null, bars: [] },
+                  style: {
+                    legend: 'auto',
+                    axis_labels: 'auto',
+                    animation: true,
+                    smooth_lines: false,
+                  },
+                  card_accent: 'theme',
+                  card_background_tint: 'none',
+                  card_border: 'none',
+                  card_size_hint: 'narrow',
+                  display_order: 1,
+                },
+                {
+                  id: 'chart-a',
+                  name: 'chart_1',
+                  chart_type: 'line',
+                  title: 'Revenue',
+                  subtitle: '',
+                  bindings: { x_axis: null, lines: [] },
+                  style: {
+                    legend: 'auto',
+                    axis_labels: 'auto',
+                    animation: true,
+                    smooth_lines: false,
+                  },
+                  card_accent: 'theme',
+                  card_background_tint: 'none',
+                  card_border: 'none',
+                  card_size_hint: 'narrow',
+                  display_order: 0,
+                },
+                // malformed: missing required chart_type → dropped
+                { id: 'chart-bad', name: 'chart_3', display_order: 2 },
+                // malformed: unknown chart_type → dropped
+                {
+                  id: 'chart-bad-2',
+                  name: 'chart_4',
+                  chart_type: 'pyramid',
+                  display_order: 3,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      error: null,
+    });
+    const result = await fetchPublicCalculator(TOKEN);
+    if (result?.status !== 'ok') throw new Error('expected ok');
+    const charts = result.calculator.sections[0].charts;
+    expect(charts.map((c) => c.id)).toEqual(['chart-a', 'chart-b']);
+    expect(charts[0]).toEqual(
+      expect.objectContaining({
+        id: 'chart-a',
+        name: 'chart_1',
+        chart_type: 'line',
+        title: 'Revenue',
+        display_order: 0,
+      }),
+    );
+  });
+
+  it('defaults sections charts to [] when the RPC omits the key (legacy payload)', async () => {
+    installRpc({
+      data: [
+        {
+          ...VALID_ROW,
+          sections: [
+            {
+              id: 'no-charts',
+              title: 'Section',
+              description: '',
+              layout_pattern_id: 'single_column',
+              display_order: 0,
+              cells: [],
+              // charts key intentionally omitted
+            },
+          ],
+        },
+      ],
+      error: null,
+    });
+    const result = await fetchPublicCalculator(TOKEN);
+    if (result?.status !== 'ok') throw new Error('expected ok');
+    expect(result.calculator.sections[0].charts).toEqual([]);
   });
 
   it('calls the RPC with the token verbatim', async () => {

@@ -19,6 +19,7 @@
 import * as React from 'react';
 
 import type { CellRow } from '@/lib/cells/types';
+import type { ChartRow } from '@/lib/charts/types';
 import type { SectionRow } from '@/lib/sections/types';
 import type { CellResult, EvaluationResult, Inputs } from '@/lib/formula';
 
@@ -34,6 +35,9 @@ export interface CalculatorStateValue {
   calculator: CalculatorStateCalculator;
   sections: SectionRow[];
   cells: CellRow[];
+  // PROJ-15 — charts surface from both the Builder (live edit state) and the
+  // visitor view (frozen at publish snapshot).
+  charts: ChartRow[];
   inputs: Inputs;
   setInput: (name: string, value: unknown) => void;
   results: EvaluationResult;

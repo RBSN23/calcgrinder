@@ -222,6 +222,78 @@ export type Database = {
           },
         ]
       }
+      charts: {
+        Row: {
+          bindings: Json
+          calculator_id: string
+          card_accent: string
+          card_background_tint: string
+          card_border: string
+          card_size_hint: string
+          chart_type: string
+          created_at: string
+          display_order: number
+          id: string
+          name: string
+          section_id: string
+          style: Json
+          subtitle: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          bindings?: Json
+          calculator_id: string
+          card_accent?: string
+          card_background_tint?: string
+          card_border?: string
+          card_size_hint?: string
+          chart_type: string
+          created_at?: string
+          display_order: number
+          id?: string
+          name: string
+          section_id: string
+          style?: Json
+          subtitle?: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          bindings?: Json
+          calculator_id?: string
+          card_accent?: string
+          card_background_tint?: string
+          card_border?: string
+          card_size_hint?: string
+          chart_type?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          name?: string
+          section_id?: string
+          style?: Json
+          subtitle?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "charts_calculator_id_fkey"
+            columns: ["calculator_id"]
+            isOneToOne: false
+            referencedRelation: "calculators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "charts_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string

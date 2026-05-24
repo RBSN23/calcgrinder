@@ -13,6 +13,7 @@
 
 import type { CalculatorRow } from '@/lib/calculators/types';
 import type { CellRow } from '@/lib/cells/types';
+import type { ChartRow } from '@/lib/charts/types';
 import type { SectionRow } from '@/lib/sections/types';
 
 /**
@@ -44,6 +45,8 @@ export interface EditorState {
   stale: boolean;
   sections: SectionRow[];
   cells: CellRow[];
+  // PROJ-15 — charts attached to this calculator's sections.
+  charts: ChartRow[];
 }
 
 export const DEFAULT_GRID_HEIGHT = 164;
@@ -79,11 +82,15 @@ export type EditorAction =
   | { type: 'REMOVE_SECTION'; id: string }
   | { type: 'UPSERT_CELL'; cell: CellRow }
   | { type: 'UPSERT_CELLS'; cells: CellRow[] }
-  | { type: 'REMOVE_CELL'; id: string };
+  | { type: 'REMOVE_CELL'; id: string }
+  // PROJ-15 — chart mutations.
+  | { type: 'SET_CHARTS'; charts: ChartRow[] }
+  | { type: 'UPSERT_CHART'; chart: ChartRow }
+  | { type: 'REMOVE_CHART'; id: string };
 
 export function initialEditorState(
   row: CalculatorRow,
-  opts: { sections?: SectionRow[]; cells?: CellRow[] } = {},
+  opts: { sections?: SectionRow[]; cells?: CellRow[]; charts?: ChartRow[] } = {},
 ): EditorState {
   return {
     calculator: row,
@@ -97,6 +104,7 @@ export function initialEditorState(
     stale: false,
     sections: opts.sections ?? [],
     cells: opts.cells ?? [],
+    charts: opts.charts ?? [],
   };
 }
 
@@ -258,9 +266,29 @@ export function editorReducer(
     }
     case 'REMOVE_CELL':
       return { ...state, cells: state.cells.filter((c) => c.id !== action.id) };
+    case 'SET_CHARTS':
+      return { ...state, charts: sortCharts(action.charts) };
+    case 'UPSERT_CHART': {
+      const idx = state.charts.findIndex((c) => c.id === action.chart.id);
+      const next =
+        idx === -1
+          ? [...state.charts, action.chart]
+          : state.charts.map((c) => (c.id === action.chart.id ? action.chart : c));
+      return { ...state, charts: sortCharts(next) };
+    }
+    case 'REMOVE_CHART':
+      return { ...state, charts: state.charts.filter((c) => c.id !== action.id) };
     default:
       return state;
   }
+}
+
+function sortCharts(rows: ChartRow[]): ChartRow[] {
+  return [...rows].sort((a, b) => {
+    if (a.section_id < b.section_id) return -1;
+    if (a.section_id > b.section_id) return 1;
+    return a.display_order - b.display_order;
+  });
 }
 
 function sortSections(rows: SectionRow[]): SectionRow[] {

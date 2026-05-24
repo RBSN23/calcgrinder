@@ -358,7 +358,7 @@ test.describe('PROJ-8 — Editor shell', () => {
     }
   });
 
-  test('Builder toolbar shows Undo · Redo · ViewportPicker · "+ Add" with Cell+Section enabled (PROJ-9), Chart+Text disabled', async ({
+  test('Builder toolbar shows Undo · Redo · ViewportPicker · "+ Add" with Cell+Section+Chart enabled, Text disabled', async ({
     page,
     isMobile,
   }) => {
@@ -381,18 +381,16 @@ test.describe('PROJ-8 — Editor shell', () => {
 
       const addButton = toolbar.getByRole('button', { name: /add element/i });
       await addButton.click();
-      // PROJ-9 flips Cell + Section from disabled to enabled.
-      for (const label of ['Cell', 'Section']) {
+      // PROJ-9 enabled Cell + Section; PROJ-15 enables Chart.
+      for (const label of ['Cell', 'Chart', 'Section']) {
         const opt = page.getByRole('menuitem', { name: new RegExp(`^${label}`, 'i') });
         await expect(opt).toBeVisible();
         await expect(opt).toBeEnabled();
       }
-      // Chart + Text block stay disabled with v1.1 tooltips.
-      for (const label of ['Chart', 'Text block']) {
-        const opt = page.getByRole('menuitem', { name: new RegExp(label, 'i') });
-        await expect(opt).toBeVisible();
-        await expect(opt).toBeDisabled();
-      }
+      // Text block stays disabled until PROJ-16 lands.
+      const textOpt = page.getByRole('menuitem', { name: /Text block/i });
+      await expect(textOpt).toBeVisible();
+      await expect(textOpt).toBeDisabled();
 
       // Preview button NOT present in PROJ-8 (ships with PROJ-10).
       await expect(

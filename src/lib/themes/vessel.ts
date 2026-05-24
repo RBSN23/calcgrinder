@@ -1,3 +1,4 @@
+import { deriveChartPalette } from './derive-chart-palette';
 import {
   SINGLE_COLUMN_PATTERN,
   TWO_COLUMN_PATTERN,
@@ -27,6 +28,16 @@ export const vessel: Theme = {
   chartA: '#FAFAFA',
   chartB: '#00DC82',
   chartGrid: '#1A1A1A',
+  chartPalette: deriveChartPalette({
+    themeId: 'vessel',
+    accent: '#00DC82',
+    ink: '#FAFAFA',
+    bg: '#0A0A0A',
+    muted: '#8A8A8A',
+    chartA: '#FAFAFA',
+    chartB: '#00DC82',
+    chartGrid: '#1A1A1A',
+  }),
   cardStyle: 'glow',
   radius: 14,
   fieldRadius: 8,

@@ -45,6 +45,7 @@ describe('bentoGlassy theme tokens', () => {
         heroFg: '#FFFFFF',
       },
       layoutPatterns: bentoGlassy.layoutPatterns,
+      chartPalette: bentoGlassy.chartPalette,
     });
   });
 });

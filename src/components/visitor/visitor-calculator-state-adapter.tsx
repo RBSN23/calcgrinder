@@ -16,8 +16,10 @@ import type {
   PublicCalculator,
   PublicSection,
   PublicSectionCell,
+  PublicSectionChart,
 } from '@/lib/calculators/types';
 import type { CellRow } from '@/lib/cells/types';
+import type { ChartRow } from '@/lib/charts/types';
 import type { SectionRow } from '@/lib/sections/types';
 import {
   evaluateCalculator,
@@ -48,6 +50,13 @@ export function VisitorCalculatorStateAdapter({
       ),
     [calculator.id, calculator.sections],
   );
+  const charts = React.useMemo<ChartRow[]>(
+    () =>
+      calculator.sections.flatMap((s) =>
+        s.charts.map((c) => toChartRow(c, calculator.id, s.id)),
+      ),
+    [calculator.id, calculator.sections],
+  );
 
   const { inputs, setInput } = useVisitorInputStore();
 
@@ -75,12 +84,13 @@ export function VisitorCalculatorStateAdapter({
       },
       sections,
       cells,
+      charts,
       inputs,
       setInput,
       results,
       getResult,
     }),
-    [calculator, sections, cells, inputs, setInput, results, getResult],
+    [calculator, sections, cells, charts, inputs, setInput, results, getResult],
   );
 
   return (
@@ -108,6 +118,20 @@ function toCellRow(
 ): CellRow {
   return {
     ...cell,
+    calculator_id,
+    section_id,
+    created_at: EMPTY_TIMESTAMP,
+    updated_at: EMPTY_TIMESTAMP,
+  };
+}
+
+function toChartRow(
+  chart: PublicSectionChart,
+  calculator_id: string,
+  section_id: string,
+): ChartRow {
+  return {
+    ...chart,
     calculator_id,
     section_id,
     created_at: EMPTY_TIMESTAMP,

@@ -9,6 +9,7 @@ export { ThemePickerDesktop, ThemePickerMobile } from './theme-picker';
 export { ViewportPicker, viewportMaxWidth } from './viewport-picker';
 export { UndoRedoButtons } from './undo-redo-buttons';
 export { AddPicker, PROJ_8_OPTIONS, type AddPickerOption } from './add-picker';
+export { useAddPickerOptions } from './use-add-picker-options';
 export { CalculatorHero } from './calculator-hero';
 export {
   SlotRenderer,
@@ -32,3 +33,9 @@ export { SharingPopover } from './sharing-popover';
 export { EditableText } from './editable-text';
 export { GridColumn } from './grid-column';
 export { DragHandle, SortableItem, useEditorDndSensors } from './dnd-helpers';
+// PROJ-15 — chart UI surface.
+export { ChartCard } from './chart-card';
+export { ChartConfigurator } from './chart-configurator';
+export { ChartGridColumn } from './chart-grid-column';
+export { ChartBrokenBindingPanel } from './chart-broken-binding-panel';
+export { registerChartSlotRenderer } from './chart-slot-registration';

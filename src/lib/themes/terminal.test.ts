@@ -40,6 +40,7 @@ describe('terminal theme tokens', () => {
       headerH: 60,
       cardTints: null,
       layoutPatterns: terminal.layoutPatterns,
+      chartPalette: terminal.chartPalette,
     });
   });
 });

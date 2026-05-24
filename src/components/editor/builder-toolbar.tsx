@@ -14,23 +14,80 @@ import {
   CalculatorApiError,
   patchCalculator,
 } from '@/lib/calculators/client';
+import { getChartStructuralErrors } from '@/lib/charts/structural-errors';
 import { useEditor } from '@/lib/editor/EditorProvider';
+import { useEvaluationContext } from '@/lib/editor/EvaluationContext';
+import { getStructuralErrors, type Cell as EngineCell } from '@/lib/formula';
 
-import { AddPicker, type AddPickerOption } from './add-picker';
+import { AddPicker } from './add-picker';
 import { HiddenCellsPill } from './hidden-cells-pill';
 import { Icons } from '../shell/icons';
 import { Pill } from '../shell/pill';
 import { SharingPopover } from './sharing-popover';
 import { UndoRedoButtons } from './undo-redo-buttons';
+import { useAddPickerOptions } from './use-add-picker-options';
 import { ViewportPicker } from './viewport-picker';
 
 export function BuilderToolbar() {
-  const { state, dispatch, addSection, addCell } = useEditor();
+  const { state, dispatch } = useEditor();
+  const { results } = useEvaluationContext();
+  const options = useAddPickerOptions();
   const [publishBusy, setPublishBusy] = React.useState(false);
   const calc = state.calculator;
 
+  // PROJ-15 — Publish-gate: cell + chart structural errors block toggling
+  // a draft → published. Tooltip surfaces a chart-only count per the AC.
+  const engineCells = React.useMemo<EngineCell[]>(
+    () =>
+      state.cells.map((c) => {
+        if (c.kind === 'input') {
+          return {
+            name: c.name,
+            kind: 'input',
+            input_type:
+              c.value_type === 'select'
+                ? 'text'
+                : (c.value_type as EngineCell['input_type']),
+            default_value: c.default_value ?? undefined,
+          };
+        }
+        return { name: c.name, kind: 'output', formula: c.formula ?? '' };
+      }),
+    [state.cells],
+  );
+  const cellErrors = React.useMemo(
+    () => getStructuralErrors(engineCells),
+    [engineCells],
+  );
+  const cellMeta = React.useMemo(
+    () => state.cells.map((c) => ({ id: c.id, name: c.name })),
+    [state.cells],
+  );
+  const chartErrors = React.useMemo(
+    () => getChartStructuralErrors(state.charts, results, cellMeta),
+    [state.charts, results, cellMeta],
+  );
+  const chartsWithErrors = React.useMemo(() => {
+    const ids = new Set<string>();
+    for (const e of chartErrors) ids.add(e.chart_id);
+    return ids.size;
+  }, [chartErrors]);
+  const hasBlockingErrors = cellErrors.length > 0 || chartErrors.length > 0;
+
+  // Only gate the draft → published transition; unpublish must always
+  // remain reachable so the maintainer can take a broken calc offline.
+  const publishGateDisabled = !calc.published && hasBlockingErrors;
+  const publishTooltip = publishGateDisabled
+    ? chartsWithErrors > 0
+      ? `${chartsWithErrors} chart${chartsWithErrors === 1 ? '' : 's'} ${
+          chartsWithErrors === 1 ? 'has' : 'have'
+        } errors that need fixing before publishing.`
+      : 'Some cells have errors that need fixing before publishing.'
+    : undefined;
+
   const handleTogglePublish = React.useCallback(async () => {
     if (publishBusy) return;
+    if (publishGateDisabled) return;
     const next = !calc.published;
     setPublishBusy(true);
     try {
@@ -57,62 +114,16 @@ export function BuilderToolbar() {
     } finally {
       setPublishBusy(false);
     }
-  }, [calc.id, calc.published, calc.updated_at, dispatch, publishBusy]);
+  }, [
+    calc.id,
+    calc.published,
+    calc.updated_at,
+    dispatch,
+    publishBusy,
+    publishGateDisabled,
+  ]);
 
   const previewHref = `/c/${calc.public_token}`;
-
-  const handleAddCell = React.useCallback(() => {
-    const last = state.sections[state.sections.length - 1];
-    if (last) {
-      void addCell(last.id);
-    } else {
-      void addSection().then((section) => {
-        if (section) void addCell(section.id);
-      });
-    }
-  }, [state.sections, addCell, addSection]);
-
-  const handleAddSection = React.useCallback(() => {
-    void addSection();
-  }, [addSection]);
-
-  const options = React.useMemo<AddPickerOption[]>(
-    () => [
-      {
-        id: 'cell',
-        label: 'Cell',
-        subtitle: 'Add an input or output value',
-        icon: <Icons.Plus size={14} />,
-        disabled: false,
-        onSelect: handleAddCell,
-      },
-      {
-        id: 'chart',
-        label: 'Chart',
-        subtitle: 'Visualise a calculation',
-        icon: <Icons.LayoutGrid size={14} />,
-        disabled: true,
-        tooltipWhenDisabled: 'Charts ship in v1.1.',
-      },
-      {
-        id: 'text',
-        label: 'Text block',
-        subtitle: 'Write Markdown content',
-        icon: <Icons.Menu size={14} />,
-        disabled: true,
-        tooltipWhenDisabled: 'Text blocks ship in v1.1.',
-      },
-      {
-        id: 'section',
-        label: 'Section',
-        subtitle: 'Group elements together',
-        icon: <Icons.Menu size={14} />,
-        disabled: false,
-        onSelect: handleAddSection,
-      },
-    ],
-    [handleAddCell, handleAddSection],
-  );
 
   return (
     <div
@@ -135,11 +146,15 @@ export function BuilderToolbar() {
       <button
         type="button"
         onClick={handleTogglePublish}
-        disabled={publishBusy}
+        disabled={publishBusy || publishGateDisabled}
+        aria-disabled={publishBusy || publishGateDisabled || undefined}
+        title={publishTooltip}
         aria-label={
           calc.published
             ? 'Calculator is published — click to unpublish'
-            : 'Calculator is a draft — click to publish'
+            : publishGateDisabled
+              ? publishTooltip
+              : 'Calculator is a draft — click to publish'
         }
         aria-pressed={calc.published}
         className="inline-flex items-center rounded-full focus-visible:ring-2 focus-visible:ring-cg-border disabled:opacity-60"

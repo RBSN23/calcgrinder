@@ -40,6 +40,7 @@ describe('calcgrinderCI theme tokens', () => {
       headerH: 62,
       cardTints: null,
       layoutPatterns: calcgrinderCI.layoutPatterns,
+      chartPalette: calcgrinderCI.chartPalette,
     });
   });
 });

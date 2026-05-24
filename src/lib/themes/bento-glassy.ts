@@ -1,3 +1,4 @@
+import { deriveChartPalette } from './derive-chart-palette';
 import {
   ONE_THIRD_TWO_THIRDS_PATTERN,
   SINGLE_COLUMN_PATTERN,
@@ -31,6 +32,18 @@ export const bentoGlassy: Theme = {
   chartA: '#1A1A2E',
   chartB: '#5B6CBA',
   chartGrid: 'rgba(26,26,46,0.08)',
+  // Bento-glassy uses a gradient bg; derivation gets a representative
+  // mid-pastel solid colour so luminance-based decisions land sensibly.
+  chartPalette: deriveChartPalette({
+    themeId: 'bentoGlassy',
+    accent: '#5B6CBA',
+    ink: '#1A1A2E',
+    bg: '#EDE6F8',
+    muted: '#5A586E',
+    chartA: '#1A1A2E',
+    chartB: '#5B6CBA',
+    chartGrid: '#DCD4E8',
+  }),
   cardStyle: 'glass',
   radius: 20,
   fieldRadius: 12,

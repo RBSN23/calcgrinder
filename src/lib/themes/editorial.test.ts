@@ -37,6 +37,7 @@ describe('editorial theme tokens', () => {
       headerH: 68,
       cardTints: null,
       layoutPatterns: editorial.layoutPatterns,
+      chartPalette: editorial.chartPalette,
     });
   });
 });

@@ -1,3 +1,4 @@
+import { deriveChartPalette } from './derive-chart-palette';
 import { SINGLE_COLUMN_PATTERN } from './layout-patterns';
 import type { Theme } from './types';
 
@@ -26,6 +27,16 @@ export const terminal: Theme = {
   chartA: '#E8E8E8',
   chartB: '#4ADE80',
   chartGrid: '#171717',
+  chartPalette: deriveChartPalette({
+    themeId: 'terminal',
+    accent: '#4ADE80',
+    ink: '#E8E8E8',
+    bg: '#0A0A0A',
+    muted: '#8A8A8A',
+    chartA: '#E8E8E8',
+    chartB: '#4ADE80',
+    chartGrid: '#171717',
+  }),
   cardStyle: 'glow',
   radius: 8,
   fieldRadius: 6,

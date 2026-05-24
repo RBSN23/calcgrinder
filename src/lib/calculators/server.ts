@@ -1,6 +1,7 @@
 import 'server-only';
 
 import type { CellRow } from '@/lib/cells/types';
+import type { ChartRow } from '@/lib/charts/types';
 import type { SectionRow } from '@/lib/sections/types';
 import { DEFAULT_SECTION_TITLE } from '@/lib/sections/types';
 import { createClient } from '@/lib/supabase/server';
@@ -13,6 +14,7 @@ export interface EditorBundle {
   calculator: CalculatorRow;
   sections: SectionRow[];
   cells: CellRow[];
+  charts: ChartRow[];
 }
 
 /**
@@ -213,6 +215,18 @@ export async function getEditorBundle(
     .order('section_id', { ascending: true })
     .order('display_order', { ascending: true });
 
+  // PROJ-15 — charts ride alongside cells in the editor bundle so a page
+  // reload restores the canvas verbatim (without this, charts created in
+  // a session vanish on refresh — QA BUG-C2).
+  const { data: charts } = await supabase
+    .from('charts')
+    .select(
+      'id, calculator_id, section_id, name, chart_type, title, subtitle, bindings, style, card_accent, card_background_tint, card_border, card_size_hint, display_order, created_at, updated_at',
+    )
+    .eq('calculator_id', id)
+    .order('section_id', { ascending: true })
+    .order('display_order', { ascending: true });
+
   // The section backfill bumped calculators.updated_at via the
   // parent-bump trigger — refresh the token so the client doesn't
   // immediately see a 409 on its first PATCH.
@@ -230,5 +244,6 @@ export async function getEditorBundle(
     calculator: { ...calculator, updated_at: refreshedUpdatedAt },
     sections: (sections ?? []) as SectionRow[],
     cells: (cells ?? []) as CellRow[],
+    charts: (charts ?? []) as unknown as ChartRow[],
   };
 }

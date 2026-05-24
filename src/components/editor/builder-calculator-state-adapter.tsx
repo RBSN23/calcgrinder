@@ -31,12 +31,22 @@ export function BuilderCalculatorStateAdapter({
       },
       sections: state.sections,
       cells: state.cells,
+      charts: state.charts,
       inputs,
       setInput,
       results,
       getResult,
     }),
-    [state.calculator, state.sections, state.cells, inputs, setInput, results, getResult],
+    [
+      state.calculator,
+      state.sections,
+      state.cells,
+      state.charts,
+      inputs,
+      setInput,
+      results,
+      getResult,
+    ],
   );
   return (
     <CalculatorStateProvider value={value}>{children}</CalculatorStateProvider>

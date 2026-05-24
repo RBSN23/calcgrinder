@@ -9,6 +9,7 @@
 
 import type { CSSProperties } from 'react';
 
+import type { ChartPalette } from './derive-chart-palette';
 import type { LayoutPattern } from './layout-patterns';
 
 export type ThemeId =
@@ -64,10 +65,15 @@ interface ThemeBase {
   accentFg: string;
   accentSoft: string;
 
-  // Chart palette
+  // Chart palette (primitives — retained for backward-compat with PROJ-6
+  // consumers that haven't migrated to chartPalette).
   chartA: string;
   chartB: string;
   chartGrid: string;
+
+  // PROJ-15 — Chart palette bundle: 8-stop series, 6-stop heat ramp,
+  // positive/negative semantic pair (+ soft variants), neutral fill.
+  chartPalette: ChartPalette;
 
   // Shape
   radius: number;
@@ -107,3 +113,4 @@ export type Theme =
     });
 
 export type { CSSProperties };
+export type { ChartPalette } from './derive-chart-palette';

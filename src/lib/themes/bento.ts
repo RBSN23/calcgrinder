@@ -1,3 +1,4 @@
+import { deriveChartPalette } from './derive-chart-palette';
 import {
   ONE_THIRD_TWO_THIRDS_PATTERN,
   SINGLE_COLUMN_PATTERN,
@@ -31,6 +32,16 @@ export const bento: Theme = {
   chartA: '#1A1A2E',
   chartB: '#FF7A5A',
   chartGrid: 'rgba(0,0,0,0.08)',
+  chartPalette: deriveChartPalette({
+    themeId: 'bento',
+    accent: '#3623A5',
+    ink: '#1A1A2E',
+    bg: '#F1ECDF',
+    muted: '#5A586E',
+    chartA: '#1A1A2E',
+    chartB: '#FF7A5A',
+    chartGrid: '#D8D2C0',
+  }),
   cardStyle: 'tinted',
   radius: 22,
   fieldRadius: 14,

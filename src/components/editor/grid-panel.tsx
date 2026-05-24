@@ -14,33 +14,44 @@ import { cn } from '@/lib/utils';
 
 import { Icons } from '../shell/icons';
 
+import { AddPicker } from './add-picker';
+import { ChartGridColumn } from './chart-grid-column';
 import { GridColumn } from './grid-column';
+import { useAddPickerOptions } from './use-add-picker-options';
+
+interface OrderedColumn {
+  kind: 'cell' | 'chart';
+  id: string;
+  sectionDisplayOrder: number;
+  displayOrder: number;
+}
 
 export function GridPanel() {
-  const { state, dispatch, addSection, addCell } = useEditor();
-  const { gridHeight, gridCollapsed, sections, cells } = state;
+  const { state, dispatch } = useEditor();
+  const { gridHeight, gridCollapsed, sections, cells, charts } = state;
+  const options = useAddPickerOptions();
 
-  // Use section-then-display_order to lay columns out
-  const orderedCells = React.useMemo(() => {
+  // Interleave cells + charts by section-then-display_order to lay columns out.
+  const orderedColumns = React.useMemo<OrderedColumn[]>(() => {
     const bySection = new Map(sections.map((s) => [s.id, s.display_order]));
-    return [...cells].sort((a, b) => {
-      const sa = bySection.get(a.section_id) ?? 0;
-      const sb = bySection.get(b.section_id) ?? 0;
-      if (sa !== sb) return sa - sb;
-      return a.display_order - b.display_order;
+    const cellCols: OrderedColumn[] = cells.map((c) => ({
+      kind: 'cell',
+      id: c.id,
+      sectionDisplayOrder: bySection.get(c.section_id) ?? 0,
+      displayOrder: c.display_order,
+    }));
+    const chartCols: OrderedColumn[] = charts.map((c) => ({
+      kind: 'chart',
+      id: c.id,
+      sectionDisplayOrder: bySection.get(c.section_id) ?? 0,
+      displayOrder: c.display_order,
+    }));
+    return [...cellCols, ...chartCols].sort((a, b) => {
+      if (a.sectionDisplayOrder !== b.sectionDisplayOrder)
+        return a.sectionDisplayOrder - b.sectionDisplayOrder;
+      return a.displayOrder - b.displayOrder;
     });
-  }, [cells, sections]);
-
-  const handleAddCell = React.useCallback(() => {
-    const last = sections[sections.length - 1];
-    if (last) {
-      void addCell(last.id);
-    } else {
-      void addSection().then((section) => {
-        if (section) void addCell(section.id);
-      });
-    }
-  }, [sections, addCell, addSection]);
+  }, [cells, charts, sections]);
 
   return (
     <section
@@ -70,29 +81,26 @@ export function GridPanel() {
           Grid
         </h2>
         <span className="rounded-full border border-cg-border bg-cg-surface-2 px-[7px] py-[1px] font-mono text-[10.5px] font-medium text-cg-text-muted">
-          {orderedCells.length}
+          {orderedColumns.length}
         </span>
         <span className="flex-1" />
-        <button
-          type="button"
-          aria-label="Add cell"
-          onClick={handleAddCell}
-          className="inline-flex h-7 items-center gap-1 rounded-md border border-dashed border-cg-border bg-cg-surface px-2 text-[12px] text-cg-text-muted hover:bg-cg-surface-2"
-        >
-          <Icons.Plus size={12} />
-          add cell
-        </button>
+        <AddPicker options={options} />
       </header>
       {!gridCollapsed ? (
-        orderedCells.length === 0 ? (
+        orderedColumns.length === 0 ? (
           <div className="flex flex-1 items-center justify-center bg-cg-bg px-4 text-[12.5px] text-cg-text-subtle">
-            No cells yet — use “+ add cell” to create the first cell.
+            No cells yet — use the + Add menu to create the first element.
           </div>
         ) : (
           <div className="flex flex-1 overflow-auto bg-cg-bg">
-            {orderedCells.map((cell) => (
-              <GridColumn key={cell.id} cell={cell} />
-            ))}
+            {orderedColumns.map((col) => {
+              if (col.kind === 'cell') {
+                const cell = cells.find((c) => c.id === col.id);
+                return cell ? <GridColumn key={cell.id} cell={cell} /> : null;
+              }
+              const chart = charts.find((c) => c.id === col.id);
+              return chart ? <ChartGridColumn key={chart.id} chart={chart} /> : null;
+            })}
           </div>
         )
       ) : null}

@@ -1,3 +1,4 @@
+import { deriveChartPalette } from './derive-chart-palette';
 import {
   SINGLE_COLUMN_PATTERN,
   THREE_COLUMN_PATTERN,
@@ -29,6 +30,16 @@ export const minimal: Theme = {
   chartA: '#0A0A0A',
   chartB: '#5E6AD2',
   chartGrid: '#F0F0F0',
+  chartPalette: deriveChartPalette({
+    themeId: 'minimal',
+    accent: '#5E6AD2',
+    ink: '#0A0A0A',
+    bg: '#FFFFFF',
+    muted: '#737373',
+    chartA: '#0A0A0A',
+    chartB: '#5E6AD2',
+    chartGrid: '#F0F0F0',
+  }),
   cardStyle: 'flat',
   radius: 8,
   fieldRadius: 6,

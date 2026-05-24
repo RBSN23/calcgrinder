@@ -30,6 +30,7 @@ export default async function EditorPage({
       initialRow={bundle.calculator}
       initialSections={bundle.sections}
       initialCells={bundle.cells}
+      initialCharts={bundle.charts}
     >
       <EditorBody />
     </EditorProvider>

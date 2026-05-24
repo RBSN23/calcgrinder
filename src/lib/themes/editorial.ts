@@ -1,3 +1,4 @@
+import { deriveChartPalette } from './derive-chart-palette';
 import {
   SINGLE_COLUMN_PATTERN,
   TWO_THIRDS_ONE_THIRD_PATTERN,
@@ -27,6 +28,16 @@ export const editorial: Theme = {
   chartA: '#16140F',
   chartB: '#B79E70',
   chartGrid: '#E9E4DC',
+  chartPalette: deriveChartPalette({
+    themeId: 'editorial',
+    accent: '#16140F',
+    ink: '#16140F',
+    bg: '#F4F1EC',
+    muted: '#6F6A60',
+    chartA: '#16140F',
+    chartB: '#B79E70',
+    chartGrid: '#E9E4DC',
+  }),
   cardStyle: 'flat',
   radius: 10,
   fieldRadius: 7,

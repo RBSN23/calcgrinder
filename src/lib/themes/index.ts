@@ -92,3 +92,11 @@ export {
 };
 export { cardSurface, labelTextStyle, numberStyle } from './helpers';
 export { ThemeSwatch } from './ThemeSwatch';
+export {
+  ALLOWED_COLOR_TOKENS,
+  deriveChartPalette,
+  isChartColorTokenId,
+  resolveChartToken,
+  type ChartColorTokenId,
+} from './derive-chart-palette';
+export type { ChartPalette } from './types';

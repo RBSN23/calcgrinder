@@ -7,7 +7,9 @@ import type {
   PublicCalculatorFetchResult,
   PublicSection,
   PublicSectionCell,
+  PublicSectionChart,
 } from './types';
+import { CHART_TYPES, type ChartType } from '@/lib/charts/types';
 
 /**
  * PROJ-11 — server-side fetch for the anonymous /c/<token> visitor route.
@@ -97,6 +99,7 @@ function normaliseSections(value: unknown): PublicSection[] {
         layout_pattern_id: layoutPattern,
         display_order: displayOrder,
         cells: normaliseCells(entry.cells),
+        charts: normaliseCharts(entry.charts),
       };
     })
     .filter((s): s is PublicSection => s !== null)
@@ -166,6 +169,59 @@ function normaliseCells(value: unknown): PublicSectionCell[] {
       };
     })
     .filter((c): c is PublicSectionCell => c !== null)
+    .sort((a, b) => a.display_order - b.display_order);
+}
+
+/**
+ * PROJ-15 — charts ride along inside each section's JSONB. Same defensive
+ * narrowing as cells: drop malformed entries silently, forward valid rows
+ * with required fields and tolerant defaults. `bindings` and `style` stay
+ * as JSON; the chart-renderer dispatch validates them on read with the
+ * per-chart_type Zod schemas (so a stale schema doesn't crash the visitor
+ * render — it shows the broken-binding panel).
+ */
+function normaliseCharts(value: unknown): PublicSectionChart[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry): PublicSectionChart | null => {
+      if (!isRecord(entry)) return null;
+      const id = stringField(entry, 'id');
+      const name = stringField(entry, 'name');
+      const chartType = stringField(entry, 'chart_type');
+      const displayOrder = numberField(entry, 'display_order');
+      if (
+        !id ||
+        !name ||
+        !chartType ||
+        !(CHART_TYPES as readonly string[]).includes(chartType) ||
+        displayOrder == null
+      ) {
+        return null;
+      }
+      return {
+        id,
+        name,
+        chart_type: chartType as ChartType,
+        title: stringField(entry, 'title') ?? '',
+        subtitle: stringField(entry, 'subtitle') ?? '',
+        bindings: (jsonField(entry, 'bindings') ??
+          {}) as PublicSectionChart['bindings'],
+        style: (jsonField(entry, 'style') ??
+          {}) as PublicSectionChart['style'],
+        card_accent: stringField(entry, 'card_accent') ?? 'theme',
+        card_background_tint:
+          (stringField(entry, 'card_background_tint') ??
+            'none') as PublicSectionChart['card_background_tint'],
+        card_border:
+          (stringField(entry, 'card_border') ??
+            'none') as PublicSectionChart['card_border'],
+        card_size_hint:
+          (stringField(entry, 'card_size_hint') ??
+            'narrow') as PublicSectionChart['card_size_hint'],
+        display_order: displayOrder,
+      };
+    })
+    .filter((c): c is PublicSectionChart => c !== null)
     .sort((a, b) => a.display_order - b.display_order);
 }
 

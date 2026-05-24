@@ -1,3 +1,4 @@
+import { deriveChartPalette } from './derive-chart-palette';
 import {
   SINGLE_COLUMN_PATTERN,
   TWO_COLUMN_PATTERN,
@@ -28,6 +29,16 @@ export const calcgrinder: Theme = {
   chartA: '#1C1917',
   chartB: '#4F46E5',
   chartGrid: '#EFEDEB',
+  chartPalette: deriveChartPalette({
+    themeId: 'calcgrinder',
+    accent: '#4F46E5',
+    ink: '#1C1917',
+    bg: '#FAFAF9',
+    muted: '#78716C',
+    chartA: '#1C1917',
+    chartB: '#4F46E5',
+    chartGrid: '#EFEDEB',
+  }),
   cardStyle: 'flat',
   radius: 8,
   fieldRadius: 6,

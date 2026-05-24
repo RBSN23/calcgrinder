@@ -37,7 +37,10 @@ import { MAX_SECTION_TITLE_LENGTH, validateSectionTitle } from '@/lib/sections/t
 import { resolveLayoutPattern, type Theme } from '@/lib/themes';
 import { cn } from '@/lib/utils';
 
+import type { ChartRow } from '@/lib/charts/types';
+
 import { CellCard } from './cell-card';
+import { ChartCard } from './chart-card';
 import { DestructiveConfirmSheet } from './destructive-confirm-sheet';
 import { DragHandle, SortableItem, useEditorDndSensors } from './dnd-helpers';
 import { EditableText } from './editable-text';
@@ -67,6 +70,7 @@ export function SectionBlock({
 }: SectionBlockProps) {
   const isBuilder = useIsBuilder();
   const { pattern, fellBack } = resolveLayoutPattern(theme.layoutPatterns, section.layout_pattern_id);
+  const { charts } = useCalculatorState();
 
   const visibleCells = React.useMemo(
     () => cells.filter((c) => c.visibility === 'visible'),
@@ -76,6 +80,16 @@ export function SectionBlock({
     () => cells.filter((c) => c.visibility === 'hidden'),
     [cells],
   );
+  const sectionCharts = React.useMemo(
+    () =>
+      charts
+        .filter((c) => c.section_id === section.id)
+        .slice()
+        .sort((a, b) => a.display_order - b.display_order),
+    [charts, section.id],
+  );
+
+  const hasContent = cells.length > 0 || sectionCharts.length > 0;
 
   return (
     <section
@@ -122,7 +136,7 @@ export function SectionBlock({
         />
       ) : null}
 
-      {cells.length === 0 ? (
+      {!hasContent ? (
         isBuilder ? <BuilderEmptySectionPlaceholder sectionId={section.id} /> : null
       ) : (
         <LayoutPatternGrid
@@ -130,11 +144,23 @@ export function SectionBlock({
           columnSpans={pattern.columnSpans}
           visibleCells={visibleCells}
           hiddenCells={hiddenCells}
+          sectionCharts={sectionCharts}
           theme={theme}
         />
       )}
     </section>
   );
+}
+
+// PROJ-15 — `wide` and `full` chart cards span every column slot of the
+// section's layout pattern; `narrow` charts (the default) take a single
+// column slot and flow inline alongside cells.
+function chartColumnSpanStyle(
+  sizeHint: ChartRow['card_size_hint'],
+  totalColumns: number,
+): React.CSSProperties {
+  if (sizeHint === 'narrow' || totalColumns <= 1) return {};
+  return { gridColumn: `1 / span ${totalColumns}` };
 }
 
 interface ReadOnlySectionTitleProps {
@@ -306,6 +332,7 @@ interface LayoutPatternGridProps {
   columnSpans: number[];
   visibleCells: CellRow[];
   hiddenCells: CellRow[];
+  sectionCharts: ChartRow[];
   theme: Theme;
 }
 
@@ -314,6 +341,7 @@ function LayoutPatternGrid({
   columnSpans,
   visibleCells,
   hiddenCells,
+  sectionCharts,
   theme,
 }: LayoutPatternGridProps) {
   const isBuilder = useIsBuilder();
@@ -324,12 +352,14 @@ function LayoutPatternGrid({
           sectionId={sectionId}
           columnSpans={columnSpans}
           visibleCells={visibleCells}
+          sectionCharts={sectionCharts}
           theme={theme}
         />
       ) : (
         <ReadOnlyLayoutGrid
           columnSpans={columnSpans}
           visibleCells={visibleCells}
+          sectionCharts={sectionCharts}
           theme={theme}
         />
       )}
@@ -347,12 +377,14 @@ function LayoutPatternGrid({
 interface ReadOnlyLayoutGridProps {
   columnSpans: number[];
   visibleCells: CellRow[];
+  sectionCharts: ChartRow[];
   theme: Theme;
 }
 
 function ReadOnlyLayoutGrid({
   columnSpans,
   visibleCells,
+  sectionCharts,
   theme,
 }: ReadOnlyLayoutGridProps) {
   const template = columnSpans.map((s) => `${s}fr`).join(' ');
@@ -363,6 +395,15 @@ function ReadOnlyLayoutGrid({
           <CellCard cell={cell} theme={theme} />
         </div>
       ))}
+      {sectionCharts.map((chart) => (
+        <div
+          key={chart.id}
+          className="min-w-0"
+          style={chartColumnSpanStyle(chart.card_size_hint, columnSpans.length)}
+        >
+          <ChartCard chart={chart} theme={theme} />
+        </div>
+      ))}
     </div>
   );
 }
@@ -371,6 +412,7 @@ interface BuilderLayoutGridProps {
   sectionId: string;
   columnSpans: number[];
   visibleCells: CellRow[];
+  sectionCharts: ChartRow[];
   theme: Theme;
 }
 
@@ -378,6 +420,7 @@ function BuilderLayoutGrid({
   sectionId,
   columnSpans,
   visibleCells,
+  sectionCharts,
   theme,
 }: BuilderLayoutGridProps) {
   const { cells: allCells } = useCalculatorState();
@@ -448,6 +491,15 @@ function BuilderLayoutGrid({
                 </div>
               )}
             </SortableItem>
+          ))}
+          {sectionCharts.map((chart) => (
+            <div
+              key={chart.id}
+              className="min-w-0"
+              style={chartColumnSpanStyle(chart.card_size_hint, columnSpans.length)}
+            >
+              <ChartCard chart={chart} theme={theme} />
+            </div>
           ))}
         </div>
       </SortableContext>

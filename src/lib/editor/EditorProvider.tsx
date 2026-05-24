@@ -36,6 +36,15 @@ import {
   type PatchCellBody,
 } from '@/lib/cells/client';
 import type { CellRow } from '@/lib/cells/types';
+import {
+  ChartApiError,
+  createChart as createChartApi,
+  deleteChart as deleteChartApi,
+  patchChart as patchChartApi,
+  type CreateChartBody,
+  type PatchChartBody,
+} from '@/lib/charts/client';
+import type { ChartRow } from '@/lib/charts/types';
 import { rewriteFormulaReference } from '@/lib/formula';
 import {
   SectionApiError,
@@ -97,6 +106,13 @@ export interface EditorApi {
     body: Omit<PatchCellBody, 'updated_at'>,
   ) => Promise<CellRow | null>;
   removeCell: (id: string) => Promise<void>;
+  // PROJ-15 — chart mutations.
+  addChart: (sectionId: string, body?: CreateChartBody) => Promise<ChartRow | null>;
+  patchChart: (
+    id: string,
+    body: Omit<PatchChartBody, 'updated_at'>,
+  ) => Promise<ChartRow | null>;
+  removeChart: (id: string) => Promise<void>;
 }
 
 class EditorStore {
@@ -109,7 +125,7 @@ class EditorStore {
     initialRow: CalculatorRow,
     patchFn: PatchFn,
     toast?: ToastReporter,
-    opts: { sections?: SectionRow[]; cells?: CellRow[] } = {},
+    opts: { sections?: SectionRow[]; cells?: CellRow[]; charts?: ChartRow[] } = {},
   ) {
     this.state = initialEditorState(initialRow, opts);
     this.patchFn = patchFn;
@@ -836,6 +852,128 @@ class EditorStore {
     });
   };
 
+  // ─── PROJ-15 chart mutations ───────────────────────────────────────────
+
+  addChart = async (
+    sectionId: string,
+    body: CreateChartBody = {},
+  ): Promise<ChartRow | null> => {
+    let createdId: string | null = null;
+    return this.recordOperation<ChartRow>({
+      label: 'Add chart',
+      doFn: async () => {
+        const res = await createChartApi(sectionId, {
+          ...body,
+          ...(createdId ? { id: createdId } : {}),
+        });
+        createdId = res.chart.id;
+        this.dispatch({ type: 'UPSERT_CHART', chart: res.chart });
+        this.refreshCalculatorUpdatedAt(res.calculatorUpdatedAt);
+        return res.chart;
+      },
+      undoFn: async () => {
+        if (!createdId) return;
+        const res = await deleteChartApi(createdId);
+        this.dispatch({ type: 'REMOVE_CHART', id: createdId });
+        this.refreshCalculatorUpdatedAt(res.calculatorUpdatedAt);
+      },
+      errorOverride: (e) => {
+        if (e instanceof ChartApiError && e.code === 'chart_cap_reached') {
+          return `${e.max ?? 30}-chart limit reached. Delete a chart to add more.`;
+        }
+        return undefined;
+      },
+    });
+  };
+
+  patchChart = async (
+    id: string,
+    body: Omit<PatchChartBody, 'updated_at'>,
+  ): Promise<ChartRow | null> => {
+    const previous = this.state.charts.find((c) => c.id === id);
+    if (!previous) return null;
+    let next: ChartRow | null = null;
+    await this.recordOperation<ChartRow | null>({
+      label: 'Edit chart',
+      doFn: async () => {
+        const res = await patchChartApi(id, {
+          ...body,
+          updated_at: next?.updated_at ?? this.state.calculator.updated_at,
+        });
+        next = res.chart;
+        this.dispatch({ type: 'UPSERT_CHART', chart: res.chart });
+        this.refreshCalculatorUpdatedAt(res.calculatorUpdatedAt);
+        return res.chart;
+      },
+      undoFn: async () => {
+        // Restore the previous chart row verbatim.
+        const res = await patchChartApi(id, {
+          chart_type: previous.chart_type,
+          name: previous.name,
+          title: previous.title,
+          subtitle: previous.subtitle,
+          bindings: previous.bindings,
+          style: previous.style,
+          card_accent: previous.card_accent,
+          card_background_tint: previous.card_background_tint,
+          card_border: previous.card_border,
+          card_size_hint: previous.card_size_hint,
+          display_order: previous.display_order,
+          updated_at: next?.updated_at ?? previous.updated_at,
+        });
+        this.dispatch({ type: 'UPSERT_CHART', chart: res.chart });
+        this.refreshCalculatorUpdatedAt(res.calculatorUpdatedAt);
+      },
+      errorOverride: (e) => {
+        if (e instanceof ChartApiError) {
+          if (e.code === 'name_collision')
+            return 'Another chart on this calculator already uses that name.';
+          if (e.code === 'name_reserved')
+            return `"${e.reservedWord ?? body.name ?? ''}" is reserved — pick a different name.`;
+          if (e.code === 'name_invalid')
+            return 'Names must start with a letter and contain only lowercase letters, digits, and underscores.';
+          if (e.code === 'cross_section_move_unsupported')
+            return `Cross-section moves aren't supported yet.`;
+          if (e.code === 'color_token_invalid')
+            return 'Pick a colour from the theme palette.';
+        }
+        return undefined;
+      },
+    });
+    return next;
+  };
+
+  removeChart = async (id: string): Promise<void> => {
+    const previous = this.state.charts.find((c) => c.id === id);
+    if (!previous) return;
+    await this.recordOperation<void>({
+      label: 'Delete chart',
+      doFn: async () => {
+        const res = await deleteChartApi(id);
+        this.dispatch({ type: 'REMOVE_CHART', id });
+        this.refreshCalculatorUpdatedAt(res.calculatorUpdatedAt);
+      },
+      undoFn: async () => {
+        const recreated = await createChartApi(previous.section_id, {
+          id: previous.id,
+          chart_type: previous.chart_type,
+          name: previous.name,
+          title: previous.title,
+          subtitle: previous.subtitle,
+          bindings: previous.bindings,
+          style: previous.style,
+          card_accent: previous.card_accent,
+          card_background_tint: previous.card_background_tint,
+          card_border: previous.card_border,
+          card_size_hint: previous.card_size_hint,
+          display_order: previous.display_order,
+        });
+        this.dispatch({ type: 'UPSERT_CHART', chart: recreated.chart });
+        this.refreshCalculatorUpdatedAt(recreated.calculatorUpdatedAt);
+      },
+    });
+  };
+
   undo = async (): Promise<void> => {
     if (this.state.stale) return;
     const past = this.state.past;
@@ -934,6 +1072,9 @@ export function useEditor(): EditorApi {
     addCell: store.addCell,
     patchCell: store.patchCell,
     removeCell: store.removeCell,
+    addChart: store.addChart,
+    patchChart: store.patchChart,
+    removeChart: store.removeChart,
   };
 }
 
@@ -951,9 +1092,10 @@ export interface EditorProviderProps {
   patchFn?: typeof patchCalculator;
   /** Toast callback. Defaults to sonner.toast.error in browser, no-op in SSR. */
   onError?: (message: string) => void;
-  /** Initial sections / cells loaded server-side. */
+  /** Initial sections / cells / charts loaded server-side. */
   initialSections?: SectionRow[];
   initialCells?: CellRow[];
+  initialCharts?: ChartRow[];
   children: React.ReactNode;
 }
 
@@ -963,6 +1105,7 @@ export function EditorProvider({
   onError,
   initialSections,
   initialCells,
+  initialCharts,
   children,
 }: EditorProviderProps) {
   // Create the store once per mount. `useState`'s lazy initializer runs
@@ -974,6 +1117,7 @@ export function EditorProvider({
       new EditorStore(initialRow, patchFn, onError, {
         sections: initialSections,
         cells: initialCells,
+        charts: initialCharts,
       }),
   );
 
