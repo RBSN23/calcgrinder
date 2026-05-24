@@ -57,7 +57,7 @@ and cloning.
 | P0 (MVP) | Settings Page                                        | Deployed |
 | P1       | Charts (12-type vocabulary)                          | Deployed |
 | P1       | Text Blocks (Markdown)                               | Deployed |
-| P1       | Tabular Output Cells                                 | Roadmap  |
+| P1       | Tabular Output Cells                                 | Deployed |
 | P1       | Cloning & Preset Discoverability                     | Roadmap  |
 | P1       | Sysadmin Moderation                                  | Roadmap  |
 | P1       | Concurrent Editing — Optimistic Concurrency          | Roadmap  |
