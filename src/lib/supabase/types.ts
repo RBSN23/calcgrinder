@@ -228,6 +228,50 @@ export type Database = {
         }
         Relationships: []
       }
+      scenarios: {
+        Row: {
+          calculator_id: string | null
+          created_at: string
+          description: string
+          id: string
+          owner_id: string
+          share_token: string | null
+          title: string
+          updated_at: string
+          values: Json
+        }
+        Insert: {
+          calculator_id?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          owner_id: string
+          share_token?: string | null
+          title: string
+          updated_at?: string
+          values?: Json
+        }
+        Update: {
+          calculator_id?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          owner_id?: string
+          share_token?: string | null
+          title?: string
+          updated_at?: string
+          values?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scenarios_calculator_id_fkey"
+            columns: ["calculator_id"]
+            isOneToOne: false
+            referencedRelation: "calculators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sections: {
         Row: {
           calculator_id: string
@@ -327,6 +371,19 @@ export type Database = {
           theme_id: string
           title: string
           updated_at: string
+        }[]
+      }
+      fn_get_scenario_by_share_token: {
+        Args: { p_calc_token: string; p_share_token: string }
+        Returns: {
+          calculator_payload: Json
+          scenario_description: string
+          scenario_id: string
+          scenario_owner_id: string
+          scenario_owner_name: string
+          scenario_title: string
+          scenario_updated_at: string
+          scenario_values: Json
         }[]
       }
       gen_calculator_public_token: { Args: never; Returns: string }

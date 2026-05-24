@@ -48,6 +48,7 @@ const FAIL_OPEN: RateLimitResult = {
 
 let cached: Ratelimit | null = null;
 let resolvedAtBootMissing: boolean | null = null;
+const customCache = new Map<string, Ratelimit>();
 
 function isConfigured(): boolean {
   if (resolvedAtBootMissing !== null) return !resolvedAtBootMissing;
@@ -81,6 +82,77 @@ export function getRatelimit(): Ratelimit | null {
     return null;
   }
   return cached;
+}
+
+export interface CustomLimiterConfig {
+  prefix: string;
+  /** Requests allowed per window. */
+  limit: number;
+  /** Window duration as an Upstash duration string, e.g. '60 s'. */
+  window: `${number} ${'ms' | 's' | 'm' | 'h' | 'd'}`;
+}
+
+/**
+ * Build (or reuse) a separately-prefixed Ratelimit client. PROJ-12 uses
+ * this for the per-user write budget (`cg:scenario-write`, 30/60s);
+ * future features (PROJ-19 sysadmin endpoints, etc.) can reuse the same
+ * factory by passing a different prefix/limit/window tuple.
+ */
+export function getCustomRatelimit(config: CustomLimiterConfig): Ratelimit | null {
+  const cacheKey = `${config.prefix}|${config.limit}|${config.window}`;
+  const existing = customCache.get(cacheKey);
+  if (existing) return existing;
+  if (!isConfigured()) return null;
+  try {
+    const client = new Ratelimit({
+      redis: Redis.fromEnv(),
+      limiter: Ratelimit.slidingWindow(config.limit, config.window),
+      prefix: config.prefix,
+      analytics: false,
+    });
+    customCache.set(cacheKey, client);
+    return client;
+  } catch (err) {
+    console.warn(
+      '[rate-limit] Upstash custom client init failed; failing open',
+      err instanceof Error ? err.message : err,
+    );
+    return null;
+  }
+}
+
+/**
+ * PROJ-12 — per-user write-limit check shared by every scenario write
+ * endpoint. Keyed by `auth.uid()` (so a shared NAT can't accidentally
+ * throttle multiple legitimate users). Fail-open on any limiter error.
+ */
+export const SCENARIO_WRITE_LIMITER: CustomLimiterConfig = {
+  prefix: 'cg:scenario-write',
+  limit: 30,
+  window: '60 s',
+};
+
+export async function checkScenarioWrite(
+  userId: string | null,
+): Promise<RateLimitResult> {
+  if (!userId) return FAIL_OPEN;
+  const limiter = getCustomRatelimit(SCENARIO_WRITE_LIMITER);
+  if (!limiter) return FAIL_OPEN;
+  try {
+    const result = await limiter.limit(userId);
+    return {
+      success: result.success,
+      limit: result.limit,
+      remaining: result.remaining,
+      reset: result.reset,
+    };
+  } catch (err) {
+    console.warn(
+      '[rate-limit] scenario-write limit() threw; failing open',
+      err instanceof Error ? err.message : err,
+    );
+    return FAIL_OPEN;
+  }
 }
 
 /**
@@ -117,4 +189,5 @@ export async function checkPageLoad(ip: string | null): Promise<RateLimitResult>
 export function __resetForTests() {
   cached = null;
   resolvedAtBootMissing = null;
+  customCache.clear();
 }

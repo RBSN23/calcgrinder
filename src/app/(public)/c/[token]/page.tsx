@@ -1,4 +1,4 @@
-// PROJ-11 — Public calculator route.
+// PROJ-11 / PROJ-12 — Public calculator route.
 //
 // Server Component that fetches the calculator via the SECURITY DEFINER
 // RPC (`fetchPublicCalculator`) and dispatches:
@@ -6,32 +6,38 @@
 //   - null             → call notFound() → not-found.tsx (404)
 //
 // The 410 (Gone) case is handled by middleware (`src/middleware.ts`)
-// BEFORE this Server Component runs: when `fn_get_public_calculator`
-// returns a row with `soft_delete_at IS NOT NULL`, middleware
-// short-circuits with a 410 HTML response. Co-locating route.ts +
-// page.tsx at the same dynamic segment is rejected by Next.js
-// (Turbopack: "Conflicting route and page at /c/[token]"), so the
-// architecture's "Route Handler shim" idea lives in middleware
-// instead. See the spec's Implementation Notes — Frontend deviation.
+// BEFORE this Server Component runs.
+//
+// PROJ-12 — when `?s=<scenario-token>` is present, we additionally
+// call `fetchPublicScenario(scenarioToken, calcToken)` and either:
+//   - serve the scenario-aware page (with the scenario's values
+//     applied + scenario header block), OR
+//   - render the scenario-specific 404 ("This scenario doesn't
+//     exist…") when the RPC returns null. We do NOT silently strip
+//     the `?s=` param — per the Decision Log a bad scenario token is
+//     a whole-page 404.
 
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 
 import {
   PublicCalculatorPage,
+  SaveScenarioController,
+  ScenarioMigrationMount,
   VisitorShell,
+  type PublicCalculatorScenarioBundle,
 } from '@/components/visitor';
+import { EmptyOrErrorState } from '@/components/shell';
+import { VisitorFooter, VisitorHeader } from '@/components/visitor';
 import { fetchPublicCalculator } from '@/lib/calculators/public';
+import { fetchPublicScenario } from '@/lib/scenarios/public';
 import { getCurrentProfile } from '@/lib/auth/getCurrentProfile';
 
 const PAGE_DESCRIPTION_MAX = 160;
 
-// Spec note: the `?s=<token>` query parameter is intentionally ignored
-// here — PROJ-12 will bind it to scenario loading. Passing through is
-// safe (the page renders with stored defaults).
-
 interface PageProps {
   params: Promise<{ token: string }>;
+  searchParams: Promise<{ s?: string | string[] }>;
 }
 
 export async function generateMetadata({
@@ -50,6 +56,7 @@ export async function generateMetadata({
     calculator.description || '',
     PAGE_DESCRIPTION_MAX,
   );
+  // PROJ-12 — meta does NOT leak scenario title / owner / date.
   return {
     title: `${calculator.title} — Calcgrinder`,
     description: description || undefined,
@@ -61,17 +68,19 @@ export async function generateMetadata({
   };
 }
 
-export default async function PublicCalculatorRoute({ params }: PageProps) {
+export default async function PublicCalculatorRoute({
+  params,
+  searchParams,
+}: PageProps) {
   const { token } = await params;
+  const { s } = await searchParams;
+  const scenarioToken = typeof s === 'string' ? s : Array.isArray(s) ? s[0] : undefined;
+
   const [result, current] = await Promise.all([
     fetchPublicCalculator(token),
     getCurrentProfile(),
   ]);
 
-  // Defensive: if the row went missing OR was soft-deleted between the
-  // middleware probe and this Server Component fetch, fall back to 404.
-  // Middleware normally short-circuits the 'gone' case with a real 410
-  // before this code runs.
   if (!result || result.status === 'gone') {
     notFound();
   }
@@ -86,10 +95,64 @@ export default async function PublicCalculatorRoute({ params }: PageProps) {
       : null;
   const isAdmin = current?.profile.role === 'sysadmin';
 
+  // PROJ-12 — Scenario branch.
+  let scenarioBundle: PublicCalculatorScenarioBundle | null = null;
+  let calculatorForRender = result.calculator;
+  if (scenarioToken) {
+    const fetched = await fetchPublicScenario(scenarioToken, token);
+    if (!fetched) {
+      return <ScenarioNotFound />;
+    }
+    scenarioBundle = {
+      scenario: {
+        id: fetched.scenarioId,
+        title: fetched.scenarioTitle,
+        description: fetched.scenarioDescription,
+        ownerName: fetched.scenarioOwnerName,
+        updatedAt: fetched.scenarioUpdatedAt,
+        isOwner: current?.user.id === fetched.scenarioOwnerId,
+        // hasDrift is computed client-side after apply; placeholder.
+        hasDrift: false,
+      },
+      values: fetched.scenarioValues,
+      initialShareToken: fetched.shareToken,
+    };
+    // The RPC returns the calculator payload as part of the scenario
+    // bundle — reuse it to spare a second probe.
+    calculatorForRender = fetched.calculator;
+  }
+
   return (
-    <VisitorShell token={token} approvedUser={approvedUser} isAdmin={isAdmin}>
-      <PublicCalculatorPage calculator={result.calculator} />
-    </VisitorShell>
+    <SaveScenarioController
+      calculator={calculatorForRender}
+      approvedUser={approvedUser}
+    >
+      <VisitorShell token={token} approvedUser={approvedUser} isAdmin={isAdmin}>
+        <ScenarioMigrationMount approved={approvedUser !== null} />
+        <PublicCalculatorPage
+          calculator={calculatorForRender}
+          scenario={scenarioBundle}
+        />
+      </VisitorShell>
+    </SaveScenarioController>
+  );
+}
+
+function ScenarioNotFound() {
+  return (
+    <>
+      <VisitorHeader token={null} approvedUser={null} />
+      <main className="flex flex-1 flex-col">
+        <div className="flex flex-1 items-center justify-center p-6">
+          <EmptyOrErrorState
+            variant="error"
+            title="Scenario not found"
+            body="This scenario doesn't exist or the link is invalid."
+          />
+        </div>
+      </main>
+      <VisitorFooter />
+    </>
   );
 }
 

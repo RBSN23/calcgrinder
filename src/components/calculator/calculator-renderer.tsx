@@ -23,7 +23,14 @@ import { getTheme } from '@/lib/themes';
 import { useCalculatorState } from './calculator-state-context';
 import { useIsBuilder } from './interactivity-context';
 
-export function CalculatorRenderer() {
+interface CalculatorRendererProps {
+  /** PROJ-12 — Optional slot rendered between the hero and the first
+   * section. The visitor surface uses this for the scenario header
+   * block + structure-drift banner. Default: no slot. */
+  afterHero?: React.ReactNode;
+}
+
+export function CalculatorRenderer({ afterHero }: CalculatorRendererProps = {}) {
   const { calculator, sections } = useCalculatorState();
   const theme = getTheme(calculator.theme_id);
   const isBuilder = useIsBuilder();
@@ -41,6 +48,7 @@ export function CalculatorRenderer() {
       className="flex flex-col gap-4"
     >
       <CalculatorHero />
+      {afterHero}
       {sections.length > 0 ? (
         <SectionList theme={theme} />
       ) : isBuilder ? (

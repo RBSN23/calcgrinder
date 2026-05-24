@@ -370,14 +370,16 @@ test.describe('PROJ-11 — Visitor View (Calculator Interface)', () => {
     }
   });
 
-  test('200 + ?s=<anything>: query parameter is ignored, page renders normally with defaults', async ({
+  test('?s=<bad-token>: PROJ-12 renders the scenario-not-found body (was: silently strip the param in pre-PROJ-12)', async ({
     page,
   }) => {
     const fx = await buildFixture();
     try {
-      const response = await page.goto(`/c/${fx.publishedToken}?s=fake-scenario-token`);
-      expect(response?.status()).toBe(200);
-      await expect(page.locator('h1', { hasText: 'Loan Repayment' })).toBeVisible();
+      await page.goto(`/c/${fx.publishedToken}?s=fake-scenario-token`);
+      await expect(page.getByText('Scenario not found')).toBeVisible();
+      await expect(
+        page.getByText("This scenario doesn't exist or the link is invalid."),
+      ).toBeVisible();
     } finally {
       await teardown(fx.user.userId);
     }
@@ -462,8 +464,11 @@ test.describe('PROJ-11 — Visitor View (Calculator Interface)', () => {
         .getByRole('link', { name: 'Sign up' })
         .getAttribute('href');
       expect(signupHref).toBe('/auth/signup');
-      // Neither Save nor Clone icon should be present (deferred to PROJ-12 / PROJ-18).
-      expect(await page.getByRole('button', { name: /^Save/i }).count()).toBe(0);
+      // PROJ-12 lit up the Save Scenario header button (always visible).
+      // PROJ-18 (Clone) is still pending.
+      expect(
+        await page.getByRole('button', { name: 'Save scenario' }).count(),
+      ).toBe(1);
       expect(await page.getByRole('button', { name: /^Clone/i }).count()).toBe(0);
     } finally {
       await teardown(fx.user.userId);

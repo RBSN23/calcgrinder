@@ -25,9 +25,21 @@ interface CellInputWidgetProps {
   value: unknown;
   onChange: (v: unknown) => void;
   readOnly?: boolean;
+  /** PROJ-12 — Visitor-side per-field padlock. When true, the widget
+   * renders normally but is non-interactive (disabled) and gets a
+   * slight desaturation on widgets where the spec calls for it
+   * (slider / toggle / dropdown). Number/currency/percent/text fields
+   * stay full opacity per spec line 1073. */
+  locked?: boolean;
 }
 
-export function CellInputWidget({ cell, value, onChange, readOnly }: CellInputWidgetProps) {
+export function CellInputWidget({
+  cell,
+  value,
+  onChange,
+  readOnly,
+  locked,
+}: CellInputWidgetProps) {
   const widget = cell.display_widget ?? defaultWidgetFor(cell.value_type);
   // Coerce display value
   const strValue =
@@ -45,11 +57,15 @@ export function CellInputWidget({ cell, value, onChange, readOnly }: CellInputWi
     );
   }
 
+  const disabled = locked === true;
+
   if (cell.value_type === 'boolean') {
     return (
       <Switch
         checked={value === true || value === 'true'}
         onCheckedChange={onChange}
+        disabled={disabled}
+        className={disabled ? 'opacity-60' : undefined}
       />
     );
   }
@@ -60,8 +76,13 @@ export function CellInputWidget({ cell, value, onChange, readOnly }: CellInputWi
       <Select
         value={strValue || undefined}
         onValueChange={onChange}
+        disabled={disabled}
       >
-        <SelectTrigger className="h-9 w-full text-[13px]">
+        <SelectTrigger
+          className={
+            'h-9 w-full text-[13px]' + (disabled ? ' opacity-60' : '')
+          }
+        >
           <SelectValue placeholder="Pick an option" />
         </SelectTrigger>
         <SelectContent>
@@ -84,7 +105,8 @@ export function CellInputWidget({ cell, value, onChange, readOnly }: CellInputWi
         step={cell.numeric_step ?? 1}
         value={Number.isFinite(Number(strValue)) ? Number(strValue) : cell.numeric_min}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full"
+        disabled={disabled}
+        className={'w-full' + (disabled ? ' opacity-40' : '')}
       />
     );
   }
@@ -95,6 +117,7 @@ export function CellInputWidget({ cell, value, onChange, readOnly }: CellInputWi
         type="date"
         value={strValue}
         onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
         className="h-9 text-[13px]"
       />
     );
@@ -109,6 +132,7 @@ export function CellInputWidget({ cell, value, onChange, readOnly }: CellInputWi
         max={cell.numeric_max ?? undefined}
         step={cell.numeric_step ?? undefined}
         onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))}
+        disabled={disabled}
         className="h-9 text-[14px] font-medium"
         placeholder={cell.unit ?? undefined}
       />
@@ -120,6 +144,7 @@ export function CellInputWidget({ cell, value, onChange, readOnly }: CellInputWi
       type="text"
       value={strValue}
       onChange={(e) => onChange(e.target.value)}
+      disabled={disabled}
       className="h-9 text-[13px]"
     />
   );

@@ -1,12 +1,14 @@
-// PROJ-11 — Visitor header.
+// PROJ-11 / PROJ-12 — Visitor header.
 //
-// Brand mark on the left; on the right either:
+// Brand mark on the left; on the right:
+//   - Save Scenario icon (always-visible on /c/<token> via
+//     SaveScenarioController, hidden on 404 / 410 error shells)
 //   - anonymous / unapproved / expired-session → "Log in" + "Sign up"
 //   - registered + approved → AvatarPopover
 //
-// No Save icon (PROJ-12), no Clone icon (PROJ-18). Mobile breakpoint
-// uses Tailwind `md:` per existing top-bar-mobile pattern; on mobile
-// the anonymous header shows only "Sign up" to preserve space.
+// Mobile breakpoint uses Tailwind `md:` per existing top-bar-mobile
+// pattern; on mobile the anonymous header shows only "Sign up" to
+// preserve space.
 
 import Link from 'next/link';
 import * as React from 'react';
@@ -19,6 +21,8 @@ import {
   type AvatarPopoverUser,
 } from '@/components/shell';
 import { Button } from '@/components/ui/button';
+
+import { SaveScenarioHeaderButton } from './save-scenario-header-button';
 
 interface VisitorHeaderProps {
   /** Token for the calculator being viewed; threaded into the Log in
@@ -46,6 +50,7 @@ export function VisitorHeader({ token, approvedUser, isAdmin }: VisitorHeaderPro
           <Wordmark />
         </Link>
         <div className="flex items-center gap-1.5 md:gap-2">
+          <SaveScenarioHeaderButton />
           {approvedUser ? (
             <AvatarPopover user={approvedUser} isAdmin={isAdmin}>
               <button

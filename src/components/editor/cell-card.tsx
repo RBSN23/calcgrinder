@@ -12,6 +12,7 @@ import * as React from 'react';
 import {
   useCalculatorState,
   useIsBuilder,
+  useIsVisitor,
 } from '@/components/calculator';
 import {
   Tooltip,
@@ -19,6 +20,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { CellLockToggle } from '@/components/visitor/cell-lock-toggle';
+import { useOptionalVisitorInputStore } from '@/components/visitor/visitor-input-store';
 import type { CellRow } from '@/lib/cells/types';
 import { useEditor } from '@/lib/editor/EditorProvider';
 import { cardSurface, labelTextStyle, numberStyle, type Theme } from '@/lib/themes';
@@ -39,6 +42,17 @@ interface CellCardProps {
 export function CellCard({ cell, theme, dragHandleProps, isDragging }: CellCardProps) {
   const { getResult, inputs, setInput } = useCalculatorState();
   const isBuilder = useIsBuilder();
+  const isVisitor = useIsVisitor();
+  const visitorStore = useOptionalVisitorInputStore();
+  // PROJ-12 — per-cell lock state. Only applies to visitor mode AND
+  // to editable cells; readonly cells skip the lock toggle entirely
+  // (they're inherently non-interactive).
+  const isEditable = cell.editability === 'editable';
+  const lockToggleVisible =
+    isVisitor && isEditable && cell.visibility !== 'hidden';
+  const isLocked = lockToggleVisible
+    ? visitorStore?.isLocked(cell.name) ?? false
+    : false;
 
   const result = getResult(cell.name);
   const tintKind = cell.kind === 'output' ? 'results' : 'inputs';
@@ -87,6 +101,11 @@ export function CellCard({ cell, theme, dragHandleProps, isDragging }: CellCardP
         </div>
       ) : null}
       {isBuilder ? <CellEditAffordance cell={cell} theme={theme} /> : null}
+      {lockToggleVisible ? (
+        <div className="absolute right-2 top-2">
+          <CellLockToggle cellName={cell.name} cellLabel={cell.label || cell.name} />
+        </div>
+      ) : null}
 
       <div className="flex items-baseline justify-between gap-2">
         <span style={labelTextStyle(theme, theme.muted)}>{cell.label || cell.name}</span>
@@ -106,6 +125,7 @@ export function CellCard({ cell, theme, dragHandleProps, isDragging }: CellCardP
           value={inputs[cell.name] ?? cell.default_value ?? undefined}
           onChange={(v) => setInput(cell.name, v)}
           readOnly={cell.editability === 'readonly'}
+          locked={isLocked}
         />
       ) : (
         <OutputDisplay

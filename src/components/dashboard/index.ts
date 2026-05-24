@@ -15,3 +15,8 @@ export {
   DeleteCalcSheet,
   type DeleteCalcSheetProps,
 } from './delete-calc-sheet';
+export {
+  MyScenariosSection,
+  type MyScenariosSectionProps,
+} from './my-scenarios-section';
+export { ScenarioRow } from './scenario-row';

@@ -145,6 +145,24 @@ export const Icons = {
   EyeOff: makeIcon(
     <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24M1 1l22 22" />,
   ),
+  // PROJ-12 — Padlock (closed) — locked input cell on the visitor surface.
+  Lock: makeIcon(
+    <>
+      <rect x="3.5" y="11" width="17" height="10" rx="2" />
+      <path d="M7 11V7a5 5 0 0110 0v4" />
+    </>,
+  ),
+  // PROJ-12 — Padlock (open) — unlocked input cell on the visitor surface.
+  Unlock: makeIcon(
+    <>
+      <rect x="3.5" y="11" width="17" height="10" rx="2" />
+      <path d="M7 11V7a5 5 0 019.9-1" />
+    </>,
+  ),
+  // PROJ-12 — Bookmark / Save Scenario — visitor header save icon.
+  Bookmark: makeIcon(
+    <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />,
+  ),
 };
 
 export type IconName = keyof typeof Icons;

@@ -11,6 +11,7 @@ import { redirect } from 'next/navigation';
 
 import {
   MyCalculatorsSection,
+  MyScenariosSection,
   NewCalculatorHero,
   Section,
   WelcomeLine,
@@ -18,6 +19,7 @@ import {
 import { EmptyOrErrorState, Icons } from '@/components/shell';
 import { getCurrentProfile } from '@/lib/auth/getCurrentProfile';
 import { listMyCalculators } from '@/lib/calculators/server';
+import { listMyScenariosWithCalc } from '@/lib/scenarios/server';
 
 export const metadata = {
   title: 'Dashboard · Calcgrinder',
@@ -33,7 +35,10 @@ export default async function DashboardPage() {
   if (!current) redirect('/auth/login');
 
   const role = (current.profile.role as 'registered' | 'sysadmin') ?? 'registered';
-  const myCalculators = await listMyCalculators();
+  const [myCalculators, myScenarios] = await Promise.all([
+    listMyCalculators(),
+    listMyScenariosWithCalc(),
+  ]);
   const retentionPeriodDays = parseInt(
     process.env.RETENTION_PERIOD_DAYS ?? '30',
     10,
@@ -65,6 +70,7 @@ export default async function DashboardPage() {
               : 30
           }
         />
+        <MyScenariosSection scenarios={myScenarios} />
         <Section title="Presets" count={0} defaultExpanded>
           <EmptyOrErrorState
             variant="empty"

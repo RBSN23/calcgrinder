@@ -52,7 +52,7 @@ and cloning.
 | P0 (MVP) | Cell Authoring & Section Management                  | Deployed |
 | P0 (MVP) | Calculator Lifecycle — Publish, Sharing, Token Regen | Deployed |
 | P0 (MVP) | Visitor View — Calculator Interface                  | Deployed |
-| P0 (MVP) | Scenarios — Save, Load, Share                        | Roadmap  |
+| P0 (MVP) | Scenarios — Save, Load, Share                        | Deployed |
 | P0 (MVP) | Soft-Delete & Trash Recovery                         | Roadmap  |
 | P0 (MVP) | Settings Page                                        | Roadmap  |
 | P1       | Charts (12-type vocabulary)                          | Roadmap  |
