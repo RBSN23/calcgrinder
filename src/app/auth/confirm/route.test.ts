@@ -98,6 +98,36 @@ describe('/auth/confirm GET handler', () => {
     expect(loc).toMatch(/error=link_invalid/);
   });
 
+  it('type=email_change + valid token_hash → verifyOtp called + redirect to /auth/email-confirmed', async () => {
+    verifyOtp.mockResolvedValueOnce({ error: null });
+
+    const res = await GET(
+      makeRequest(
+        'http://localhost:3000/auth/confirm?token_hash=ec&type=email_change',
+      ),
+    );
+
+    expect(verifyOtp).toHaveBeenCalledWith({
+      type: 'email_change',
+      token_hash: 'ec',
+    });
+    expect(res.headers.get('location')).toMatch(/\/auth\/email-confirmed$/);
+  });
+
+  it('type=email_change + verifyOtp error → redirect to /auth/login?error=link_invalid', async () => {
+    verifyOtp.mockResolvedValueOnce({ error: { message: 'expired' } });
+
+    const res = await GET(
+      makeRequest(
+        'http://localhost:3000/auth/confirm?token_hash=bad&type=email_change',
+      ),
+    );
+
+    const loc = res.headers.get('location') ?? '';
+    expect(loc).toMatch(/\/auth\/login/);
+    expect(loc).toMatch(/error=link_invalid/);
+  });
+
   it('next= containing a scheme is rejected (open-redirect guard)', async () => {
     verifyOtp.mockResolvedValueOnce({ error: null });
 

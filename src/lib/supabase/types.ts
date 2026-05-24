@@ -39,6 +39,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_deletion_requests: {
+        Row: {
+          cancelled_at: string | null
+          consumed_at: string | null
+          created_at: string
+          id: string
+          token: string
+          user_id: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          consumed_at?: string | null
+          created_at?: string
+          id?: string
+          token: string
+          user_id: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          consumed_at?: string | null
+          created_at?: string
+          id?: string
+          token?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       calculators: {
         Row: {
           created_at: string
@@ -198,6 +225,7 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
+          default_calculator_theme: string | null
           email: string
           id: string
           name: string
@@ -208,6 +236,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          default_calculator_theme?: string | null
           email: string
           id: string
           name: string
@@ -218,6 +247,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          default_calculator_theme?: string | null
           email?: string
           id?: string
           name?: string
@@ -345,6 +375,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      fn_clear_pending_email_change: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
       fn_duplicate_calculator: {
         Args: { source_id: string }
         Returns: {

@@ -60,9 +60,26 @@ export async function POST(): Promise<Response> {
     return NextResponse.json({ error: 'create_failed' }, { status: 500 });
   }
 
+  // PROJ-14: honour the user's preferred starting theme. NULL falls
+  // through to the calculators.theme_id column DEFAULT ('calcgrinder').
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('default_calculator_theme')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  const insertRow: {
+    owner_id: string;
+    title: string;
+    theme_id?: string;
+  } = { owner_id: user.id, title: resolvedTitle };
+  if (profile?.default_calculator_theme) {
+    insertRow.theme_id = profile.default_calculator_theme;
+  }
+
   const { data: calculator, error: calcErr } = await supabase
     .from('calculators')
-    .insert({ owner_id: user.id, title: resolvedTitle })
+    .insert(insertRow)
     .select(CALCULATOR_ROW_COLUMNS)
     .single();
 

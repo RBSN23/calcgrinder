@@ -51,6 +51,8 @@ describe('POST /api/calculators', () => {
       fromResults: [
         // Title auto-resolve lookup: "Untitled calculator" is free.
         { data: null, error: null },
+        // PROJ-14: default_calculator_theme lookup — user has no override.
+        { data: { default_calculator_theme: null }, error: null },
         { data: ROW_FIXTURE, error: null }, // calculator insert
         { data: SECTION_FIXTURE, error: null }, // section insert
         { data: REFRESHED_UPDATED_AT, error: null }, // refresh updated_at
@@ -68,16 +70,19 @@ describe('POST /api/calculators', () => {
       default_section_id: SECTION_FIXTURE.id,
     });
 
-    // The calculator insert MUST set owner_id from the auth context.
-    const calcInsertCall = supabase._builders[1]?.insert.mock.calls[0]?.[0] as {
+    // The calculator insert MUST set owner_id from the auth context and
+    // MUST NOT carry theme_id (let the column DEFAULT apply).
+    const calcInsertCall = supabase._builders[2]?.insert.mock.calls[0]?.[0] as {
       owner_id: string;
       title: string;
+      theme_id?: string;
     };
     expect(calcInsertCall.owner_id).toBe(USER_FIXTURE.id);
     expect(calcInsertCall.title).toBe('Untitled calculator');
+    expect(calcInsertCall.theme_id).toBeUndefined();
 
     // The section insert MUST bind to the new calculator and use defaults.
-    const sectionInsertCall = supabase._builders[2]?.insert.mock
+    const sectionInsertCall = supabase._builders[3]?.insert.mock
       .calls[0]?.[0] as {
       calculator_id: string;
       title: string;
@@ -90,15 +95,13 @@ describe('POST /api/calculators', () => {
     expect(sectionInsertCall.display_order).toBe(0);
   });
 
-  it('auto-resolves the default title when "Untitled calculator" is already taken', async () => {
+  it('uses profiles.default_calculator_theme when the user has set one', async () => {
     const supabase = makeSupabaseMock({
       user: USER_FIXTURE,
       fromResults: [
-        // First lookup: "Untitled calculator" exists.
-        { data: { id: 'existing-1' }, error: null },
-        // Second lookup: "Untitled calculator (2)" is free.
-        { data: null, error: null },
-        { data: { ...ROW_FIXTURE, title: 'Untitled calculator (2)' }, error: null },
+        { data: null, error: null }, // title lookup
+        { data: { default_calculator_theme: 'terminal' }, error: null },
+        { data: { ...ROW_FIXTURE, theme_id: 'terminal' }, error: null },
         { data: SECTION_FIXTURE, error: null },
         { data: REFRESHED_UPDATED_AT, error: null },
       ],
@@ -109,6 +112,32 @@ describe('POST /api/calculators', () => {
 
     expect(res.status).toBe(201);
     const calcInsertCall = supabase._builders[2]?.insert.mock.calls[0]?.[0] as {
+      theme_id?: string;
+    };
+    expect(calcInsertCall.theme_id).toBe('terminal');
+  });
+
+  it('auto-resolves the default title when "Untitled calculator" is already taken', async () => {
+    const supabase = makeSupabaseMock({
+      user: USER_FIXTURE,
+      fromResults: [
+        // First lookup: "Untitled calculator" exists.
+        { data: { id: 'existing-1' }, error: null },
+        // Second lookup: "Untitled calculator (2)" is free.
+        { data: null, error: null },
+        // default_calculator_theme: not set
+        { data: { default_calculator_theme: null }, error: null },
+        { data: { ...ROW_FIXTURE, title: 'Untitled calculator (2)' }, error: null },
+        { data: SECTION_FIXTURE, error: null },
+        { data: REFRESHED_UPDATED_AT, error: null },
+      ],
+    });
+    installSupabaseMock(mockCreateClient, supabase);
+
+    const res = await POST();
+
+    expect(res.status).toBe(201);
+    const calcInsertCall = supabase._builders[3]?.insert.mock.calls[0]?.[0] as {
       title: string;
     };
     expect(calcInsertCall.title).toBe('Untitled calculator (2)');
@@ -122,6 +151,7 @@ describe('POST /api/calculators', () => {
         user: USER_FIXTURE,
         fromResults: [
           { data: null, error: null }, // title lookup: free
+          { data: { default_calculator_theme: null }, error: null },
           { data: null, error: { message: 'simulated calculator insert failure' } },
         ],
       }),
@@ -140,6 +170,7 @@ describe('POST /api/calculators', () => {
       user: USER_FIXTURE,
       fromResults: [
         { data: null, error: null }, // title lookup: free
+        { data: { default_calculator_theme: null }, error: null },
         { data: ROW_FIXTURE, error: null }, // calculator insert ok
         { data: null, error: { message: 'simulated section insert failure' } },
         { data: null, error: null }, // delete (no result needed)
@@ -153,7 +184,7 @@ describe('POST /api/calculators', () => {
     expect(await res.json()).toEqual({ error: 'create_failed' });
     expect(errorSpy).toHaveBeenCalled();
 
-    // The fourth .from('calculators') call should have deleted the row.
-    expect(supabase._builders[3]?.delete).toHaveBeenCalled();
+    // The fifth .from() call (index 4) should have deleted the calculator row.
+    expect(supabase._builders[4]?.delete).toHaveBeenCalled();
   });
 });

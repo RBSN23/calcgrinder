@@ -10,6 +10,9 @@ export default async function AppGroupLayout({
 }) {
   const current = await getCurrentProfile();
   if (!current) redirect('/auth/login');
+  if (current.profile.status === 'pending_deletion') {
+    redirect('/auth/cancel-deletion');
+  }
   if (current.profile.status !== 'approved') {
     redirect('/auth/waiting-for-approval');
   }

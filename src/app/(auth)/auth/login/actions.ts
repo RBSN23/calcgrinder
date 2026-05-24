@@ -123,5 +123,8 @@ export async function loginAction(
   if (profile?.status === 'approved') {
     redirect(safeNext);
   }
+  if (profile?.status === 'pending_deletion') {
+    redirect('/auth/cancel-deletion');
+  }
   redirect('/auth/waiting-for-approval');
 }

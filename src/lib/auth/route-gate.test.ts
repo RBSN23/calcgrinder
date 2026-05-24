@@ -6,6 +6,7 @@ const ANON: RouteGateAuth = null;
 const PENDING: RouteGateAuth = { status: 'pending' };
 const DECLINED: RouteGateAuth = { status: 'declined' };
 const APPROVED: RouteGateAuth = { status: 'approved' };
+const PENDING_DELETION: RouteGateAuth = { status: 'pending_deletion' };
 
 describe('routeGate — the 15-case acceptance matrix', () => {
   // 1. anonymous browser × /dashboard → 302 /auth/login?next=/dashboard
@@ -133,6 +134,72 @@ describe('routeGate — private API surface', () => {
     expect(routeGate('/api/calculators', ANON)).toEqual({
       kind: 'redirect',
       to: '/auth/login?next=%2Fapi%2Fcalculators',
+    });
+  });
+});
+
+describe('routeGate — PROJ-14 pending_deletion matrix', () => {
+  it('pending_deletion × /dashboard → /auth/cancel-deletion', () => {
+    expect(routeGate('/dashboard', PENDING_DELETION)).toEqual({
+      kind: 'redirect',
+      to: '/auth/cancel-deletion',
+    });
+  });
+
+  it('pending_deletion × /settings → /auth/cancel-deletion', () => {
+    expect(routeGate('/settings', PENDING_DELETION)).toEqual({
+      kind: 'redirect',
+      to: '/auth/cancel-deletion',
+    });
+  });
+
+  it('pending_deletion × /editor/abc → /auth/cancel-deletion', () => {
+    expect(routeGate('/editor/abc', PENDING_DELETION)).toEqual({
+      kind: 'redirect',
+      to: '/auth/cancel-deletion',
+    });
+  });
+
+  it('pending_deletion × /auth/cancel-deletion → pass', () => {
+    expect(routeGate('/auth/cancel-deletion', PENDING_DELETION)).toEqual({
+      kind: 'pass',
+    });
+  });
+
+  it('pending_deletion × /auth/login → /auth/cancel-deletion', () => {
+    expect(routeGate('/auth/login', PENDING_DELETION)).toEqual({
+      kind: 'redirect',
+      to: '/auth/cancel-deletion',
+    });
+  });
+
+  it('anonymous × /auth/cancel-deletion → /auth/login', () => {
+    expect(routeGate('/auth/cancel-deletion', ANON)).toEqual({
+      kind: 'redirect',
+      to: '/auth/login',
+    });
+  });
+
+  it('approved × /auth/cancel-deletion → /dashboard', () => {
+    expect(routeGate('/auth/cancel-deletion', APPROVED)).toEqual({
+      kind: 'redirect',
+      to: '/dashboard',
+    });
+  });
+
+  it('anonymous × /auth/account/<token>/confirm-delete → pass', () => {
+    expect(routeGate('/auth/account/abc/confirm-delete', ANON)).toEqual({
+      kind: 'pass',
+    });
+  });
+
+  it('anonymous × /auth/email-confirmed → pass', () => {
+    expect(routeGate('/auth/email-confirmed', ANON)).toEqual({ kind: 'pass' });
+  });
+
+  it('approved × /auth/email-confirmed → pass', () => {
+    expect(routeGate('/auth/email-confirmed', APPROVED)).toEqual({
+      kind: 'pass',
     });
   });
 });

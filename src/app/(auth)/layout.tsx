@@ -19,7 +19,15 @@ export default async function AuthGroupLayout({
   const pathname = hdrs.get('x-pathname') ?? '';
   const decision = routeGate(
     pathname,
-    current ? { status: current.profile.status as 'pending' | 'approved' | 'declined' } : null,
+    current
+      ? {
+          status: current.profile.status as
+            | 'pending'
+            | 'approved'
+            | 'declined'
+            | 'pending_deletion',
+        }
+      : null,
   );
   if (decision.kind === 'redirect') redirect(decision.to);
 

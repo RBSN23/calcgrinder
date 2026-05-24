@@ -35,9 +35,8 @@ function defaultNext(type: EmailOtpType): string {
     case 'recovery':
       return '/auth/reset-password';
     case 'email_change':
-      // PROJ-14 will own this surface; redirect to settings once it
-      // exists. For now we land on the dashboard which gates correctly.
-      return '/dashboard';
+      // PROJ-14 — success landing for an email-change confirmation.
+      return '/auth/email-confirmed';
     case 'invite':
     case 'magiclink':
       return '/dashboard';

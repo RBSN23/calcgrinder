@@ -189,6 +189,25 @@ describe('loginAction — happy paths', () => {
     }
     expect(dest).toBe('/auth/waiting-for-approval');
   });
+
+  // PROJ-14 QA BUG-M2 regression — pending_deletion users must land on
+  // /auth/cancel-deletion directly, not on /auth/waiting-for-approval
+  // (which previously relied on the (auth) layout's route-gate to
+  // re-bounce).
+  it('pending_deletion user → redirect to /auth/cancel-deletion', async () => {
+    ssrAuth.profileStatusResult = { data: { status: 'pending_deletion' } };
+    let dest: string | null = null;
+    try {
+      await loginAction(
+        { ok: false },
+        makeFormData({ email: 'alice@example.com', password: 'pw' }),
+      );
+    } catch (err) {
+      if (err instanceof RedirectError) dest = err.destination;
+      else throw err;
+    }
+    expect(dest).toBe('/auth/cancel-deletion');
+  });
 });
 
 describe('loginAction — invalid_credentials branching (H1 regression)', () => {

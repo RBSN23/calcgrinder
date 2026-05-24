@@ -21,22 +21,34 @@
  *   1. Public paths bypass every gate (visitor surface, admin click,
  *      Supabase OTP callback, sign-out POST, static assets).
  *   2. Pre-auth surfaces (`/auth/*` minus public ones):
- *      • anonymous → pass.
- *      • approved → redirect to /dashboard.
+ *      • anonymous → pass (except /auth/cancel-deletion which 302s to
+ *        /auth/login — no session means no grace-window screen).
+ *      • approved → pass on /auth/email-confirmed (PROJ-14: post-email-
+ *        change landing — anonymous OK too); redirect away from
+ *        /auth/cancel-deletion; otherwise redirect to /dashboard.
  *      • pending / declined on /auth/waiting-for-approval → pass.
  *      • pending / declined elsewhere under /auth → redirect to
  *        /auth/waiting-for-approval (signed-in pending user has no
  *        business on /auth/login etc.).
+ *      • pending_deletion on /auth/cancel-deletion → pass.
+ *      • pending_deletion elsewhere under /auth → redirect to
+ *        /auth/cancel-deletion (the grace-window screen is the only
+ *        auth surface this user can reach).
  *   3. Private paths (`/dashboard`, `/editor/*`, `/settings`, `/api/*`
  *      excluding `/api/cron/*`):
  *      • anonymous → redirect to /auth/login?next=<pathname>.
- *      • non-approved → redirect to /auth/waiting-for-approval.
+ *      • pending / declined → redirect to /auth/waiting-for-approval.
+ *      • pending_deletion → redirect to /auth/cancel-deletion.
  *      • approved → pass.
  *   4. Anything else (root `/` and unmatched paths) → pass; the page
  *      handler decides.
  */
 
-export type ApprovalStatus = 'pending' | 'approved' | 'declined';
+export type ApprovalStatus =
+  | 'pending'
+  | 'approved'
+  | 'declined'
+  | 'pending_deletion';
 
 export type RouteGateAuth =
   | null
@@ -52,7 +64,9 @@ const PASS: RouteDecision = { kind: 'pass' };
 const PUBLIC_PREFIXES = [
   '/c/',                  // visitor calculator surface (PROJ-11)
   '/auth/admin/',         // sysadmin approve/decline click-from-email
+  '/auth/account/',       // PROJ-14 deletion-confirm click-from-email
   '/auth/confirm',        // Supabase Auth OTP callback
+  '/auth/email-confirmed',// PROJ-14 post-email-change landing (anonymous OK)
   '/auth/sign-out',       // no-JS POST sign-out
   '/api/cron/',           // Vercel-invoked, authed via CRON_SECRET header
   '/_next/',              // Next.js assets
@@ -103,8 +117,21 @@ export function routeGate(
   if (isPublic(pathname)) return PASS;
 
   if (isAuthSurface(pathname)) {
-    if (!auth) return PASS;
-    if (auth.status === 'approved') return { kind: 'redirect', to: '/dashboard' };
+    if (!auth) {
+      // Anonymous browser on /auth/cancel-deletion has no session to read
+      // the grace-window state from — bounce to login.
+      if (pathname === '/auth/cancel-deletion') {
+        return { kind: 'redirect', to: '/auth/login' };
+      }
+      return PASS;
+    }
+    if (auth.status === 'approved') {
+      return { kind: 'redirect', to: '/dashboard' };
+    }
+    if (auth.status === 'pending_deletion') {
+      if (pathname === '/auth/cancel-deletion') return PASS;
+      return { kind: 'redirect', to: '/auth/cancel-deletion' };
+    }
     // pending / declined are allowed only on the waiting-for-approval screen.
     if (pathname === '/auth/waiting-for-approval') return PASS;
     return { kind: 'redirect', to: '/auth/waiting-for-approval' };
@@ -116,6 +143,9 @@ export function routeGate(
         kind: 'redirect',
         to: `/auth/login?next=${encodeURIComponent(pathname)}`,
       };
+    }
+    if (auth.status === 'pending_deletion') {
+      return { kind: 'redirect', to: '/auth/cancel-deletion' };
     }
     if (auth.status !== 'approved') {
       return { kind: 'redirect', to: '/auth/waiting-for-approval' };
