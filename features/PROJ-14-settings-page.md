@@ -1,8 +1,8 @@
 # PROJ-14: Settings Page
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-24
-**Last Updated:** 2026-05-24
+**Last Updated:** 2026-05-24 (deployed to production after QA approval)
 
 ## Dependencies
 
@@ -1582,4 +1582,140 @@ response shape, operator doc) are safe to address as follow-ups.
   Tracked here pending a future feature pass or follow-up commit.
 
 ## Deployment
-_To be added by /deploy_
+
+**Date:** 2026-05-24
+**Production URL:** https://calcgrinder.vercel.app
+**Deploy commit:** `eb3b27a` (feat) + the deploy commit that
+follows this section (status flip + tag).
+**Git tag:** `v1.14.0-PROJ-14`
+**Deployer:** /deploy (Claude)
+
+### Pre-deployment checks
+
+- `npm run build` → clean. New routes listed in the Route
+  map: `/settings`, `/auth/email-confirmed`,
+  `/auth/cancel-deletion`,
+  `/auth/account/[token]/confirm-delete`.
+- `npm run lint` → 0 errors, 5 pre-existing warnings unrelated
+  to PROJ-14 (formula engine + PROJ-11 leftovers).
+- `npm test` → 762/762 vitest cases pass.
+- QA status: **Approved** (0 critical / 0 high / 2 medium /
+  3 low — BUG-M2 + BUG-L1 + BUG-L2 fixed; BUG-M1 deferred to
+  Known Issues; BUG-L3 closed in this /deploy by writing
+  `docs/production/settings.md`).
+- Migration `20260528000000_settings_page.sql` already pushed
+  to the linked Cloud project (verified via
+  `npx supabase migration list --linked` — local + remote
+  rows match).
+- `src/lib/supabase/types.ts` regenerated post-migration
+  (committed in the feat commit).
+- No new env vars; reuses `RETENTION_PERIOD_DAYS` and
+  `CRON_SECRET` from PROJ-13.
+- `vercel.json` cron entry unchanged (`0 4 * * *` →
+  `/api/cron/purge`); the same handler now runs both
+  the calculator soft-delete purge and the account-deletion
+  hard-purge pass.
+
+### Deploy flow
+
+1. `feat(PROJ-14)` commit `eb3b27a` pushed to `origin/main`.
+2. Vercel GitHub integration auto-built and deployed.
+3. Monitor probed `https://calcgrinder.vercel.app/auth/email-confirmed`
+   until it returned 200 (live within ~1 min).
+
+### Post-deployment smoke tests
+
+All performed against https://calcgrinder.vercel.app immediately
+after the deploy went live:
+
+| Endpoint                                                  | Probe                      | Expected                                              | Actual |
+|-----------------------------------------------------------|----------------------------|-------------------------------------------------------|--------|
+| `GET /` (unauth)                                          | route gate                 | 307 → `/auth/login`                                   | 307 ✓ |
+| `GET /dashboard` (unauth)                                 | private surface            | 307 → `/auth/login?next=/dashboard`                   | 307 ✓ |
+| `GET /settings` (unauth)                                  | private surface            | 307 → `/auth/login?next=/settings`                    | 307 ✓ |
+| `GET /auth/login`                                         | login page                 | 200                                                   | 200 ✓ |
+| `GET /auth/email-confirmed` (anon)                        | PUBLIC_PREFIXES bypass     | 200                                                   | 200 ✓ |
+| `GET /auth/cancel-deletion` (anon)                        | bounce to login            | 307 → `/auth/login`                                   | 307 ✓ |
+| `GET /auth/account/aaa/confirm-delete`                    | invalid token shape        | 404                                                   | 404 ✓ |
+| `GET /auth/account/<43-char>/confirm-delete`              | unknown token              | 404                                                   | 404 ✓ |
+| `GET /api/cron/purge` (no bearer)                         | unauth                     | 401                                                   | 401 ✓ |
+| `GET /api/cron/purge` (wrong bearer)                      | constant-time mismatch     | 401                                                   | 401 ✓ |
+
+No 5xx anywhere; every gate fired before any handler
+side-effect; the cron bearer-auth contract from PROJ-13
+preserved exactly.
+
+### Cron next-run notes
+
+The shared daily cron at `0 4 * * *` UTC now runs both
+passes per invocation:
+
+1. Calculator soft-delete purge (PROJ-13).
+2. Account hard-purge (PROJ-14) — selects profiles where
+   `status='pending_deletion' AND pending_deletion_at < NOW()
+   - make_interval(days => RETENTION_PERIOD_DAYS)` and calls
+   `supabaseAdmin.auth.admin.deleteUser(id)` for each.
+
+For the first few days the new pass returns
+`purged_accounts: 0` until a `pending_deletion` profile
+created today actually ages past `RETENTION_PERIOD_DAYS`.
+
+### Rollback plan
+
+If a regression surfaces in production:
+1. Vercel Dashboard → Deployments → promote the prior
+   deployment (PROJ-13 deploy commit `fed8cd0`) to production.
+   Estimated time-to-rollback: < 30s.
+2. The cron picks up the rolled-back handler on its next
+   scheduled run (only the calculator-purge pass; the
+   `purged_accounts` key disappears from the response — no
+   schema rollback needed).
+3. **Schema rollback** — additive migration, no rollback
+   required for the deploy to be safely rolled back:
+   - `profiles.default_calculator_theme` is NULL by default;
+     pre-PROJ-14 code never reads it.
+   - `profiles.status` CHECK widened — narrowing back to 3
+     values would only be needed if rows have been written
+     with `status='pending_deletion'`. The rolled-back
+     route-gate would treat any such row as "not approved"
+     and bounce to `/auth/waiting-for-approval`, which is
+     surfaceable but recoverable via a manual SQL flip back
+     to `'approved'`.
+   - `account_deletion_requests` retains existing rows (the
+     rolled-back code can't touch them). Drop the table only
+     after confirming no rollback is needed.
+   - `fn_clear_pending_email_change` and the visitor-read
+     RPC re-defs are forward-compat with the pre-PROJ-14
+     paths.
+4. No env-var rollback needed: PROJ-14 added no env vars.
+
+### Known follow-ups closed by this deploy
+
+- **BUG-L3 (Low) — `docs/production/settings.md`**: written
+  in this /deploy pass. Covers the four sections, the
+  email-change flow, the `account_deletion_requests` table +
+  `pending_deletion` status, the cron extension,
+  `RETENTION_PERIOD_DAYS` env, and recovery from accidental
+  DB state.
+
+### Production-ready essentials
+
+- Error tracking: out of scope for this deploy; see
+  `docs/production/error-tracking.md` for the standing
+  Sentry setup that already covers the production deployment.
+- Security headers: already configured in `next.config` from
+  prior deploys; no PROJ-14 changes needed.
+- Rate limiting: PROJ-14's settings actions intentionally
+  have no Upstash gate (per the QA security audit —
+  acceptable for v1's single-deployer assumption; RLS +
+  service-role-only `account_deletion_requests` posture
+  scopes blast radius; SMTP-side rate limiting bounds the
+  email-deletion path).
+
+### PROJ-14 marks the end of P0
+
+With Settings Page deployed, the v1 single-author loop is
+complete: signup → approval → build → publish → share →
+scenarios → trash → account management. Next features
+(PROJ-15 Charts onward) are P1 — feature-set expansion,
+not blocking the audience-facing MVP.

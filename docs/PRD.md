@@ -54,7 +54,7 @@ and cloning.
 | P0 (MVP) | Visitor View — Calculator Interface                  | Deployed |
 | P0 (MVP) | Scenarios — Save, Load, Share                        | Deployed |
 | P0 (MVP) | Soft-Delete & Trash Recovery                         | Deployed |
-| P0 (MVP) | Settings Page                                        | Planned  |
+| P0 (MVP) | Settings Page                                        | Deployed |
 | P1       | Charts (12-type vocabulary)                          | Roadmap  |
 | P1       | Text Blocks (Markdown)                               | Roadmap  |
 | P1       | Tabular Output Cells                                 | Roadmap  |
