@@ -1,8 +1,10 @@
-// PROJ-11 / PROJ-12 — Visitor header.
+// PROJ-11 / PROJ-12 / PROJ-18 — Visitor header.
 //
 // Brand mark on the left; on the right:
 //   - Save Scenario icon (always-visible on /c/<token> via
 //     SaveScenarioController, hidden on 404 / 410 error shells)
+//   - Clone icon (PROJ-18 — visible to approved users via
+//     CloneController, hidden on error shells / for anonymous)
 //   - anonymous / unapproved / expired-session → "Log in" + "Sign up"
 //   - registered + approved → AvatarPopover
 //
@@ -22,6 +24,7 @@ import {
 } from '@/components/shell';
 import { Button } from '@/components/ui/button';
 
+import { CloneHeaderButton } from './clone-header-button';
 import { SaveScenarioHeaderButton } from './save-scenario-header-button';
 
 interface VisitorHeaderProps {
@@ -51,6 +54,7 @@ export function VisitorHeader({ token, approvedUser, isAdmin }: VisitorHeaderPro
         </Link>
         <div className="flex items-center gap-1.5 md:gap-2">
           <SaveScenarioHeaderButton />
+          <CloneHeaderButton />
           {approvedUser ? (
             <AvatarPopover user={approvedUser} isAdmin={isAdmin}>
               <button

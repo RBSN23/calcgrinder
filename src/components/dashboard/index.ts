@@ -12,6 +12,10 @@ export {
   type MyCalculatorsSectionProps,
 } from './my-calculators-section';
 export {
+  PresetsSection,
+  type PresetsSectionProps,
+} from './presets-section';
+export {
   DeleteCalcSheet,
   type DeleteCalcSheetProps,
 } from './delete-calc-sheet';

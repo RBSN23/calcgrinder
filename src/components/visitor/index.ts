@@ -25,6 +25,11 @@ export {
 } from './save-scenario-controller';
 export { SaveScenarioSheet } from './save-scenario-sheet';
 export { SaveScenarioHeaderButton } from './save-scenario-header-button';
+export {
+  CloneController,
+  useOptionalCloneController,
+} from './clone-controller';
+export { CloneHeaderButton } from './clone-header-button';
 export { ResponsiveSheet } from './responsive-sheet';
 export { UnsavedChangesGuard } from './unsaved-changes-guard';
 export { ScenarioMigrationMount } from './scenario-migration-mount';

@@ -21,6 +21,7 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 
 import {
+  CloneController,
   PublicCalculatorPage,
   SaveScenarioController,
   ScenarioMigrationMount,
@@ -127,13 +128,22 @@ export default async function PublicCalculatorRoute({
       calculator={calculatorForRender}
       approvedUser={approvedUser}
     >
-      <VisitorShell token={token} approvedUser={approvedUser} isAdmin={isAdmin}>
-        <ScenarioMigrationMount approved={approvedUser !== null} />
-        <PublicCalculatorPage
-          calculator={calculatorForRender}
-          scenario={scenarioBundle}
-        />
-      </VisitorShell>
+      <CloneController
+        calculator={calculatorForRender}
+        approvedUser={approvedUser}
+      >
+        <VisitorShell
+          token={token}
+          approvedUser={approvedUser}
+          isAdmin={isAdmin}
+        >
+          <ScenarioMigrationMount approved={approvedUser !== null} />
+          <PublicCalculatorPage
+            calculator={calculatorForRender}
+            scenario={scenarioBundle}
+          />
+        </VisitorShell>
+      </CloneController>
     </SaveScenarioController>
   );
 }

@@ -13,15 +13,15 @@ import {
   MyCalculatorsSection,
   MyScenariosSection,
   NewCalculatorHero,
-  Section,
+  PresetsSection,
   TrashSection,
   WelcomeLine,
 } from '@/components/dashboard';
-import { EmptyOrErrorState, Icons } from '@/components/shell';
 import { getCurrentProfile } from '@/lib/auth/getCurrentProfile';
 import {
   listMyCalculators,
   listMySoftDeletedCalculators,
+  listPresets,
 } from '@/lib/calculators/server';
 import {
   countMyOrphanScenarios,
@@ -42,13 +42,19 @@ export default async function DashboardPage() {
   if (!current) redirect('/auth/login');
 
   const role = (current.profile.role as 'registered' | 'sysadmin') ?? 'registered';
-  const [myCalculators, myScenarios, trashedCalculators, orphanCount] =
-    await Promise.all([
-      listMyCalculators(),
-      listMyScenariosWithCalc(),
-      listMySoftDeletedCalculators(),
-      countMyOrphanScenarios(),
-    ]);
+  const [
+    myCalculators,
+    myScenarios,
+    trashedCalculators,
+    orphanCount,
+    presets,
+  ] = await Promise.all([
+    listMyCalculators(),
+    listMyScenariosWithCalc(),
+    listMySoftDeletedCalculators(),
+    countMyOrphanScenarios(),
+    listPresets(),
+  ]);
   const retentionPeriodDaysRaw = parseInt(
     process.env.RETENTION_PERIOD_DAYS ?? '30',
     10,
@@ -84,15 +90,7 @@ export default async function DashboardPage() {
           scenarios={myScenarios}
           orphanCount={orphanCount}
         />
-        <Section title="Presets" count={0} defaultExpanded>
-          <EmptyOrErrorState
-            variant="empty"
-            framed={false}
-            icon={<Icons.LayoutGrid size={32} />}
-            title="No presets yet"
-            body="Curated calculators will appear here once a sysadmin publishes one."
-          />
-        </Section>
+        <PresetsSection presets={presets} />
         <TrashSection
           calculators={trashedCalculators}
           retentionPeriodDays={retentionPeriodDays}

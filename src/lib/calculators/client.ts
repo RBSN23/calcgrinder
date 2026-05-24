@@ -123,6 +123,31 @@ export async function duplicateCalculator(
   return (await res.json()) as DuplicateResponse;
 }
 
+// PROJ-18 — cross-user clone. Reuses the duplicate route by passing
+// the source's `public_token` in the body, which switches the stored
+// procedure to the cross-user branch (token-gated read, `" — Copy"`
+// suffix unless source is a Sysadmin Preset, attribution column set).
+// Returns the same shape as duplicate plus `source_calculator_id`.
+export interface CloneResponse extends DuplicateResponse {
+  source_calculator_id: string | null;
+}
+
+export async function cloneCalculator(
+  id: string,
+  sourceToken: string,
+): Promise<CloneResponse> {
+  const res = await fetch(
+    `/api/calculators/${encodeURIComponent(id)}/duplicate`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ source_token: sourceToken }),
+    },
+  );
+  if (!res.ok) throw await parseError(res);
+  return (await res.json()) as CloneResponse;
+}
+
 // PROJ-10 — soft-delete. Sets soft_delete_at = NOW(); recovery
 // lives in PROJ-13. Echoes the new updated_at so any callers
 // holding the row in memory can refresh their concurrency token.

@@ -22,6 +22,7 @@ import * as React from 'react';
 
 import {
   CalculatorApiError,
+  cloneCalculator,
   duplicateCalculator,
   patchCalculator,
   softDeleteCalculator,
@@ -40,16 +41,29 @@ import {
 
 import { DeleteCalcSheet } from './delete-calc-sheet';
 
+export type CalcCardVariant = 'mine' | 'preset';
+
 export interface CalcCardProps {
   calculator: CalculatorRow;
+  /** PROJ-10 retention countdown for the delete sheet copy. Required
+   * for `variant='mine'`; ignored when `variant='preset'`. */
   retentionPeriodDays: number;
+  /** PROJ-18 — `'mine'` keeps the kebab + Status pill + Edit/Duplicate
+   * icons (owner affordances). `'preset'` strips them and swaps in
+   * the Clone icon next to Public-view. */
+  variant?: CalcCardVariant;
 }
 
 const TITLE_TAKEN_MESSAGE = 'A calculator with this title already exists.';
 const TITLE_REQUIRED_MESSAGE = 'Title is required.';
 const TITLE_TOO_LONG_MESSAGE = `Titles can be at most ${MAX_TITLE_LENGTH} characters.`;
 
-export function CalcCard({ calculator, retentionPeriodDays }: CalcCardProps) {
+export function CalcCard({
+  calculator,
+  retentionPeriodDays,
+  variant = 'mine',
+}: CalcCardProps) {
+  const isPreset = variant === 'preset';
   const router = useRouter();
   const [row, setRow] = React.useState<CalculatorRow>(calculator);
   const [renaming, setRenaming] = React.useState(false);
@@ -146,6 +160,20 @@ export function CalcCard({ calculator, retentionPeriodDays }: CalcCardProps) {
     }
   }
 
+  async function handleClone(): Promise<void> {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const created = await cloneCalculator(row.id, row.public_token);
+      // Keep the spinner state through navigation — busy stays true.
+      router.push(`/editor/${created.id}`);
+    } catch {
+      const { toast } = await import('sonner');
+      toast.error("Couldn't clone — please try again.");
+      setBusy(false);
+    }
+  }
+
   async function handlePublishToggle(): Promise<void> {
     if (busy) return;
     const next = !row.published;
@@ -206,7 +234,11 @@ export function CalcCard({ calculator, retentionPeriodDays }: CalcCardProps) {
         target="_blank"
         rel="noopener noreferrer"
         onClick={handleCardClick}
-        aria-label={`${row.title}, ${row.published ? 'Published' : 'Draft'}. Open public view in new tab.`}
+        aria-label={
+          isPreset
+            ? `${row.title}. Open public view in new tab.`
+            : `${row.title}, ${row.published ? 'Published' : 'Draft'}. Open public view in new tab.`
+        }
         className="group/calc-card relative flex min-h-[128px] flex-col gap-3 rounded-[10px] border border-cg-border bg-cg-surface p-4 text-left no-underline outline-none transition-colors hover:border-cg-border-strong hover:bg-cg-surface-2 focus-visible:ring-2 focus-visible:ring-cg-border"
       >
         <div className="flex items-start gap-3">
@@ -277,81 +309,83 @@ export function CalcCard({ calculator, retentionPeriodDays }: CalcCardProps) {
               </p>
             ) : null}
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                aria-label="More actions"
-                onClick={stop}
-                onMouseDown={stop}
-                className="-mr-1 -mt-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-cg-text-muted outline-none hover:bg-cg-surface-2 focus-visible:ring-2 focus-visible:ring-cg-border"
+          {isPreset ? null : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="More actions"
+                  onClick={stop}
+                  onMouseDown={stop}
+                  className="-mr-1 -mt-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-cg-text-muted outline-none hover:bg-cg-surface-2 focus-visible:ring-2 focus-visible:ring-cg-border"
+                >
+                  <Icons.Kebab size={16} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="min-w-[180px] bg-cg-surface"
               >
-                <Icons.Kebab size={16} />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="min-w-[180px] bg-cg-surface"
-            >
-              <DropdownMenuItem
-                onSelect={() => {
-                  window.open(publicHref, '_blank', 'noopener,noreferrer');
-                }}
-                className="gap-2 text-[13px]"
-              >
-                <Icons.External size={14} aria-hidden />
-                Public Link
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={() => {
-                  setRenameValue(row.title);
-                  setRenameError(null);
-                  setRenaming(true);
-                }}
-                className="gap-2 text-[13px]"
-              >
-                <Icons.Pencil size={14} aria-hidden />
-                Rename
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={() => {
-                  void handleDuplicate(false);
-                }}
-                className="gap-2 text-[13px]"
-              >
-                <Icons.Copy size={14} aria-hidden />
-                Duplicate
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={() => {
-                  void handlePublishToggle();
-                }}
-                className="gap-2 text-[13px]"
-              >
-                {row.published ? (
-                  <>
-                    <Icons.EyeOff size={14} aria-hidden />
-                    Unpublish
-                  </>
-                ) : (
-                  <>
-                    <Icons.Eye size={14} aria-hidden />
-                    Publish
-                  </>
-                )}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onSelect={() => {
-                  setDeleteOpen(true);
-                }}
-                className="gap-2 text-[13px] text-red-600 focus:bg-red-50 focus:text-red-700"
-              >
-                <Icons.Trash size={14} aria-hidden />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    window.open(publicHref, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="gap-2 text-[13px]"
+                >
+                  <Icons.External size={14} aria-hidden />
+                  Public Link
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    setRenameValue(row.title);
+                    setRenameError(null);
+                    setRenaming(true);
+                  }}
+                  className="gap-2 text-[13px]"
+                >
+                  <Icons.Pencil size={14} aria-hidden />
+                  Rename
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    void handleDuplicate(false);
+                  }}
+                  className="gap-2 text-[13px]"
+                >
+                  <Icons.Copy size={14} aria-hidden />
+                  Duplicate
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    void handlePublishToggle();
+                  }}
+                  className="gap-2 text-[13px]"
+                >
+                  {row.published ? (
+                    <>
+                      <Icons.EyeOff size={14} aria-hidden />
+                      Unpublish
+                    </>
+                  ) : (
+                    <>
+                      <Icons.Eye size={14} aria-hidden />
+                      Publish
+                    </>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onSelect={() => {
+                    setDeleteOpen(true);
+                  }}
+                  className="gap-2 text-[13px] text-red-600 focus:bg-red-50 focus:text-red-700"
+                >
+                  <Icons.Trash size={14} aria-hidden />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
 
         <div className="mt-auto flex items-center justify-between gap-2 pt-2">
@@ -362,60 +396,118 @@ export function CalcCard({ calculator, retentionPeriodDays }: CalcCardProps) {
             Edited {editedRelative}
           </span>
           <div className="flex shrink-0 items-center gap-1">
-            <button
-              type="button"
-              aria-label="Edit calculator"
-              onClick={(e) => {
-                stop(e);
-                router.push(editorHref);
-              }}
-              onMouseDown={stop}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-cg-text-muted hover:bg-cg-surface-2"
-            >
-              <Icons.Pencil size={14} />
-            </button>
-            <button
-              type="button"
-              aria-label="Open public view in new tab"
-              onClick={(e) => {
-                stop(e);
-                window.open(publicHref, '_blank', 'noopener,noreferrer');
-              }}
-              onMouseDown={stop}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-cg-text-muted hover:bg-cg-surface-2"
-            >
-              <Icons.External size={14} />
-            </button>
-            <button
-              type="button"
-              aria-label="Duplicate calculator"
-              disabled={busy}
-              onClick={(e) => {
-                stop(e);
-                void handleDuplicate(true);
-              }}
-              onMouseDown={stop}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-cg-text-muted hover:bg-cg-surface-2 disabled:opacity-50"
-            >
-              <Icons.Copy size={14} />
-            </button>
-            <span className="ml-1">
-              <Pill kind={row.published ? 'published' : 'draft'}>
-                {row.published ? 'Published' : 'Draft'}
-              </Pill>
-            </span>
+            {isPreset ? (
+              <>
+                <button
+                  type="button"
+                  aria-label="Open public view in new tab"
+                  onClick={(e) => {
+                    stop(e);
+                    window.open(publicHref, '_blank', 'noopener,noreferrer');
+                  }}
+                  onMouseDown={stop}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-cg-text-muted hover:bg-cg-surface-2"
+                >
+                  <Icons.External size={14} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Clone this calculator into your account"
+                  title="Clone this calculator into your account"
+                  aria-busy={busy ? 'true' : undefined}
+                  disabled={busy}
+                  onClick={(e) => {
+                    stop(e);
+                    void handleClone();
+                  }}
+                  onMouseDown={stop}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-cg-text-muted hover:bg-cg-surface-2 disabled:opacity-70"
+                >
+                  {busy ? <CardSpinner /> : <Icons.Copy size={14} />}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  aria-label="Edit calculator"
+                  onClick={(e) => {
+                    stop(e);
+                    router.push(editorHref);
+                  }}
+                  onMouseDown={stop}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-cg-text-muted hover:bg-cg-surface-2"
+                >
+                  <Icons.Pencil size={14} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Open public view in new tab"
+                  onClick={(e) => {
+                    stop(e);
+                    window.open(publicHref, '_blank', 'noopener,noreferrer');
+                  }}
+                  onMouseDown={stop}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-cg-text-muted hover:bg-cg-surface-2"
+                >
+                  <Icons.External size={14} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Duplicate calculator"
+                  disabled={busy}
+                  onClick={(e) => {
+                    stop(e);
+                    void handleDuplicate(true);
+                  }}
+                  onMouseDown={stop}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-cg-text-muted hover:bg-cg-surface-2 disabled:opacity-50"
+                >
+                  <Icons.Copy size={14} />
+                </button>
+                <span className="ml-1">
+                  <Pill kind={row.published ? 'published' : 'draft'}>
+                    {row.published ? 'Published' : 'Draft'}
+                  </Pill>
+                </span>
+              </>
+            )}
           </div>
         </div>
       </a>
 
-      <DeleteCalcSheet
-        open={deleteOpen}
-        onOpenChange={setDeleteOpen}
-        title={row.title}
-        retentionPeriodDays={retentionPeriodDays}
-        onConfirm={handleDeleteConfirm}
-      />
+      {isPreset ? null : (
+        <DeleteCalcSheet
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
+          title={row.title}
+          retentionPeriodDays={retentionPeriodDays}
+          onConfirm={handleDeleteConfirm}
+        />
+      )}
     </>
+  );
+}
+
+// PROJ-18 — inline spinner used by the Preset card's Clone icon-button
+// (the My Calculators "Duplicate" icon stays static — its router.push
+// happens fast enough that the icon flicker is the lesser evil compared
+// to swapping in a spinner for a sub-100ms transition).
+function CardSpinner() {
+  return (
+    <svg
+      width={14}
+      height={14}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      className="animate-spin"
+      aria-hidden="true"
+    >
+      <path d="M21 12a9 9 0 11-6.219-8.56" />
+    </svg>
   );
 }
 

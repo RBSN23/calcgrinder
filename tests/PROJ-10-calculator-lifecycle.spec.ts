@@ -350,7 +350,8 @@ test.describe('PROJ-10 — Calculator Lifecycle', () => {
       );
       expect(dup.status()).toBe(201);
       const dupBody = await dup.json();
-      expect(dupBody.title).toBe('Copy of Mortgage');
+      // PROJ-18 unified the suffix convention: "Copy of <X>" → "<X> — Copy".
+      expect(dupBody.title).toBe('Mortgage — Copy');
       expect(dupBody.published).toBe(false);
       expect(dupBody.public_token).toMatch(TOKEN_REGEX);
       expect(dupBody.public_token).not.toBe(src.public_token);
@@ -379,7 +380,7 @@ test.describe('PROJ-10 — Calculator Lifecycle', () => {
     }
   });
 
-  test('Duplicate auto-resolves "Copy of <X>" → "Copy of <X> (2)" on collision (no 409)', async ({
+  test('Duplicate auto-resolves "<X> — Copy" → "<X> — Copy (2)" on collision (no 409)', async ({
     page,
   }) => {
     const user = await bootstrapApprovedUser();
@@ -399,9 +400,9 @@ test.describe('PROJ-10 — Calculator Lifecycle', () => {
         await page.request.post(`/api/calculators/${src.id}/duplicate`, { data: {} })
       ).json();
       expect([dup1.title, dup2.title, dup3.title]).toEqual([
-        'Copy of Mortgage',
-        'Copy of Mortgage (2)',
-        'Copy of Mortgage (3)',
+        'Mortgage — Copy',
+        'Mortgage — Copy (2)',
+        'Mortgage — Copy (3)',
       ]);
     } finally {
       await teardown(user.userId);

@@ -147,7 +147,7 @@ describe('<CalcCard>', () => {
     const dup = vi.spyOn(clientApi, 'duplicateCalculator').mockResolvedValue({
       ...ROW,
       id: 'calc-2',
-      title: 'Copy of Mortgage Calculator',
+      title: 'Mortgage Calculator — Copy',
       public_token: 'tok-new',
       default_section_id: 'sec-1',
     } as never);
@@ -200,6 +200,127 @@ describe('<CalcCard>', () => {
     expect(
       await screen.findByRole('menuitem', { name: /Unpublish/i }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("<CalcCard variant='preset'>", () => {
+  beforeEach(() => {
+    pushMock.mockReset();
+    refreshMock.mockReset();
+    toastSuccess.mockReset();
+    toastError.mockReset();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('hides the kebab, the Edit and Duplicate icons, and the Status pill', () => {
+    render(
+      <CalcCard
+        calculator={ROW}
+        retentionPeriodDays={30}
+        variant="preset"
+      />,
+    );
+    expect(
+      screen.queryByRole('button', { name: 'More actions' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Edit calculator' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Duplicate calculator' }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Draft')).not.toBeInTheDocument();
+    expect(screen.queryByText('Published')).not.toBeInTheDocument();
+  });
+
+  it('renders the Public-view and Clone icon-buttons in that order', () => {
+    render(
+      <CalcCard
+        calculator={ROW}
+        retentionPeriodDays={30}
+        variant="preset"
+      />,
+    );
+    const publicBtn = screen.getByRole('button', {
+      name: 'Open public view in new tab',
+    });
+    const cloneBtn = screen.getByRole('button', {
+      name: 'Clone this calculator into your account',
+    });
+    expect(publicBtn).toBeInTheDocument();
+    expect(cloneBtn).toBeInTheDocument();
+    expect(
+      publicBtn.compareDocumentPosition(cloneBtn) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("renders the card anchor without the Draft/Published prefix in the aria-label", () => {
+    render(
+      <CalcCard
+        calculator={ROW}
+        retentionPeriodDays={30}
+        variant="preset"
+      />,
+    );
+    const anchor = screen.getByRole('link', {
+      name: 'Mortgage Calculator. Open public view in new tab.',
+    });
+    expect(anchor).toHaveAttribute('href', '/c/tok-123');
+    expect(anchor).toHaveAttribute('target', '_blank');
+  });
+
+  it('clicking the Clone icon-button calls cloneCalculator with the source token', async () => {
+    const clone = vi.spyOn(clientApi, 'cloneCalculator').mockResolvedValue({
+      ...ROW,
+      id: 'calc-2',
+      title: 'Mortgage Calculator — Copy',
+      public_token: 'tok-new',
+      default_section_id: 'sec-1',
+      source_calculator_id: ROW.id,
+    } as never);
+    render(
+      <CalcCard
+        calculator={ROW}
+        retentionPeriodDays={30}
+        variant="preset"
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Clone this calculator into your account',
+      }),
+    );
+    await waitFor(() =>
+      expect(clone).toHaveBeenCalledWith('calc-1', 'tok-123'),
+    );
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/editor/calc-2'));
+  });
+
+  it('shows an error toast when the clone request fails', async () => {
+    vi.spyOn(clientApi, 'cloneCalculator').mockRejectedValue(
+      new CalculatorApiError(500, 'boom'),
+    );
+    render(
+      <CalcCard
+        calculator={ROW}
+        retentionPeriodDays={30}
+        variant="preset"
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Clone this calculator into your account',
+      }),
+    );
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith(
+        "Couldn't clone — please try again.",
+      ),
+    );
+    expect(pushMock).not.toHaveBeenCalled();
   });
 });
 

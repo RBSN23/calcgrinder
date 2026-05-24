@@ -144,6 +144,45 @@ export async function listMySoftDeletedCalculators(): Promise<
     .filter((r): r is TrashedCalculatorRow => r !== null);
 }
 
+/**
+ * PROJ-18 — server-side fetch of the curated Presets list for the
+ * dashboard. Backed by the SECURITY DEFINER `fn_list_presets` RPC
+ * (owner-only RLS on `calculators` blocks cross-user reads, so the
+ * visibility rule lives inside the function: sysadmin owner +
+ * published + not soft-deleted). Returns the full preset shape;
+ * `<CalcCard variant='preset'>` only consumes the CalculatorRow
+ * subset, the rest is forward-compat for the deferred attribution
+ * banner.
+ *
+ * Failure handling mirrors `listMyCalculators` — a transient RPC
+ * error degrades to an empty array + `console.error`, so the
+ * dashboard renders the empty-state body instead of crashing.
+ */
+export interface PresetCalculatorRow extends CalculatorRow {
+  owner_id: string;
+  owner_name: string;
+}
+
+export async function listPresets(): Promise<PresetCalculatorRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc('fn_list_presets');
+  if (error || !data) {
+    if (error) console.error('listPresets: RPC failed', error);
+    return [];
+  }
+  return data.map((row) => ({
+    id: row.id,
+    title: row.title,
+    description: row.description ?? '',
+    theme_id: row.theme_id,
+    updated_at: row.updated_at,
+    published: row.published,
+    public_token: row.public_token,
+    owner_id: row.owner_id,
+    owner_name: row.owner_name ?? '',
+  }));
+}
+
 export async function getCalculatorForEditor(
   id: string,
 ): Promise<CalculatorRow | null> {

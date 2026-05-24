@@ -75,6 +75,7 @@ export type Database = {
           public_token: string
           published: boolean
           soft_delete_at: string | null
+          source_calculator_id: string | null
           theme_id: string
           title: string
           updated_at: string
@@ -87,6 +88,7 @@ export type Database = {
           public_token?: string
           published?: boolean
           soft_delete_at?: string | null
+          source_calculator_id?: string | null
           theme_id?: string
           title?: string
           updated_at?: string
@@ -99,11 +101,20 @@ export type Database = {
           public_token?: string
           published?: boolean
           soft_delete_at?: string | null
+          source_calculator_id?: string | null
           theme_id?: string
           title?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "calculators_source_calculator_id_fkey"
+            columns: ["source_calculator_id"]
+            isOneToOne: false
+            referencedRelation: "calculators"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cells: {
         Row: {
@@ -518,11 +529,26 @@ export type Database = {
         Returns: undefined
       }
       fn_duplicate_calculator: {
-        Args: { source_id: string }
+        Args: { source_id: string; source_token?: string | null }
         Returns: {
           default_section_id: string
           description: string
           id: string
+          public_token: string
+          published: boolean
+          source_calculator_id: string | null
+          theme_id: string
+          title: string
+          updated_at: string
+        }[]
+      }
+      fn_list_presets: {
+        Args: Record<string, never>
+        Returns: {
+          description: string
+          id: string
+          owner_id: string
+          owner_name: string
           public_token: string
           published: boolean
           theme_id: string
