@@ -30,7 +30,7 @@
 | PROJ-13 | Soft-Delete & Trash Recovery                         | P0       | PROJ-5, PROJ-10, PROJ-12              | Deployed | [PROJ-13](PROJ-13-soft-delete-and-trash-recovery.md) | 2026-05-22 |
 | PROJ-14 | Settings Page                                        | P0       | PROJ-3, PROJ-6                        | Deployed | [PROJ-14](PROJ-14-settings-page.md) | 2026-05-24 |
 | PROJ-15 | Charts                                               | P1       | PROJ-6, PROJ-7, PROJ-8, PROJ-9        | Deployed | [PROJ-15](PROJ-15-charts.md) | 2026-05-22 |
-| PROJ-16 | Text Blocks (Markdown)                               | P1       | PROJ-6, PROJ-8, PROJ-9, PROJ-11       | Approved    | [PROJ-16](PROJ-16-text-blocks-markdown.md) | 2026-05-22 |
+| PROJ-16 | Text Blocks (Markdown)                               | P1       | PROJ-6, PROJ-8, PROJ-9, PROJ-11       | Deployed | [PROJ-16](PROJ-16-text-blocks-markdown.md) | 2026-05-22 |
 | PROJ-17 | Tabular Output Cells                                 | P1       | PROJ-9                                | Roadmap | —    | 2026-05-22 |
 | PROJ-18 | Cloning & Preset Discoverability                     | P1       | PROJ-5, PROJ-10                       | Roadmap | —    | 2026-05-22 |
 | PROJ-19 | Sysadmin Moderation                                  | P1       | PROJ-5, PROJ-13                       | Roadmap | —    | 2026-05-22 |

@@ -56,7 +56,7 @@ and cloning.
 | P0 (MVP) | Soft-Delete & Trash Recovery                         | Deployed |
 | P0 (MVP) | Settings Page                                        | Deployed |
 | P1       | Charts (12-type vocabulary)                          | Deployed |
-| P1       | Text Blocks (Markdown)                               | Planned  |
+| P1       | Text Blocks (Markdown)                               | Deployed |
 | P1       | Tabular Output Cells                                 | Roadmap  |
 | P1       | Cloning & Preset Discoverability                     | Roadmap  |
 | P1       | Sysadmin Moderation                                  | Roadmap  |

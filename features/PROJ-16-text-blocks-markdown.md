@@ -1,8 +1,46 @@
 # PROJ-16: Text Blocks (Markdown)
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-24
-**Last Updated:** 2026-05-24
+**Last Updated:** 2026-05-24 (deployed to production at https://calcgrinder.vercel.app)
+
+## Deployment
+
+- **Production URL:** https://calcgrinder.vercel.app
+- **Deployed:** 2026-05-24
+- **Feat commit:** ef4fffa
+- **Tag:** v1.16.0-PROJ-16
+- **Migrations applied to Cloud** (verified via
+  `npx supabase migration list --linked` — local + remote match):
+  - `20260531000000_text_blocks.sql` (DDL)
+  - `20260531000001_public_calculator_text_blocks.sql` (RPC
+    replace + KI-1 owner-status JOIN restoration on both
+    `fn_get_public_calculator` and `fn_get_scenario_by_share_token`)
+- **Env-var changes:** none — text blocks introduce no new
+  config. No new cron, no new secrets.
+- **New runtime deps** (locked into `package.json`):
+  `react-markdown@^10.1.0`, `remark-gfm@^4.0.1`,
+  `rehype-sanitize@^6.0.0`. The renderer stack runs entirely
+  client-side; no SSR markdown pre-render in v1.
+- **Pre-deploy checks:**
+  - `npm run build` — clean (TypeScript pass, all 38 routes
+    generated including new `/api/sections/[id]/text_blocks`
+    and `/api/text_blocks/[id]`).
+  - `npm run lint` — 0 errors, 8 pre-existing warnings
+    (unchanged from PROJ-15 baseline).
+  - `npm test` — 835/835 Vitest pass (+26 PROJ-16 cases).
+  - PROJ-14:593 regression gate — passes (KI-1 closed).
+- **Vercel auto-deploy:** triggered by push of `ef4fffa` to
+  `main`. Standard auto-deploy pipeline; no manual `vercel
+  --prod` invocation.
+- **Carry-over MED bug:** BUG-M1 PROJ-14 (visitor `/c/<token>`
+  emits HTTP 404 instead of 410 for owners in
+  `pending_deletion`) carries unchanged into the PROJ-16
+  deploy. The PROJ-16 RPC migration restored the JOIN
+  (KI-1 closure, security gate met) but the status-code
+  divergence requires a route-handler patch deliberately
+  deferred to a future cycle per the spec's bundled-fix
+  scope. No user-visible content leak.
 
 ## Dependencies
 
@@ -1640,6 +1678,3 @@ and visitor surfaces, and bundled regressions (KI-1 + BUG-M1
 PROJ-14) pass.
 
 Next step: `/deploy` to ship PROJ-16 to production.
-
-## Deployment
-_To be added by /deploy_
