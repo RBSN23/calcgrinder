@@ -22,15 +22,22 @@ import {
 } from '@/components/ui/tooltip';
 import { CellLockToggle } from '@/components/visitor/cell-lock-toggle';
 import { useOptionalVisitorInputStore } from '@/components/visitor/visitor-input-store';
-import type { CellRow } from '@/lib/cells/types';
-import { useEditor } from '@/lib/editor/EditorProvider';
+import { formatCellValue } from '@/lib/cells/format';
+import { computeTabularActionPatch } from '@/lib/cells/tabular-action';
+import {
+  reconcileTabularColumns,
+  seedTabularColumns,
+} from '@/lib/cells/tabular-reconcile';
+import type { CellRow, TabularColumn } from '@/lib/cells/types';
+import { useEditor, useOptionalEditor } from '@/lib/editor/EditorProvider';
 import { cardSurface, labelTextStyle, numberStyle, type Theme } from '@/lib/themes';
 import { cn } from '@/lib/utils';
-import { isEmpty } from '@/lib/formula';
+import type { CellResult } from '@/lib/formula';
 
 import { CellInputWidget } from './cell-input-widget';
 import { CellVisualPanel } from './cell-visual-panel';
 import { DragHandle } from './dnd-helpers';
+import { TabularRenderer } from './tabular-renderer';
 
 interface CellCardProps {
   cell: CellRow;
@@ -57,6 +64,14 @@ export function CellCard({ cell, theme, dragHandleProps, isDragging }: CellCardP
   const result = getResult(cell.name);
   const tintKind = cell.kind === 'output' ? 'results' : 'inputs';
   const surface = cardSurface(theme, tintKind);
+
+  // PROJ-17 — Lazy first-Tabular-activation. Fires once per cell, on
+  // either (a) emphasis explicitly switched to 'tabular', or (b) the
+  // auto-fallback path (default 'plain' emphasis + array_of_objects
+  // formula + empty config). The PATCH carries the seed columns AND
+  // the narrow→wide card_size_hint bump (one-time). Builder-only —
+  // visitors never mutate cell config.
+  useTabularAutoPopulation(cell, result, isBuilder);
 
   const cardStyle: React.CSSProperties = {
     ...surface,
@@ -160,7 +175,33 @@ interface CellEditAffordanceProps {
 
 function CellEditAffordance({ cell, theme }: CellEditAffordanceProps) {
   const { patchCell, removeCell } = useEditor();
+  const { getResult } = useCalculatorState();
   const [panelOpen, setPanelOpen] = React.useState(false);
+  // BUG-M1 fix — intercept emphasis switches that flip TO 'tabular' on
+  // a default-emphasis cell. Bundle the first-time seed (+ size_hint
+  // bump) into the SAME patchCell so the user's "click Tabular" maps
+  // to one undo entry, not two. All other PATCHes pass through
+  // unchanged. (Emphasis switches AWAY from 'tabular' don't trigger
+  // any tabular_columns mutation by design — the persisted config
+  // survives cycling per spec.)
+  const handlePatch = React.useCallback(
+    (body: Parameters<typeof patchCell>[1]) => {
+      const next = body as { display_emphasis?: CellRow['display_emphasis'] };
+      if (
+        next.display_emphasis &&
+        next.display_emphasis !== cell.display_emphasis
+      ) {
+        const tabularPatch = computeTabularActionPatch({
+          cell,
+          nextEmphasis: next.display_emphasis,
+          result: getResult(cell.name),
+        });
+        return patchCell(cell.id, { ...body, ...tabularPatch });
+      }
+      return patchCell(cell.id, body);
+    },
+    [cell, getResult, patchCell],
+  );
   return (
     <>
       <div className="pointer-events-none absolute right-2 top-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
@@ -178,7 +219,7 @@ function CellEditAffordance({ cell, theme }: CellEditAffordanceProps) {
           cell={cell}
           theme={theme}
           onClose={() => setPanelOpen(false)}
-          onPatch={(body) => patchCell(cell.id, body)}
+          onPatch={handlePatch}
           onRemove={() => {
             setPanelOpen(false);
             void removeCell(cell.id);
@@ -207,7 +248,7 @@ function CellKindPill({ kind }: { kind: 'input' | 'output' }) {
 interface OutputDisplayProps {
   cell: CellRow;
   theme: Theme;
-  result: ReturnType<typeof Object> | undefined; // CellResult | undefined (avoid import cycle)
+  result: CellResult | undefined;
   isArrayResult: boolean;
   errorMsg: string | null;
 }
@@ -220,19 +261,44 @@ function OutputDisplay({ cell, theme, result, isArrayResult, errorMsg }: OutputD
       </p>
     );
   }
-  if (isArrayResult && cell.display_emphasis !== 'kpi') {
+  // PROJ-17 — Tabular dispatch.
+  //
+  // Render the shared TabularRenderer when:
+  //   * emphasis is explicitly 'tabular' (the authoritative signal —
+  //     either the maintainer picked it, OR the auto-pop effect
+  //     promoted the cell on first array_of_objects evaluation); OR
+  //   * emphasis is the default 'plain' AND the formula returns
+  //     array_of_objects AND tabular_columns is empty (auto-fallback
+  //     bootstrap-paint — only true for one render in builder mode,
+  //     between mount and the auto-pop PATCH landing; visitor surfaces
+  //     never enter this branch because they never get the chance to
+  //     mutate the cell, but the renderer still paints correctly
+  //     against the empty config).
+  const tabularBranch = isTabularBranchActive(cell, result);
+  if (tabularBranch === 'tabular') {
+    if (result?.shape === 'array_of_scalars') {
+      return (
+        <p className="text-[12.5px] font-medium text-red-600" role="alert">
+          Expected array of objects, got array of scalars.
+        </p>
+      );
+    }
+    const rows = extractTabularRows(result);
     return (
-      <p
-        className="text-[12px] italic"
-        style={{ color: theme.muted }}
-      >
-        Array result — tabular display ships in v1.1.
-      </p>
+      <TabularRenderer
+        columns={cell.tabular_columns ?? []}
+        rows={rows}
+        theme={theme}
+        cellCurrencyCode={cell.currency_code}
+      />
     );
   }
-  // Best-effort scalar render
-  const value = (result as { value?: unknown } | undefined)?.value;
-  const formatted = formatValue(cell, value);
+  // Best-effort scalar render (also covers PROJ-9 KPI fallback for
+  // array results once tabular_columns is non-empty AND emphasis is
+  // 'plain' — see Edge Cases in spec).
+  const rawValue = result?.value;
+  const value = isArrayResult ? extractFirstScalar(rawValue) : rawValue;
+  const formatted = formatCellValue(cell, value);
   const sizeMap = { s: 18, m: 28, l: 28, xl: 40 } as const;
   const size = (sizeMap[cell.text_size as keyof typeof sizeMap] ?? 28) as 18 | 28 | 40;
   return (
@@ -240,61 +306,217 @@ function OutputDisplay({ cell, theme, result, isArrayResult, errorMsg }: OutputD
   );
 }
 
-function formatValue(cell: CellRow, raw: unknown): string {
-  if (raw === undefined || raw === null) return '—';
-  if (isEmpty(raw)) return '—';
-  const format = cell.display_format;
-  const num = typeof raw === 'number' ? raw : Number(raw);
-
-  try {
-    if (cell.value_type === 'currency' || format === 'currency') {
-      const code = cell.currency_code || 'USD';
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: code,
-        maximumFractionDigits: 2,
-      }).format(num);
-    }
-    if (cell.value_type === 'percent' || format === 'percent_0' || format === 'percent_2') {
-      const fractionDigits = format === 'percent_0' ? 0 : 2;
-      return new Intl.NumberFormat('en-US', {
-        style: 'percent',
-        maximumFractionDigits: fractionDigits,
-        minimumFractionDigits: fractionDigits,
-      }).format(num);
-    }
-    if (cell.value_type === 'date' || format === 'date_short' || format === 'date_long') {
-      const date = raw instanceof Date ? raw : new Date(String(raw));
-      if (!Number.isNaN(date.getTime())) {
-        return date.toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-        });
-      }
-    }
-    if (cell.value_type === 'boolean') {
-      return raw ? 'Yes' : 'No';
-    }
-    if (cell.value_type === 'text') {
-      return String(raw);
-    }
-    if (Number.isFinite(num)) {
-      if (format === 'number_integer') {
-        return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(num);
-      }
-      if (format === 'number_decimal_2') {
-        return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
-      }
-      if (format === 'number_decimal_4') {
-        return new Intl.NumberFormat('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 }).format(num);
-      }
-      return new Intl.NumberFormat('en-US').format(num);
-    }
-    return String(raw);
-  } catch {
-    return String(raw);
+/**
+ * Decide whether the cell renders via the TabularRenderer or via the
+ * scalar/KPI path.
+ *
+ * Returns `'tabular'` when:
+ *   1. `display_emphasis === 'tabular'` — the authoritative signal.
+ *      This covers both the explicit maintainer choice and the post-
+ *      auto-pop state (the seed effect promotes default-plain cells to
+ *      explicit tabular emphasis in the same PATCH that seeds the
+ *      columns, so subsequent renders enter this branch unambiguously
+ *      via the explicit field). The renderer surfaces shape errors
+ *      inline so the config isn't lost across temporary formula breaks.
+ *   2. The bootstrap-paint case: `display_emphasis === 'plain'` AND
+ *      `tabular_columns` is empty AND the formula returns
+ *      `array_of_objects`. In builder mode this is true only between
+ *      mount and the auto-pop PATCH landing (the PATCH flips emphasis
+ *      to 'tabular', moving the cell into branch 1). In visitor mode
+ *      the auto-pop hook is gated off, so a cell that was never opened
+ *      in the builder lands here — the renderer paints against the
+ *      empty config and the table shows headers + "No data" if rows
+ *      exist for unknown keys.
+ *
+ * After auto-pop runs once, `display_emphasis` is the durable signal —
+ * never the implicit `tabular_columns.length === 0` flag. A maintainer
+ * who explicitly flips emphasis back to 'plain' lands neither branch
+ * and renders the scalar/KPI first-value fallback (Edge Case spec line
+ * 750-766 "plain means plain").
+ */
+function isTabularBranchActive(
+  cell: CellRow,
+  result: CellResult | undefined,
+): 'tabular' | 'scalar' {
+  if (cell.display_emphasis === 'tabular') return 'tabular';
+  if (
+    cell.display_emphasis === 'plain' &&
+    (cell.tabular_columns ?? []).length === 0 &&
+    result?.shape === 'array_of_objects'
+  ) {
+    return 'tabular';
   }
+  return 'scalar';
+}
+
+function extractTabularRows(result: CellResult | undefined): unknown[] {
+  if (!result || result.error) return [];
+  if (Array.isArray(result.value)) return result.value;
+  return [];
+}
+
+function extractFirstScalar(raw: unknown): unknown {
+  if (!Array.isArray(raw) || raw.length === 0) return raw;
+  const first = raw[0];
+  if (first === null || first === undefined) return undefined;
+  if (typeof first === 'object') {
+    for (const v of Object.values(first as Record<string, unknown>)) {
+      return v;
+    }
+    return undefined;
+  }
+  return first;
+}
+
+// BUG-M2 — module-level "we've already seeded this cell's first-row
+// keys in this page session" cache. Keyed by `${cellId}::${firstRowKeysSig}`
+// so a formula edit that changes the row shape can still re-seed once
+// (in practice it never has to — the handler-driven seed bundles into
+// the formula commit PATCH via the BUG-M1 path).
+//
+// Lives at module scope on purpose: React strict-mode double-mounts
+// reset every `useRef`/`useState` in the component, so a per-mount
+// flag wasn't enough to prevent the second mount from re-firing the
+// seed PATCH against the (still-empty) pre-PATCH state. A module-level
+// Set survives the unmount/remount and lets the second mount short-
+// circuit naturally. Cleared on hard reload by virtue of being module
+// state.
+const seededAutoPopBootstraps = new Set<string>();
+
+/**
+ * PROJ-17 — Side-effect that auto-populates `tabular_columns`, promotes
+ * `display_emphasis` from 'plain' to 'tabular' on the auto-fallback
+ * path, and bumps `card_size_hint` narrow → wide on first activation.
+ * Fires once per cell at the moment its formula starts returning
+ * array_of_objects AND the cell is in the tabular branch (explicit
+ * 'tabular' emphasis OR auto-fallback "default plain + empty config").
+ * Subsequent emphasis cycling does NOT re-trigger the seed — once
+ * `tabular_columns` is non-empty we drop into the smart-merge branch
+ * instead.
+ */
+function useTabularAutoPopulation(
+  cell: CellRow,
+  result: CellResult | undefined,
+  isBuilder: boolean,
+): void {
+  const editor = useOptionalEditor();
+  const lastFirstRowKeysRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!isBuilder || !editor) return;
+    if (cell.kind !== 'output') return;
+    if (!result || result.error) return;
+    if (result.shape !== 'array_of_objects') {
+      lastFirstRowKeysRef.current = null;
+      return;
+    }
+    const rows = Array.isArray(result.value) ? result.value : [];
+    if (rows.length === 0) return;
+    const firstRow = rows[0];
+    if (!firstRow || typeof firstRow !== 'object') return;
+    const firstRowAsRecord = firstRow as Record<string, unknown>;
+    const firstRowKeysSig = Object.keys(firstRowAsRecord).join('|');
+
+    const tabularBranchActive =
+      cell.display_emphasis === 'tabular' ||
+      (cell.display_emphasis === 'plain' &&
+        (cell.tabular_columns ?? []).length === 0);
+    if (!tabularBranchActive) {
+      lastFirstRowKeysRef.current = null;
+      return;
+    }
+    const existing = cell.tabular_columns ?? [];
+    const existingIds = existing.map((c) => c.id);
+    const sig = `${existingIds.join('|')}::${firstRowKeysSig}`;
+
+    // First-time seed: empty config → seed from the row.
+    //
+    // After BUG-M1 the formula-commit handler (in `grid-column.tsx`)
+    // and the emphasis-switch interceptor (in `CellEditAffordance`)
+    // both bundle their own seed into the user-action PATCH. This
+    // branch's remaining responsibility is the LOAD-TIME bootstrap:
+    // a cell mounted with empty columns + array_of_objects formula
+    // that the user has NOT acted on this session (e.g. an existing
+    // calculator opened fresh, or an admin-seeded fixture in tests).
+    //
+    // BUG-M2 fix — the bootstrap is a passive initialization, NOT a
+    // user action. It runs via `patchCellSilent` so it bypasses
+    // `recordOperation` and never lands an undo entry the user
+    // can't sensibly revert. (User-action-driven seeds STILL bundle
+    // into their action's undo entry via the BUG-M1 path; only the
+    // load-time bootstrap is silent.) The two guards below also
+    // prevent the effect from issuing duplicate silent PATCHes within
+    // a single mount; React strict-mode double-mount is naturally
+    // handled because each mount sees the post-PATCH state on its
+    // second pass, dropping into the smart-merge no-op branch.
+    if (existing.length === 0) {
+      const bootstrapKey = `${cell.id}::${firstRowKeysSig}`;
+      if (seededAutoPopBootstraps.has(bootstrapKey)) return;
+      if (lastFirstRowKeysRef.current === sig) return;
+      lastFirstRowKeysRef.current = sig;
+      seededAutoPopBootstraps.add(bootstrapKey);
+      const seeded = seedTabularColumns(firstRowAsRecord);
+      const patch: Parameters<typeof editor.patchCellSilent>[1] = {
+        tabular_columns: seeded,
+      };
+      // BUG-H1 fix — promote the cell to explicit tabular emphasis
+      // in the same PATCH. `display_emphasis` is the durable,
+      // authoritative tabular signal; the length-based gate only
+      // survives as the bootstrap-paint trigger.
+      if (cell.display_emphasis === 'plain') {
+        patch.display_emphasis = 'tabular';
+      }
+      // One-time card_size_hint bump (narrow → wide) on first
+      // Tabular activation. Spec: subsequent maintainer changes to
+      // size_hint are respected; the empty-columns check is also
+      // the one-time activation flag.
+      if (cell.card_size_hint === 'narrow') {
+        patch.card_size_hint = 'wide';
+      }
+      void editor.patchCellSilent(cell.id, patch);
+      return;
+    }
+
+    // Smart-merge: existing config + new first-row keys → reconcile.
+    //
+    // After BUG-M1, the formula-commit handler bundles its own
+    // reconciliation, so this branch typically observes a config
+    // that's already in sync (sameColumnIdsAndOrder returns true →
+    // no PATCH). The branch survives as a safety-net for state
+    // drift not driven by the formula-commit handler (e.g. a future
+    // server-driven update path or concurrent-edit refresh) — in
+    // those cases it issues ONE PATCH for the reconciliation, which
+    // creates ONE undo entry. Maintainer label / format / alignment
+    // edits never trigger because their cell row already carries
+    // the change.
+    if (lastFirstRowKeysRef.current === sig) return;
+    lastFirstRowKeysRef.current = sig;
+    const reconciled = reconcileTabularColumns({
+      prev: existing,
+      firstRow: firstRowAsRecord,
+    });
+    if (sameColumnIdsAndOrder(existing, reconciled)) return;
+    void editor.patchCell(cell.id, { tabular_columns: reconciled });
+  }, [
+    isBuilder,
+    editor,
+    cell.id,
+    cell.kind,
+    cell.display_emphasis,
+    cell.card_size_hint,
+    cell.tabular_columns,
+    result,
+  ]);
+}
+
+function sameColumnIdsAndOrder(
+  a: TabularColumn[],
+  b: TabularColumn[],
+): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].id !== b[i].id) return false;
+  }
+  return true;
 }
 
 function PencilIcon() {

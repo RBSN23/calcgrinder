@@ -132,6 +132,7 @@ export type Database = {
           numeric_step: number | null
           section_id: string
           select_options: Json | null
+          tabular_columns: Json
           text_colour: string
           text_size: string
           unit: string | null
@@ -165,6 +166,7 @@ export type Database = {
           numeric_step?: number | null
           section_id: string
           select_options?: Json | null
+          tabular_columns?: Json
           text_colour?: string
           text_size?: string
           unit?: string | null
@@ -198,6 +200,7 @@ export type Database = {
           numeric_step?: number | null
           section_id?: string
           select_options?: Json | null
+          tabular_columns?: Json
           text_colour?: string
           text_size?: string
           unit?: string | null

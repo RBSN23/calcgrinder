@@ -1,6 +1,6 @@
 // PROJ-9 — Client-side wrappers around the cell API routes.
 
-import type { CellRow } from './types';
+import type { CellRow, TabularColumn } from './types';
 
 export class CellApiError extends Error {
   readonly status: number;
@@ -101,6 +101,7 @@ export interface CreateCellBody {
   card_size_hint?: 'narrow' | 'wide' | 'full';
   text_size?: string;
   text_colour?: string;
+  tabular_columns?: TabularColumn[];
   display_order?: number;
   // Optional explicit id for undo-driven recreates.
   id?: string;

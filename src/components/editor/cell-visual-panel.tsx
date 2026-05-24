@@ -16,10 +16,13 @@ import type {
   CellDisplayEmphasis,
   CellRow,
   CellWidget,
+  TabularColumn,
 } from '@/lib/cells/types';
 import type { PatchCellBody } from '@/lib/cells/client';
 import type { Theme } from '@/lib/themes';
 import { cn } from '@/lib/utils';
+
+import { TabularColumnConfig } from './tabular-column-config';
 
 interface CellVisualPanelProps {
   cell: CellRow;
@@ -102,10 +105,20 @@ export function CellVisualPanel({ cell, theme, onClose, onPatch, onRemove }: Cel
         <div className="mt-3">
           <SegmentedField
             label="Emphasis"
-            value={cell.display_emphasis === 'tabular' ? 'plain' : cell.display_emphasis}
-            options={['plain', 'kpi'] as CellDisplayEmphasis[]}
+            value={cell.display_emphasis}
+            options={['plain', 'kpi', 'tabular'] as CellDisplayEmphasis[]}
             onChange={(v) => onPatch({ display_emphasis: v as CellDisplayEmphasis })}
           />
+          {cell.display_emphasis === 'tabular' ? (
+            <TabularColumnConfig
+              columns={cell.tabular_columns ?? []}
+              fallbackCurrencyCode={cell.currency_code || 'USD'}
+              hasShapeMatch={(cell.tabular_columns ?? []).length > 0}
+              onChange={(next: TabularColumn[]) =>
+                onPatch({ tabular_columns: next })
+              }
+            />
+          ) : null}
         </div>
       ) : null}
 

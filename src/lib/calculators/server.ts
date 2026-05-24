@@ -211,7 +211,15 @@ export async function getEditorBundle(
   const { data: cells } = await supabase
     .from('cells')
     .select(
-      'id, calculator_id, section_id, kind, name, label, description, description_render, value_type, visibility, editability, default_value, formula, display_widget, display_format, display_emphasis, unit, numeric_min, numeric_max, numeric_step, select_options, currency_code, card_accent, card_background_tint, card_border, card_size_hint, text_size, text_colour, display_order, created_at, updated_at',
+      // PROJ-17 — `tabular_columns` is included so the editor doesn't
+      // hydrate with `undefined` columns and then phantom-seed on
+      // every mount (which would clobber the persisted config + drop
+      // an unwanted PATCH into the undo stack). Audit surface per
+      // the BUG-H2 maintenance contract: cell-column enumeration
+      // must stay in sync across server.ts (editor bundle),
+      // fn_get_public_calculator + fn_get_scenario_by_share_token
+      // (read RPCs), and fn_duplicate_calculator (write RPC).
+      'id, calculator_id, section_id, kind, name, label, description, description_render, value_type, visibility, editability, default_value, formula, display_widget, display_format, display_emphasis, unit, numeric_min, numeric_max, numeric_step, select_options, currency_code, card_accent, card_background_tint, card_border, card_size_hint, text_size, text_colour, tabular_columns, display_order, created_at, updated_at',
     )
     .eq('calculator_id', id)
     .order('section_id', { ascending: true })
@@ -257,7 +265,7 @@ export async function getEditorBundle(
   return {
     calculator: { ...calculator, updated_at: refreshedUpdatedAt },
     sections: (sections ?? []) as SectionRow[],
-    cells: (cells ?? []) as CellRow[],
+    cells: (cells ?? []) as unknown as CellRow[],
     charts: (charts ?? []) as unknown as ChartRow[],
     textBlocks,
   };

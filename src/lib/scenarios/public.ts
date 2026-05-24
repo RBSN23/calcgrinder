@@ -10,6 +10,7 @@ import type {
   PublicSectionTextBlock,
 } from '@/lib/calculators/types';
 import { CHART_TYPES, type ChartType } from '@/lib/charts/types';
+import type { TabularColumn } from '@/lib/cells/types';
 
 import type { ScenarioValues } from './types';
 
@@ -241,11 +242,31 @@ function normaliseCells(value: unknown): PublicSectionCell[] {
             'narrow') as PublicSectionCell['card_size_hint'],
         text_size: stringField(entry, 'text_size') ?? 'm',
         text_colour: stringField(entry, 'text_colour') ?? 'default',
+        tabular_columns: normaliseTabularColumns(jsonField(entry, 'tabular_columns')),
         display_order: displayOrder,
       };
     })
     .filter((c): c is PublicSectionCell => c !== null)
     .sort((a, b) => a.display_order - b.display_order);
+}
+
+function normaliseTabularColumns(value: unknown): TabularColumn[] {
+  if (!Array.isArray(value)) return [];
+  const out: TabularColumn[] = [];
+  for (const entry of value) {
+    if (!isRecord(entry)) continue;
+    const id = stringField(entry, 'id');
+    if (!id) continue;
+    out.push({
+      id,
+      label: stringField(entry, 'label') ?? '',
+      format: stringField(entry, 'format') ?? 'auto',
+      alignment: (stringField(entry, 'alignment') ?? 'left') as TabularColumn['alignment'],
+      currency_code: stringField(entry, 'currency_code'),
+      visibility: (stringField(entry, 'visibility') ?? 'visible') as TabularColumn['visibility'],
+    });
+  }
+  return out;
 }
 
 /**

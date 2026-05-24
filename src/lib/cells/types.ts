@@ -43,6 +43,34 @@ export interface SelectOption {
   label: string;
 }
 
+// PROJ-17 — Per-column config for Output cells whose formula returns
+// `array_of_objects`. Persisted as JSONB on `cells.tabular_columns`.
+// Array order is the rendered column order. The set of `id`s is owned
+// by the formula's first-row keys; smart-merge on formula commit
+// reconciles (matching keys keep their hand-tuning; vanished keys are
+// dropped; new keys append with auto-populated defaults).
+export type TabularColumnAlignment = 'left' | 'center' | 'right';
+export type TabularColumnVisibility = 'visible' | 'hidden';
+
+export interface TabularColumn {
+  id: string;
+  label: string;
+  format: string;
+  alignment: TabularColumnAlignment;
+  currency_code: string | null;
+  visibility: TabularColumnVisibility;
+}
+
+// Per-column label cap matches PROJ-9's section title cap so the field
+// shares a familiar maintainer bound. Trim-empty labels are accepted
+// (renderer falls back to displaying `id` in the header).
+export const MAX_TABULAR_COLUMN_LABEL_LENGTH = 100;
+
+// Sanity cap for the columns array. The formula engine already caps
+// arrays at 10k rows; columns are bounded by the maintainer's row
+// shape, which in practice is well under this number.
+export const MAX_TABULAR_COLUMNS = 200;
+
 export type CellDefaultValue =
   | number
   | string
@@ -78,6 +106,7 @@ export interface CellRow {
   card_size_hint: CellCardSizeHint;
   text_size: string;
   text_colour: string;
+  tabular_columns: TabularColumn[];
   display_order: number;
   created_at: string;
   updated_at: string;

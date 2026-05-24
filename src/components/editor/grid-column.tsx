@@ -8,6 +8,10 @@
 
 import * as React from 'react';
 
+import {
+  computeTabularActionPatch,
+  evaluateSpeculative,
+} from '@/lib/cells/tabular-action';
 import type { CellRow } from '@/lib/cells/types';
 import { useEditor } from '@/lib/editor/EditorProvider';
 import { useEvaluationContext } from '@/lib/editor/EvaluationContext';
@@ -30,10 +34,39 @@ export function GridColumn({ cell, defaultExpanded = false }: GridColumnProps) {
       ? ''
       : String(cell.default_value),
   );
-  const { patchCell } = useEditor();
-  const { getResult } = useEvaluationContext();
+  const { patchCell, state } = useEditor();
+  const { getResult, inputs } = useEvaluationContext();
   const result = getResult(cell.name);
   const errorMsg = result?.error?.message ?? null;
+
+  // BUG-M1 fix — single patchCell wrapper shared between the Grid
+  // panel's formula input and the data-model panel's formula input.
+  // When the body carries a `formula` change, speculatively evaluate
+  // the new formula and bundle the resulting `tabular_columns` delta
+  // (seed-on-first-fire OR smart-merge) into the SAME PATCH. One
+  // PATCH → one `recordOperation` → one undo entry that reverts
+  // formula + emphasis + columns + size_hint atomically.
+  const commitCellPatch = React.useCallback(
+    (body: Parameters<typeof patchCell>[1]) => {
+      const next = body as { formula?: string | null };
+      if (typeof next.formula === 'string' && next.formula !== (cell.formula ?? '')) {
+        const speculativeResult = evaluateSpeculative(
+          state.cells,
+          inputs,
+          cell.id,
+          next.formula,
+        );
+        const tabularPatch = computeTabularActionPatch({
+          cell,
+          nextEmphasis: cell.display_emphasis,
+          result: speculativeResult,
+        });
+        return patchCell(cell.id, { ...body, ...tabularPatch });
+      }
+      return patchCell(cell.id, body);
+    },
+    [cell, inputs, patchCell, state.cells],
+  );
 
   React.useEffect(() => setDraftFormula(cell.formula ?? ''), [cell.formula]);
   React.useEffect(
@@ -145,7 +178,7 @@ export function GridColumn({ cell, defaultExpanded = false }: GridColumnProps) {
             onBlur={async () => {
               setEditingFormula(false);
               if (draftFormula !== (cell.formula ?? '')) {
-                await patchCell(cell.id, { formula: draftFormula });
+                await commitCellPatch({ formula: draftFormula });
               }
             }}
             onKeyDown={(e) => {
@@ -188,7 +221,7 @@ export function GridColumn({ cell, defaultExpanded = false }: GridColumnProps) {
         <div className="border-t border-cg-border bg-cg-surface-2">
           <CellDataModelPanel
             cell={cell}
-            onPatch={(body) => patchCell(cell.id, body)}
+            onPatch={commitCellPatch}
             onClose={() => setExpanded(false)}
           />
         </div>

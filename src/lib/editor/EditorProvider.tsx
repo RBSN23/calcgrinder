@@ -114,6 +114,20 @@ export interface EditorApi {
     id: string,
     body: Omit<PatchCellBody, 'updated_at'>,
   ) => Promise<CellRow | null>;
+  /**
+   * PROJ-17 BUG-M2 — non-undoable cell PATCH for passive initialization
+   * effects (the load-time tabular auto-pop bootstrap). Bypasses
+   * `recordOperation`, so Cmd-Z doesn't see the change and the effect
+   * can fire on every mount (including React strict-mode double-mount)
+   * without piling up undo entries the user can't sensibly revert.
+   * Intended ONLY for side-effect initializations triggered by mount,
+   * not user actions — those go through `patchCell` to preserve the
+   * undo trail.
+   */
+  patchCellSilent: (
+    id: string,
+    body: Omit<PatchCellBody, 'updated_at'>,
+  ) => Promise<CellRow | null>;
   removeCell: (id: string) => Promise<void>;
   // PROJ-15 — chart mutations.
   addChart: (sectionId: string, body?: CreateChartBody) => Promise<ChartRow | null>;
@@ -830,6 +844,31 @@ class EditorStore {
     });
   };
 
+  // PROJ-17 BUG-M2 — non-undoable cell PATCH (see EditorApi docstring).
+  patchCellSilent = async (
+    id: string,
+    body: Omit<PatchCellBody, 'updated_at'>,
+  ): Promise<CellRow | null> => {
+    if (this.state.stale) return null;
+    const previous = this.state.cells.find((c) => c.id === id);
+    if (!previous) return null;
+    try {
+      const res = await patchCellApi(id, {
+        ...body,
+        updated_at: this.state.calculator.updated_at,
+      });
+      this.dispatch({ type: 'UPSERT_CELL', cell: res.cell });
+      this.refreshCalculatorUpdatedAt(res.calculatorUpdatedAt);
+      return res.cell;
+    } catch (e) {
+      if (this.isStale(e)) {
+        this.dispatch({ type: 'MARK_STALE' });
+      }
+      this.reportError(e);
+      return null;
+    }
+  };
+
   removeCell = async (id: string): Promise<void> => {
     const previous = this.state.cells.find((c) => c.id === id);
     if (!previous) return;
@@ -1228,6 +1267,46 @@ export function useEditor(): EditorApi {
     removeSection: store.removeSection,
     addCell: store.addCell,
     patchCell: store.patchCell,
+    patchCellSilent: store.patchCellSilent,
+    removeCell: store.removeCell,
+    addChart: store.addChart,
+    patchChart: store.patchChart,
+    removeChart: store.removeChart,
+    addTextBlock: store.addTextBlock,
+    patchTextBlock: store.patchTextBlock,
+    removeTextBlock: store.removeTextBlock,
+  };
+}
+
+/**
+ * Like `useEditor()` but returns `null` when no editor store is
+ * mounted (e.g. visitor surfaces that mount the shared cell renderer
+ * but never expose mutation hooks). Side-effects gated on builder
+ * mode can call this without try/catch.
+ */
+export function useOptionalEditor(): EditorApi | null {
+  const state = React.useSyncExternalStore(
+    subscribeToStore,
+    getStateSnapshot,
+    getStateSnapshot,
+  );
+  const store = activeStore.current;
+  if (!store || !state) return null;
+  return {
+    state,
+    dispatch: store.dispatch,
+    renameCalculator: store.renameCalculator,
+    renameCalculatorChecked: store.renameCalculatorChecked,
+    setDescription: store.setDescription,
+    setTheme: store.setTheme,
+    undo: store.undo,
+    redo: store.redo,
+    addSection: store.addSection,
+    patchSection: store.patchSection,
+    removeSection: store.removeSection,
+    addCell: store.addCell,
+    patchCell: store.patchCell,
+    patchCellSilent: store.patchCellSilent,
     removeCell: store.removeCell,
     addChart: store.addChart,
     patchChart: store.patchChart,

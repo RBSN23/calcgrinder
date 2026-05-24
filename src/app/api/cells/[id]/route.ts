@@ -38,13 +38,14 @@ import {
   validateCellInvariants,
   validateCellNameField,
   validateFormulaLength,
+  validateTabularColumns,
   validateValueType,
 } from '@/lib/cells/validation';
 
 export const runtime = 'nodejs';
 
 const CELL_COLUMNS =
-  'id, calculator_id, section_id, kind, name, label, description, description_render, value_type, visibility, editability, default_value, formula, display_widget, display_format, display_emphasis, unit, numeric_min, numeric_max, numeric_step, select_options, currency_code, card_accent, card_background_tint, card_border, card_size_hint, text_size, text_colour, display_order, created_at, updated_at' as const;
+  'id, calculator_id, section_id, kind, name, label, description, description_render, value_type, visibility, editability, default_value, formula, display_widget, display_format, display_emphasis, unit, numeric_min, numeric_max, numeric_step, select_options, currency_code, card_accent, card_background_tint, card_border, card_size_hint, text_size, text_colour, tabular_columns, display_order, created_at, updated_at' as const;
 
 const patchSchema = z
   .object({
@@ -80,6 +81,7 @@ const patchSchema = z
     card_size_hint: z.enum(['narrow', 'wide', 'full']).optional(),
     text_size: z.string().optional(),
     text_colour: z.string().optional(),
+    tabular_columns: z.array(z.unknown()).optional(),
     display_order: z.number().int().min(0).optional(),
     // Cross-section moves are rejected at the API in v1.
     section_id: z.string().uuid().optional(),
@@ -185,6 +187,12 @@ export async function PATCH(req: Request, { params }: Ctx): Promise<Response> {
   if (nextFormula !== null) {
     const v = validateFormulaLength(nextFormula);
     if (!v.ok) return NextResponse.json(v.body, { status: v.status });
+  }
+  let nextTabularColumns: unknown = undefined;
+  if (patch.tabular_columns !== undefined) {
+    const v = validateTabularColumns(patch.tabular_columns);
+    if (!v.ok) return NextResponse.json(v.body, { status: v.status });
+    nextTabularColumns = v.normalised ?? [];
   }
   const inv = validateCellInvariants({
     kind: nextKind,
@@ -302,6 +310,9 @@ export async function PATCH(req: Request, { params }: Ctx): Promise<Response> {
     updates.card_size_hint = patch.card_size_hint;
   if (patch.text_size !== undefined) updates.text_size = patch.text_size;
   if (patch.text_colour !== undefined) updates.text_colour = patch.text_colour;
+  if (nextTabularColumns !== undefined) {
+    updates.tabular_columns = nextTabularColumns;
+  }
 
   // Reorder: walk siblings within the same section.
   const reorderRequested =
