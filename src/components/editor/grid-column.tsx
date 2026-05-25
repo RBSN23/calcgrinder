@@ -1,10 +1,15 @@
 'use client';
 
-// PROJ-9 — Grid column (one per cell).
+// PROJ-9 / PROJ-23 — Grid column (one per cell).
 //
-// Header strip (name + kind pill + visibility chip + kebab) + data row
-// (value preview for Inputs, formula text for Outputs) + kebab-expand
-// data-model panel.
+// Header strip (name + kind pill + visibility chip + chevron toggle) +
+// data row (value preview for Inputs, formula text for Outputs) +
+// global expand-in-place settings panel.
+//
+// PROJ-23 changes:
+// - Per-column `expanded` replaced by global `gridSettingsExpanded`.
+// - Kebab ⋮ replaced by a chevron toggle.
+// - Double-click on name text triggers inline rename (Issue 2).
 
 import * as React from 'react';
 
@@ -13,39 +18,37 @@ import {
   evaluateSpeculative,
 } from '@/lib/cells/tabular-action';
 import type { CellRow } from '@/lib/cells/types';
+import { validateCellName } from '@/lib/cells/types';
 import { useEditor } from '@/lib/editor/EditorProvider';
 import { useEvaluationContext } from '@/lib/editor/EvaluationContext';
 import { cn } from '@/lib/utils';
+
+import { Icons } from '../shell/icons';
 
 import { CellDataModelPanel } from './cell-data-model-panel';
 
 interface GridColumnProps {
   cell: CellRow;
-  defaultExpanded?: boolean;
 }
 
-export function GridColumn({ cell, defaultExpanded = false }: GridColumnProps) {
-  const [expanded, setExpanded] = React.useState(defaultExpanded);
+export function GridColumn({ cell }: GridColumnProps) {
   const [editingFormula, setEditingFormula] = React.useState(false);
   const [editingValue, setEditingValue] = React.useState(false);
+  const [editingName, setEditingName] = React.useState(false);
+  const [draftName, setDraftName] = React.useState(cell.name);
+  const [nameError, setNameError] = React.useState<string | null>(null);
   const [draftFormula, setDraftFormula] = React.useState(cell.formula ?? '');
   const [draftValue, setDraftValue] = React.useState(
     cell.default_value === null || cell.default_value === undefined
       ? ''
       : String(cell.default_value),
   );
-  const { patchCell, state } = useEditor();
+  const { patchCell, state, dispatch } = useEditor();
   const { getResult, inputs } = useEvaluationContext();
   const result = getResult(cell.name);
   const errorMsg = result?.error?.message ?? null;
+  const expanded = state.gridSettingsExpanded;
 
-  // BUG-M1 fix — single patchCell wrapper shared between the Grid
-  // panel's formula input and the data-model panel's formula input.
-  // When the body carries a `formula` change, speculatively evaluate
-  // the new formula and bundle the resulting `tabular_columns` delta
-  // (seed-on-first-fire OR smart-merge) into the SAME PATCH. One
-  // PATCH → one `recordOperation` → one undo entry that reverts
-  // formula + emphasis + columns + size_hint atomically.
   const commitCellPatch = React.useCallback(
     (body: Parameters<typeof patchCell>[1]) => {
       const next = body as { formula?: string | null };
@@ -78,6 +81,36 @@ export function GridColumn({ cell, defaultExpanded = false }: GridColumnProps) {
       ),
     [cell.default_value],
   );
+  React.useEffect(() => setDraftName(cell.name), [cell.name]);
+
+  const commitName = React.useCallback(async () => {
+    if (draftName === cell.name) {
+      setEditingName(false);
+      setNameError(null);
+      return;
+    }
+    const v = validateCellName(draftName);
+    if (!v.ok) {
+      setNameError(
+        v.reason === 'name_invalid'
+          ? 'Lowercase letters, digits, underscores. Starts with a letter.'
+          : v.reason === 'name_reserved'
+            ? `"${v.reservedWord}" is reserved.`
+            : 'Name required.',
+      );
+      return;
+    }
+    const existing = state.cells.find(
+      (c) => c.id !== cell.id && c.name === v.value,
+    );
+    if (existing) {
+      setNameError('Name already in use.');
+      return;
+    }
+    setNameError(null);
+    await patchCell(cell.id, { name: v.value });
+    setEditingName(false);
+  }, [draftName, cell.name, cell.id, patchCell, state.cells]);
 
   return (
     <div
@@ -87,9 +120,52 @@ export function GridColumn({ cell, defaultExpanded = false }: GridColumnProps) {
       {/* Header strip */}
       <header className="flex items-center gap-1 border-b border-cg-border px-2 py-1.5">
         <div className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate font-mono text-[11px] font-medium text-cg-text">
-            {cell.name}
-          </span>
+          {editingName ? (
+            <div className="flex flex-col">
+              <input
+                autoFocus
+                type="text"
+                value={draftName}
+                maxLength={40}
+                onChange={(e) => {
+                  setDraftName(e.target.value);
+                  setNameError(null);
+                }}
+                onBlur={() => void commitName()}
+                onFocus={(e) => e.currentTarget.select()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    void commitName();
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    setDraftName(cell.name);
+                    setEditingName(false);
+                    setNameError(null);
+                  }
+                }}
+                aria-label="Rename cell"
+                aria-invalid={nameError ? true : undefined}
+                className={cn(
+                  'w-full truncate border-none bg-transparent font-mono text-[11px] font-medium text-cg-text outline-none ring-1 rounded px-0.5',
+                  nameError ? 'ring-red-500' : 'ring-cg-accent/40',
+                )}
+              />
+              {nameError ? (
+                <p className="mt-0.5 text-[9.5px] text-red-600">{nameError}</p>
+              ) : null}
+            </div>
+          ) : (
+            <span
+              className="cursor-text truncate font-mono text-[11px] font-medium text-cg-text"
+              onDoubleClick={() => {
+                setDraftName(cell.name);
+                setEditingName(true);
+              }}
+            >
+              {cell.name}
+            </span>
+          )}
           <div className="flex items-center gap-1">
             <span
               className={cn(
@@ -110,19 +186,27 @@ export function GridColumn({ cell, defaultExpanded = false }: GridColumnProps) {
         </div>
         <button
           type="button"
-          aria-label={expanded ? 'Collapse cell details' : 'Expand cell details'}
+          aria-label={expanded ? 'Collapse cell settings' : 'Expand cell settings'}
           aria-expanded={expanded}
-          onClick={() => setExpanded((v) => !v)}
+          onClick={() => dispatch({ type: 'TOGGLE_GRID_SETTINGS' })}
           className="inline-flex h-6 w-6 items-center justify-center rounded text-cg-text-muted hover:bg-cg-surface-2"
         >
-          ⋮
+          <span
+            className={cn(
+              'inline-flex transition-transform duration-150',
+              expanded ? 'rotate-180' : 'rotate-0',
+            )}
+            aria-hidden
+          >
+            <Icons.ChevD size={12} />
+          </span>
         </button>
       </header>
 
       {/* Data row */}
       <div
         className={cn(
-          'flex-1 px-2 py-2 text-[12px]',
+          'px-2 py-2 text-[12px]',
           errorMsg && 'text-red-700',
         )}
       >
@@ -216,13 +300,12 @@ export function GridColumn({ cell, defaultExpanded = false }: GridColumnProps) {
         ) : null}
       </div>
 
-      {/* Expand panel */}
+      {/* PROJ-23 — Expand-in-place settings panel (global toggle) */}
       {expanded ? (
         <div className="border-t border-cg-border bg-cg-surface-2">
           <CellDataModelPanel
             cell={cell}
             onPatch={commitCellPatch}
-            onClose={() => setExpanded(false)}
           />
         </div>
       ) : null}

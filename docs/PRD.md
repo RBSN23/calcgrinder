@@ -60,6 +60,7 @@ and cloning.
 | P1       | Tabular Output Cells                                 | Deployed |
 | P1       | Cloning & Preset Discoverability                     | Deployed |
 | P1       | Sysadmin Moderation                                  | Deployed |
+| P1       | UI/UX Polish Part 1 — Editor                         | Planned  |
 | P1       | Concurrent Editing — Optimistic Concurrency          | Roadmap  |
 | P1       | Code-Import (Smart merge / Append / Replace all)     | Roadmap  |
 | P2       | JSON Export / Import                                 | Roadmap  |

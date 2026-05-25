@@ -14,7 +14,7 @@ export default function PublicLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen flex-col bg-cg-bg text-cg-text">
+    <div className="cg-force-light flex min-h-screen flex-col bg-cg-bg text-cg-text">
       {children}
     </div>
   );

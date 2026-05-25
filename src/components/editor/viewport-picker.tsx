@@ -68,6 +68,6 @@ export function viewportMaxWidth(mode: ViewportMode): string {
       return '390px';
     case 'desktop':
     default:
-      return '100%';
+      return '1200px';
   }
 }

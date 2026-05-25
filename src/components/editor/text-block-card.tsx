@@ -1,18 +1,16 @@
 'use client';
 
-// PROJ-16 — Text-block card (Builder + Visitor).
+// PROJ-16 / PROJ-23 — Text-block card (Builder + Visitor).
 //
-// Mounted via the SlotRenderer text_block registration. In resting state
-// it renders the markdown body via the shared <MarkdownRenderer> — pixel-
-// identical between Builder preview and visitor view by construction.
+// Mounted via the SlotRenderer text_block registration. Renders the
+// markdown body via <MarkdownRenderer> — identical between Builder and
+// Visitor by construction.
 //
-// In the Builder, hover affordances expose a drag handle, an edit icon,
-// and a kebab (Delete). Clicking edit expands the card into the split-
-// pane editor (desktop) / stacked editor (mobile). The visitor surface
-// has no EditorProvider, so all edit-only state lives in the
-// <TextBlockEditAffordance> child gated on `isBuilder`.
-//
-// Empty body in the visitor view renders NOTHING — no card, no spacer.
+// PROJ-23 Issue 5 changes the Builder editing model:
+// - Resting state = rendered markdown (same as visitor).
+// - Click on content = inline textarea (no split-pane).
+// - Pencil hover icon = opens TextBlockVisualPanel (style controls).
+// - Empty body shows an empty-state placeholder; clicking opens textarea.
 
 import * as React from 'react';
 
@@ -24,13 +22,14 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useEditor } from '@/lib/editor/EditorProvider';
+import { useDebouncedCallback } from '@/lib/text-blocks/use-debounced-callback';
+import { TextBlockApiError } from '@/lib/text-blocks/client';
 import type { TextBlockRow } from '@/lib/text-blocks/types';
 import { cardSurface, type Theme } from '@/lib/themes';
 import { cn } from '@/lib/utils';
 
 import { DragHandle } from './dnd-helpers';
 import { MarkdownRenderer } from '@/components/markdown/markdown-renderer';
-import { TextBlockEditorPane } from './text-block-editor-pane';
 import { TextBlockVisualPanel } from './text-block-visual-panel';
 
 interface TextBlockCardProps {
@@ -48,8 +47,6 @@ export function TextBlockCard({
 }: TextBlockCardProps) {
   const isBuilder = useIsBuilder();
 
-  // Visitor view: empty body produces nothing — no card, no spacer.
-  // PROJ-16 spec AC: "Other elements flow as if the text block didn't exist."
   if (!isBuilder && textBlock.body.trim() === '') return null;
 
   const surface = cardSurface(theme, 'generic');
@@ -107,145 +104,145 @@ interface TextBlockEditAffordanceProps {
   isEmpty: boolean;
 }
 
+const PATCH_DEBOUNCE_MS = 500;
+
 function TextBlockEditAffordance({
   textBlock,
   theme,
   isEmpty,
 }: TextBlockEditAffordanceProps) {
   const { patchTextBlock, removeTextBlock } = useEditor();
+  const [editing, setEditing] = React.useState(isEmpty);
+  const [visualPanelOpen, setVisualPanelOpen] = React.useState(false);
+  const [body, setBody] = React.useState(textBlock.body);
+  const lastServerBody = React.useRef(textBlock.body);
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
-  // Fresh blocks (empty body, never edited) auto-expand on creation so
-  // the maintainer lands directly in the source editor. Once the body
-  // has any content (or the maintainer collapses), it stays collapsed
-  // across reloads.
-  const [expanded, setExpanded] = React.useState(isEmpty);
+  React.useEffect(() => {
+    if (textBlock.body !== lastServerBody.current) {
+      lastServerBody.current = textBlock.body;
+      setBody(textBlock.body);
+    }
+  }, [textBlock.body]);
 
-  // Other surfaces (Grid drawer, +Add picker) can ask a specific block
-  // to open by dispatching `cg:open-text-block` with the id. Mirrors
-  // PROJ-15's `cg:open-chart-configurator` pattern.
   React.useEffect(() => {
     function onOpen(e: Event) {
       const detail = (e as CustomEvent<{ id: string }>).detail;
       if (detail?.id !== textBlock.id) return;
-      setExpanded(true);
+      setEditing(true);
     }
     window.addEventListener('cg:open-text-block', onOpen);
     return () => window.removeEventListener('cg:open-text-block', onOpen);
   }, [textBlock.id]);
 
-  if (expanded) {
-    return (
-      <TextBlockExpandedView
-        textBlock={textBlock}
-        theme={theme}
-        onCollapse={() => setExpanded(false)}
-        onRemove={() => {
-          setExpanded(false);
-          void removeTextBlock(textBlock.id);
-        }}
-        onPatch={(body) => patchTextBlock(textBlock.id, body)}
-      />
-    );
-  }
+  const debouncedSave = useDebouncedCallback((nextBody: string) => {
+    void patchTextBlock(textBlock.id, { body: nextBody })
+      .then(() => { lastServerBody.current = nextBody; })
+      .catch((e: unknown) => {
+        if (e instanceof TextBlockApiError && e.code === 'body_too_large') {
+          // Silently cap — the user sees the textarea content.
+        }
+      });
+  }, PATCH_DEBOUNCE_MS);
+
+  const handleChange = (next: string) => {
+    setBody(next);
+    debouncedSave(next);
+  };
+
+  const exitEdit = () => {
+    debouncedSave.flush();
+    setEditing(false);
+  };
+
+  React.useEffect(() => {
+    return () => debouncedSave.flush();
+  }, [debouncedSave]);
 
   return (
     <>
-      <div className="pointer-events-none absolute right-2 top-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+      {/* Hover affordances: pencil (visual panel) + delete */}
+      <div className="pointer-events-none absolute right-2 top-2 z-10 flex items-center gap-1 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
         <TooltipProvider delayDuration={120}>
           <Tooltip>
             <TooltipTrigger asChild>
               <button
                 type="button"
-                aria-label="Edit text block"
-                onClick={() => setExpanded(true)}
+                aria-label="Text block style"
+                onClick={() => setVisualPanelOpen((v) => !v)}
                 className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-cg-surface/90 text-cg-text-muted shadow-sm ring-1 ring-cg-border hover:text-cg-text"
               >
                 <PencilIcon />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="left">Edit text block</TooltipContent>
+            <TooltipContent side="left">Style controls</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                aria-label="Delete text block"
+                onClick={() => void removeTextBlock(textBlock.id)}
+                className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-cg-surface/90 text-red-600 shadow-sm ring-1 ring-cg-border hover:bg-red-50"
+              >
+                <TrashIcon />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="left">Delete</TooltipContent>
           </Tooltip>
         </TooltipProvider>
       </div>
 
-      <div
-        className="cursor-text"
-        onClick={(e) => {
-          // Don't hijack clicks on links or the drag handle.
-          const target = e.target as HTMLElement;
-          if (target.closest('a') || target.closest('[data-drag-handle]')) return;
-          setExpanded(true);
-        }}
-      >
-        {isEmpty ? (
-          <p className="text-[12.5px] italic text-cg-text-muted">
-            Empty text block — click to edit
-          </p>
-        ) : (
-          <MarkdownRenderer
-            body={textBlock.body}
-            textSize={textBlock.text_size}
-            textColour={textBlock.text_colour}
-            theme={theme}
-          />
-        )}
-      </div>
+      {editing ? (
+        <textarea
+          ref={textareaRef}
+          autoFocus
+          value={body}
+          onChange={(e) => handleChange(e.target.value)}
+          onBlur={exitEdit}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              exitEdit();
+            }
+          }}
+          placeholder="Write Markdown here…"
+          spellCheck
+          className="w-full resize-none rounded-md border border-cg-border bg-cg-surface p-2 font-mono text-[12.5px] leading-snug text-cg-text outline-none focus-visible:ring-2 focus-visible:ring-cg-accent/40"
+          style={{ fieldSizing: 'content' as never, minHeight: 60 }}
+        />
+      ) : (
+        <div
+          className="cursor-text"
+          onClick={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('a') || target.closest('[data-drag-handle]')) return;
+            setEditing(true);
+          }}
+        >
+          {isEmpty ? (
+            <p className="text-[12.5px] italic text-cg-text-muted">
+              Empty text block — click to edit
+            </p>
+          ) : (
+            <MarkdownRenderer
+              body={textBlock.body}
+              textSize={textBlock.text_size}
+              textColour={textBlock.text_colour}
+              theme={theme}
+            />
+          )}
+        </div>
+      )}
+
+      {visualPanelOpen ? (
+        <TextBlockVisualPanel
+          textBlock={textBlock}
+          theme={theme}
+          onPatch={(patchBody) => patchTextBlock(textBlock.id, patchBody)}
+        />
+      ) : null}
     </>
-  );
-}
-
-interface TextBlockExpandedViewProps {
-  textBlock: TextBlockRow;
-  theme: Theme;
-  onCollapse: () => void;
-  onRemove: () => void;
-  onPatch: (
-    body: Parameters<
-      ReturnType<typeof useEditor>['patchTextBlock']
-    >[1],
-  ) => Promise<unknown>;
-}
-
-function TextBlockExpandedView({
-  textBlock,
-  theme,
-  onCollapse,
-  onRemove,
-  onPatch,
-}: TextBlockExpandedViewProps) {
-  return (
-    <div className="relative flex flex-col gap-3">
-      <div className="absolute right-0 top-0 flex items-center gap-1">
-        <button
-          type="button"
-          onClick={onRemove}
-          className="rounded px-2 py-1 text-[11.5px] font-medium text-red-600 hover:bg-red-50"
-        >
-          Delete
-        </button>
-        <button
-          type="button"
-          aria-label="Collapse text block"
-          onClick={onCollapse}
-          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-cg-text-muted hover:bg-cg-surface-2"
-        >
-          <ChevronDownIcon />
-        </button>
-      </div>
-
-      <TextBlockEditorPane
-        textBlock={textBlock}
-        theme={theme}
-        onPatch={onPatch}
-        onCollapse={onCollapse}
-      />
-
-      <TextBlockVisualPanel
-        textBlock={textBlock}
-        theme={theme}
-        onPatch={onPatch}
-      />
-    </div>
   );
 }
 
@@ -267,20 +264,20 @@ function PencilIcon() {
   );
 }
 
-function ChevronDownIcon() {
+function TrashIcon() {
   return (
     <svg
-      width="14"
-      height="14"
+      width="12"
+      height="12"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
       strokeWidth="1.8"
       strokeLinecap="round"
       strokeLinejoin="round"
-      aria-hidden
     >
-      <path d="M6 9l6 6 6-6" />
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
     </svg>
   );
 }

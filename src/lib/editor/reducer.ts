@@ -44,6 +44,8 @@ export interface EditorState {
   gridDrawerOpen: boolean;
   /** Set to true after a 409 stale-write. Disables further commits until reload. */
   stale: boolean;
+  /** PROJ-23 — global expand/collapse for cell/chart settings in the grid panel. Session-only. */
+  gridSettingsExpanded: boolean;
   sections: SectionRow[];
   cells: CellRow[];
   // PROJ-15 — charts attached to this calculator's sections.
@@ -78,6 +80,7 @@ export type EditorAction =
   | { type: 'TOGGLE_GRID_COLLAPSED' }
   | { type: 'SET_VIEWPORT'; mode: ViewportMode }
   | { type: 'SET_DRAWER_OPEN'; open: boolean }
+  | { type: 'TOGGLE_GRID_SETTINGS' }
   | { type: 'MARK_STALE' }
   | { type: 'SET_SECTIONS'; sections: SectionRow[] }
   | { type: 'SET_CELLS'; cells: CellRow[] }
@@ -114,6 +117,7 @@ export function initialEditorState(
     viewportMode: 'desktop',
     gridDrawerOpen: false,
     stale: false,
+    gridSettingsExpanded: false,
     sections: opts.sections ?? [],
     cells: opts.cells ?? [],
     charts: opts.charts ?? [],
@@ -240,6 +244,8 @@ export function editorReducer(
       return { ...state, viewportMode: action.mode };
     case 'SET_DRAWER_OPEN':
       return { ...state, gridDrawerOpen: action.open };
+    case 'TOGGLE_GRID_SETTINGS':
+      return { ...state, gridSettingsExpanded: !state.gridSettingsExpanded };
     case 'MARK_STALE':
       // Once stale, freeze the history so undo cannot replay against a 409 server.
       return { ...state, stale: true, past: [], future: [] };

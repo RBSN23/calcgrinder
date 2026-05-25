@@ -135,7 +135,6 @@ function BuilderHeroEditors({
           if (result.code === 'title_too_long') {
             return { ok: false, error: TITLE_TOO_LONG_MESSAGE };
           }
-          // Stale-write or unknown error — the store already toasted.
           return { ok: true };
         }}
         renderResting={({ displayValue, isPlaceholder }) => (
@@ -154,7 +153,16 @@ function BuilderHeroEditors({
             {displayValue}
           </h1>
         )}
-        inputClassName="w-full font-bold tracking-tight"
+        inputStyle={{
+          color: heroColor,
+          fontFamily: themeFont,
+          fontSize: 28,
+          fontWeight: 700,
+          letterSpacing: themeUppercase ? 1 : -0.4,
+          textTransform: themeUppercase ? 'uppercase' : 'none',
+          lineHeight: 1.15,
+        }}
+        inputClassName="w-full"
       />
       <EditableText
         value={description}
@@ -177,7 +185,13 @@ function BuilderHeroEditors({
             {displayValue}
           </p>
         )}
-        inputClassName="w-full text-sm"
+        inputStyle={{
+          color: heroColor,
+          fontFamily: themeFont,
+          fontSize: 14,
+          lineHeight: 1.45,
+        }}
+        inputClassName="w-full"
       />
     </>
   );

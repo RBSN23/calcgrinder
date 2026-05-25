@@ -191,7 +191,7 @@ function FocusedExpand({
           Back
         </button>
       </div>
-      <CellDataModelPanel cell={cell} onPatch={onPatch} onClose={onClose} />
+      <CellDataModelPanel cell={cell} onPatch={onPatch} />
     </div>
   );
 }

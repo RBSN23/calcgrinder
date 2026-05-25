@@ -16,6 +16,9 @@ interface EditableTextProps {
   ariaLabel: string;
   className?: string;
   inputClassName?: string;
+  /** Inline style object applied to the input/textarea in edit mode.
+   * Use to match the resting-state font metrics for zero layout shift. */
+  inputStyle?: React.CSSProperties;
   multiline?: boolean;
   maxLength?: number;
   /**
@@ -51,6 +54,7 @@ export function EditableText({
   ariaLabel,
   className,
   inputClassName,
+  inputStyle,
   multiline = false,
   maxLength,
   onCommit,
@@ -148,6 +152,7 @@ export function EditableText({
                 cancel();
               }
             }}
+            style={inputStyle}
             className={cn(
               'w-full resize-none border-none bg-transparent outline-none ring-1 rounded px-1 py-0.5',
               invalid || inlineError
@@ -189,6 +194,7 @@ export function EditableText({
               cancel();
             }
           }}
+          style={inputStyle}
           className={cn(
             'border-none bg-transparent outline-none ring-1 rounded px-1',
             invalid || inlineError

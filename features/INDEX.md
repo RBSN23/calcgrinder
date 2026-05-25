@@ -37,7 +37,7 @@
 | PROJ-20 | Concurrent Editing — Optimistic Concurrency          | P1       | PROJ-8                                | Roadmap | —    | 2026-05-22 |
 | PROJ-21 | Code-Import (Smart merge / Append / Replace all)     | P1       | PROJ-9, PROJ-15, PROJ-16              | Roadmap | —    | 2026-05-22 |
 | PROJ-22 | JSON Export / Import                                 | P2       | PROJ-9, PROJ-15, PROJ-16              | Roadmap | —    | 2026-05-22 |
-| PROJ-23 | UI/UX Polish Part 1 — Editor                         | P1       | PROJ-6, PROJ-8, PROJ-9, PROJ-15, PROJ-16 | Architected | [PROJ-23](PROJ-23-ui-ux-polish-editor.md) | 2026-05-25 |
+| PROJ-23 | UI/UX Polish Part 1 — Editor                         | P1       | PROJ-6, PROJ-8, PROJ-9, PROJ-15, PROJ-16 | Approved | [PROJ-23](PROJ-23-ui-ux-polish-editor.md) | 2026-05-25 |
 
 <!-- Add features above this line -->
 

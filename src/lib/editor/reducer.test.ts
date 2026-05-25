@@ -179,6 +179,15 @@ describe('editorReducer — layout slice', () => {
     expect(editorReducer(start, { type: 'SET_DRAWER_OPEN', open: true }).gridDrawerOpen).toBe(true);
   });
 
+  it('TOGGLE_GRID_SETTINGS toggles gridSettingsExpanded', () => {
+    const start = initialEditorState(ROW);
+    expect(start.gridSettingsExpanded).toBe(false);
+    const expanded = editorReducer(start, { type: 'TOGGLE_GRID_SETTINGS' });
+    expect(expanded.gridSettingsExpanded).toBe(true);
+    const collapsed = editorReducer(expanded, { type: 'TOGGLE_GRID_SETTINGS' });
+    expect(collapsed.gridSettingsExpanded).toBe(false);
+  });
+
   it('initial state uses DEFAULT_GRID_HEIGHT', () => {
     expect(initialEditorState(ROW).gridHeight).toBe(DEFAULT_GRID_HEIGHT);
   });

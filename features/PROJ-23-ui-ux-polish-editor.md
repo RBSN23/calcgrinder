@@ -1,6 +1,6 @@
 # PROJ-23: UI/UX Polish Part 1 — Editor
 
-## Status: Architected
+## Status: Approved
 **Created:** 2026-05-25
 **Last Updated:** 2026-05-25
 
@@ -312,8 +312,177 @@ None. All 7 issues are implementable with existing packages.
 - **Q: Should inline rename update formula references?** → YES. The existing PATCH `/api/cells/:id` already rewrites dependent formulas on name change. The EditorProvider already handles the client-side formula rewrite + undo snapshot. Inline rename uses the same path — behavior is identical to the current data-model panel rename.
 - **Q: Should expand/collapse be shared across sections or truly global?** → GLOBAL. One boolean (`gridSettingsExpanded`) controls all columns. Since columns are side-by-side in a horizontal scroll, expanding one column's settings is visually identical to expanding all (same vertical space consumed).
 
+## Implementation Notes
+
+### Deviations from Architecture Spec
+
+| Change | Rationale | Date |
+|--------|-----------|------|
+| Compact settings panel: all labels removed except Min/Max/Step | Toggle options (Input/Output, Visible/Hidden, etc.) and dropdowns are self-explanatory — labels doubled the vertical space for no usability gain. `aria-label` kept for screen readers. | 2026-05-25 |
+| Currency field changed from text input to Select dropdown (32 currencies) | Dropdown prevents typos and is faster than typing a 3-letter code. Covers all major world currencies. | 2026-05-25 |
+| Settings panels top-aligned (not bottom-aligned) | Removed `flex-1` from data row so panels stack directly below header + data. First toggle sits at the same Y across all columns — much easier to scan and operate. | 2026-05-25 |
+| Builder canvas desktop max-width changed from `100%` to `1200px` | Matches the public view's `max-w-[1200px]` constraint. Builder preview is now pixel-identical to visitor view at the same window width. | 2026-05-25 |
+| Dark/light mode isolation via `.cg-force-light` CSS class | Architecture spec only mentioned replacing `bg-cg-bg` with `theme.bg` on the canvas wrapper. In practice, `cg-*` CSS variables leaked throughout the entire calculator rendering pipeline (visitor page background, input fields, borders). Fix: a CSS class that redeclares all `cg-*` + shadcn variables to their light values, applied to the public layout and builder canvas. | 2026-05-25 |
+
+### Files Changed
+
+- `src/lib/editor/reducer.ts` — `gridSettingsExpanded` state + `TOGGLE_GRID_SETTINGS` action
+- `src/components/editor/grid-panel.tsx` — master settings toggle, auto-height when expanded
+- `src/components/editor/grid-column.tsx` — chevron toggle, inline rename, top-aligned settings
+- `src/components/editor/cell-data-model-panel.tsx` — compact label-free layout, currency dropdown
+- `src/components/editor/chart-grid-column.tsx` — chevron toggle, expanded chart info
+- `src/components/editor/cell-visual-panel.tsx` — LABEL field added at top
+- `src/components/editor/text-block-card.tsx` — inline editing replaces split-pane
+- `src/components/editor/editable-text.tsx` — `inputStyle` prop for zero-shift editing
+- `src/components/editor/calculator-hero.tsx` — passes font metrics via `inputStyle`
+- `src/components/editor/builder-canvas.tsx` — `cg-force-light` + `theme.bg` + matched padding
+- `src/components/editor/viewport-picker.tsx` — desktop max-width `1200px`
+- `src/app/globals.css` — `.cg-force-light` utility class
+- `src/app/(public)/layout.tsx` — `cg-force-light` on visitor wrapper
+
 ## QA Test Results
-_To be added by /qa_
+
+**QA Date:** 2026-05-25
+**Tested By:** QA Engineer (automated + code review)
+**Build:** Local dev (commit 8d517ca + uncommitted PROJ-23 implementation)
+
+### Automated Test Suite (Pre-QA Baseline)
+
+| Suite | Result | Count |
+|-------|--------|-------|
+| Vitest unit/integration | PASS | 907 passed (906 existing + 1 new) |
+| Playwright E2E (existing) | PASS | 313 passed, 28 skipped |
+| Playwright E2E (PROJ-23 new) | PASS | 16 passed |
+
+### Acceptance Criteria Results
+
+#### Issue 1 — Grid Cell Settings: Expand-in-Place + Compact Redesign
+
+| # | Criterion | Result | Notes |
+|---|-----------|--------|-------|
+| 1.1 | Clicking chevron expands ALL cell/chart columns | PASS | E2E: master toggle + per-column chevron verified |
+| 1.2 | Clicking chevron again collapses ALL | PASS | E2E: collapse toggle verified |
+| 1.3 | Collapsed state shows downward chevron (not kebab ⋮) | PASS | Code review: `Icons.ChevD` replaces kebab |
+| 1.4 | Expanded state rotates chevron | PASS | Code review: `rotate-180` class applied |
+| 1.5 | Master expand/collapse toggle in Grid header | PASS | E2E: master "Settings" button verified |
+| 1.6 | Master toggle syncs with individual chevrons | PASS | Both dispatch same `TOGGLE_GRID_SETTINGS` action |
+| 1.7 | Builder toolbar/canvas shift downward (no overflow/clipping) | PASS | Code review: grid uses auto height + max-h-[60vh] |
+| 1.8 | No close-X button on settings panel | PASS | E2E: verified no close button exists |
+| 1.9 | Segmented toggles for KIND, VISIBILITY, EDITABILITY, DESC RENDER | PASS | E2E: radiogroup controls verified |
+| 1.10 | VALUE TYPE as compact inline select (7 options) | PASS | Code review: Select component with all 7 types |
+| 1.11 | Numeric constraints appear for number/currency/percent | PASS | Code review: conditional render verified |
+| 1.12 | Currency code appears for currency type | PASS | Code review: Select dropdown with 32 currencies |
+| 1.13 | Select options appear for select type | PASS | Code review: SelectOptionsEditor rendered |
+| 1.14 | No extra fields for types without them | PASS | Code review: conditional rendering |
+| 1.15 | NAME field absent (moved to inline rename) | PASS | Code review: removed from CellDataModelPanel |
+| 1.16 | LABEL field absent (moved to Visual Panel) | PASS | E2E: verified no Label in settings panel |
+| 1.17 | NOTES field at bottom (renamed from DESCRIPTION) | PASS | Code review: notes field with placeholder |
+| 1.18 | Chart columns show chart-specific settings | PASS | Code review: ChartGridColumn expanded state |
+| 1.19 | Compact panel height ≤ half of former | PASS | Code review: label-free layout, segmented toggles |
+
+#### Issue 2 — Cell Name: Double-Click Inline Rename in Grid
+
+| # | Criterion | Result | Notes |
+|---|-----------|--------|-------|
+| 2.1 | Double-click name → inline text input | PASS | E2E: verified |
+| 2.2 | Enter/blur commits via PATCH | PASS | E2E: verified DB write |
+| 2.3 | Escape discards edit | PASS | E2E: verified |
+| 2.4 | Empty name → validation error | PASS | E2E: verified |
+| 2.5 | Duplicate name → validation error | PASS | Code review: `state.cells.find` check |
+| 2.6 | Invalid characters → validation error | PASS | Code review: `validateCellName` called |
+| 2.7 | Monospace styling, no layout shift | PASS | Code review: same font-mono class as resting state |
+
+#### Issue 3 — Label Field Moves to Cell Visual Panel
+
+| # | Criterion | Result | Notes |
+|---|-----------|--------|-------|
+| 3.1 | No LABEL in data model panel | PASS | E2E + code review |
+| 3.2 | LABEL text field at top of Visual Panel | PASS | Code review: added before style controls |
+| 3.3 | LABEL change saved via PATCH on blur | PASS | Code review: onBlur handler |
+| 3.4 | Empty LABEL falls back to cell name | PASS | Code review: `placeholder={cell.name}` |
+
+#### Issue 4 — Grid Panel Sticky on Desktop
+
+| # | Criterion | Result | Notes |
+|---|-----------|--------|-------|
+| 4.1 | Grid panel stays fixed while canvas scrolls | PASS | Code review: flex column layout, grid has fixed height |
+| 4.2 | Canvas scrolls independently | PASS | Code review: `flex-1 overflow-auto` on BuilderCanvas |
+| 4.3 | Grid grows when settings expanded | PASS | Code review: auto height + max-h-[60vh] |
+| 4.4 | Grid returns to collapsed height | PASS | Code review: conditional height prop |
+| 4.5 | Resize handle continues to function | PASS | Code review: ResizeHandle unchanged, controls collapsed height |
+| 4.6 | Mobile layout unchanged | PASS | Code review: no changes to mobile layout |
+
+#### Issue 5 — Text Block Builder Canvas: Inline Editing
+
+| # | Criterion | Result | Notes |
+|---|-----------|--------|-------|
+| 5.1 | Resting state = rendered markdown (identical to visitor) | PASS | E2E: rendered h2 verified |
+| 5.2 | Click → plain textarea with raw markdown | PASS | E2E: textarea with markdown source |
+| 5.3 | Auto-saved on type (debounced PATCH) | PASS | Code review: 500ms debounce |
+| 5.4 | Click outside / blur → rendered markdown returns | PASS | E2E: verified |
+| 5.5 | Escape → rendered markdown returns | PASS | E2E: verified |
+| 5.6 | No source + preview split-pane | PASS | E2E: no "Live preview" or "Markdown source" |
+| 5.7 | Pencil hover icon → Visual Panel (not textarea) | PASS | Code review: separate onClick handler |
+| 5.8 | Empty text block shows placeholder; click opens textarea | PASS | Code review: isEmpty conditional |
+
+#### Issue 6 — Title Editing: Constant Font Size in Hero
+
+| # | Criterion | Result | Notes |
+|---|-----------|--------|-------|
+| 6.1 | Input has same font metrics as resting h1 | PASS | E2E: computed fontSize match verified |
+| 6.2 | Zero layout shift | PASS | Code review: inputStyle matches renderResting style |
+| 6.3 | Seamless transition back | PASS | Code review: same font metrics |
+
+#### Issue 7 — Dark/Light Mode: App Theme Does Not Affect Calculator Preview
+
+| # | Criterion | Result | Notes |
+|---|-----------|--------|-------|
+| 7.1 | App theme switch doesn't affect canvas | PASS | Code review: `.cg-force-light` resets all cg-* vars |
+| 7.2 | Canvas renders exclusively with calculator theme tokens | PASS | E2E: `cg-force-light` class present |
+| 7.3 | Builder preview matches visitor view | PASS | E2E: inline `background` style from theme.bg + cg-force-light on public layout |
+
+### Edge Cases Tested
+
+| Edge Case | Result | Notes |
+|-----------|--------|-------|
+| Double-click on kind pill (not name text) | PASS | E2E: no rename triggered |
+| Inline rename validation (empty, invalid, duplicate) | PASS | E2E + code review |
+| Text block auto-grow textarea | PASS | Code review: `fieldSizing: content` with 60px min-height fallback |
+
+### Bugs Found
+
+| # | Severity | Issue | Component | Steps to Reproduce |
+|---|----------|-------|-----------|-------------------|
+| 1 | Low | Missing `focus-visible:ring-2` on per-column chevron buttons | `grid-column.tsx:192`, `chart-grid-column.tsx:73` | Tab to the per-column chevron toggle — no visible focus ring. The master toggle in `grid-panel.tsx` has `focus-visible:ring-2 focus-visible:ring-cg-accent`, but individual column chevrons don't. |
+| 2 | Low | No explicit `min-h-[200px]` on canvas area | `editor-body.tsx` | With 20+ cells and settings expanded, on a small viewport (≤700px height), the canvas could shrink below 200px. The max-h-[60vh] cap on the grid mitigates this for most viewport sizes, but the spec requires a minimum. |
+
+### Pre-Existing Issues (Not PROJ-23 Regressions)
+
+| # | Severity | Issue | Component | Notes |
+|---|----------|-------|-----------|-------|
+| 1 | Medium | `SelectOptionsEditor` has `value` + `defaultValue` on Input without `onChange` | `cell-data-model-panel.tsx:278-309` | Both `id` and `label` inputs use `value={opt.id}` (controlled) alongside `defaultValue` (ignored in controlled mode) without an `onChange` handler. In React, this makes the inputs effectively read-only during typing. Pre-existing from PROJ-9 — identical code before and after PROJ-23. |
+
+### Security Audit
+
+| Check | Result | Notes |
+|-------|--------|-------|
+| XSS via inline rename | PASS | `validateCellName` enforces `/^[a-z][a-z0-9_]{0,39}$/`; React auto-escapes |
+| XSS via text block markdown | PASS | `rehype-sanitize` + `skipHtml` + no `rehype-raw` |
+| CSS injection via theme.bg | PASS | Static compile-time constants, not user-controlled |
+| CSS injection via inputStyle | PASS | Hardcoded object literals from theme data |
+| Authorization (PATCH calls) | PASS | All reuse existing authenticated, RLS-protected endpoints |
+| Data exposure in DOM | PASS | Only UUIDs in data attributes; no secrets or PII |
+
+### Test Files
+
+| Type | File | Tests |
+|------|------|-------|
+| Unit | `src/lib/editor/reducer.test.ts` | +1 (TOGGLE_GRID_SETTINGS toggle) |
+| E2E | `tests/PROJ-23-ui-ux-polish-editor.spec.ts` | 16 tests covering Issues 1-3, 5-7 |
+
+### Production-Ready Decision
+
+**READY** — No Critical or High bugs. Two Low-severity issues found (missing focus ring on column chevrons, no explicit canvas min-height). Both are cosmetic/edge-case and do not block deployment. One pre-existing Medium bug in SelectOptionsEditor is not a PROJ-23 regression.
 
 ## Deployment
 _To be added by /deploy_

@@ -28,18 +28,17 @@ export function BuilderCanvas() {
   const { state } = useEditor();
   const { calculator, viewportMode } = state;
   const isFallback = !getThemeIds().includes(calculator.theme_id as never);
-  // The renderer itself reads theme_id from the calculator-state context;
-  // we only need `getTheme` here for the future fallback banner.
-  void getTheme(calculator.theme_id);
+  const theme = getTheme(calculator.theme_id);
 
   return (
     <div
       role="region"
       aria-label="Calculator preview"
-      className="flex-1 overflow-auto bg-cg-bg"
+      className="cg-force-light flex-1 overflow-auto"
+      style={{ background: theme.bg }}
     >
       <div
-        className="mx-auto flex h-full flex-col gap-3 p-6"
+        className="mx-auto flex h-full flex-col gap-3 p-4 md:p-6"
         style={{ maxWidth: viewportMaxWidth(viewportMode) }}
       >
         {isFallback ? <FallbackThemeBanner /> : null}

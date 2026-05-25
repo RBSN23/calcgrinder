@@ -28,7 +28,7 @@ interface OrderedColumn {
 
 export function GridPanel() {
   const { state, dispatch } = useEditor();
-  const { gridHeight, gridCollapsed, sections, cells, charts } = state;
+  const { gridHeight, gridCollapsed, gridSettingsExpanded, sections, cells, charts } = state;
   const options = useAddPickerOptions();
 
   // Interleave cells + charts by section-then-display_order to lay columns out.
@@ -53,11 +53,16 @@ export function GridPanel() {
     });
   }, [cells, charts, sections]);
 
+  const hasColumns = orderedColumns.length > 0;
+
   return (
     <section
       aria-label="Grid panel"
-      style={{ height: gridHeight }}
-      className="relative flex shrink-0 flex-col overflow-hidden border-b border-cg-border bg-cg-surface"
+      style={gridSettingsExpanded && !gridCollapsed ? undefined : { height: gridHeight }}
+      className={cn(
+        'relative flex shrink-0 flex-col border-b border-cg-border bg-cg-surface',
+        gridSettingsExpanded && !gridCollapsed ? 'max-h-[60vh]' : 'overflow-hidden',
+      )}
     >
       <header className="flex h-10 shrink-0 items-center gap-2 border-b border-cg-border px-3">
         <button
@@ -83,6 +88,27 @@ export function GridPanel() {
         <span className="rounded-full border border-cg-border bg-cg-surface-2 px-[7px] py-[1px] font-mono text-[10.5px] font-medium text-cg-text-muted">
           {orderedColumns.length}
         </span>
+        {/* PROJ-23 — Master expand/collapse toggle for cell/chart settings */}
+        {hasColumns && !gridCollapsed ? (
+          <button
+            type="button"
+            aria-label={gridSettingsExpanded ? 'Collapse all settings' : 'Expand all settings'}
+            aria-expanded={gridSettingsExpanded}
+            onClick={() => dispatch({ type: 'TOGGLE_GRID_SETTINGS' })}
+            className="inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-[10.5px] font-medium text-cg-text-muted outline-none transition-colors hover:bg-cg-surface-2 hover:text-cg-text focus-visible:ring-2 focus-visible:ring-cg-accent"
+          >
+            <span
+              className={cn(
+                'inline-flex transition-transform duration-150',
+                gridSettingsExpanded ? 'rotate-180' : 'rotate-0',
+              )}
+              aria-hidden
+            >
+              <Icons.ChevD size={12} />
+            </span>
+            Settings
+          </button>
+        ) : null}
         <span className="flex-1" />
         <AddPicker options={options} />
       </header>

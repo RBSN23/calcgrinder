@@ -9,6 +9,7 @@
 
 import * as React from 'react';
 
+import { Input } from '@/components/ui/input';
 import type {
   CellCardBackgroundTint,
   CellCardBorder,
@@ -39,6 +40,9 @@ const TEXT_SIZE_OPTIONS: string[] = ['s', 'm', 'l', 'xl'];
 const TEXT_COLOUR_OPTIONS: string[] = ['default', 'accent_1', 'accent_2'];
 
 export function CellVisualPanel({ cell, theme, onClose, onPatch, onRemove }: CellVisualPanelProps) {
+  const [label, setLabel] = React.useState(cell.label);
+  React.useEffect(() => setLabel(cell.label), [cell.label]);
+
   return (
     <div className="mt-2 rounded-md border border-cg-border bg-cg-surface p-3 text-cg-text">
       <header className="mb-2 flex items-center justify-between">
@@ -63,6 +67,22 @@ export function CellVisualPanel({ cell, theme, onClose, onPatch, onRemove }: Cel
           </button>
         </div>
       </header>
+
+      {/* PROJ-23 Issue 3 — Label field at top of Visual Panel */}
+      <div className="mb-3 flex flex-col gap-1">
+        <label className="text-[10.5px] font-semibold uppercase tracking-wide text-cg-text-muted">
+          Label
+        </label>
+        <Input
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          onBlur={() => {
+            if (label !== cell.label) onPatch({ label });
+          }}
+          placeholder={cell.name}
+          className="h-8 text-[12px]"
+        />
+      </div>
 
       <div className="grid grid-cols-2 gap-3">
         <SegmentedField

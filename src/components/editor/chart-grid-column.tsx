@@ -1,11 +1,11 @@
 'use client';
 
-// PROJ-15 — Grid panel chart column (listing-only).
+// PROJ-15 / PROJ-23 — Grid panel chart column.
 //
-// Narrower than a Cell column. The kebab does NOT inline-expand; instead
-// it jumps focus to the Builder canvas, scrolls the corresponding chart
-// card into view, expands the configurator there, and briefly pulses
-// the Grid column for ~600ms.
+// PROJ-23 changes: kebab replaced with chevron toggle that participates
+// in the global gridSettingsExpanded state. When expanded, shows a
+// compact chart-type summary + "Open in Builder" button. Pulse-on-click
+// (scrolling to the chart card in the canvas) is preserved.
 
 import * as React from 'react';
 
@@ -13,6 +13,8 @@ import type { ChartRow } from '@/lib/charts/types';
 import { useEditor } from '@/lib/editor/EditorProvider';
 import { useEvaluationContext } from '@/lib/editor/EvaluationContext';
 import { cn } from '@/lib/utils';
+
+import { Icons } from '../shell/icons';
 
 import { chartTypeSummary } from './chart-data-resolver';
 
@@ -22,11 +24,12 @@ interface ChartGridColumnProps {
 
 export function ChartGridColumn({ chart }: ChartGridColumnProps) {
   const [pulsing, setPulsing] = React.useState(false);
-  const { state } = useEditor();
+  const { state, dispatch } = useEditor();
   const { results } = useEvaluationContext();
   const summary = chartTypeSummary(chart, state.cells, results);
+  const expanded = state.gridSettingsExpanded;
 
-  const onKebabClick = () => {
+  const scrollToChart = () => {
     setPulsing(true);
     setTimeout(() => setPulsing(false), 600);
     const target = document.querySelector(
@@ -36,10 +39,6 @@ export function ChartGridColumn({ chart }: ChartGridColumnProps) {
       target.scrollIntoView({ behavior: 'smooth', block: 'center' });
       target.focus({ preventScroll: true });
     }
-    // PROJ-15 QA BUG-L2 — dispatch an OPEN signal (not a toggle). The
-    // chart card's listener idempotently opens its configurator; if it's
-    // already open the kebab is a no-op, matching the spec ("kebab jumps
-    // to the Builder, scrolls in, expands").
     window.dispatchEvent(
       new CustomEvent('cg:open-chart-configurator', {
         detail: { id: chart.id },
@@ -68,24 +67,37 @@ export function ChartGridColumn({ chart }: ChartGridColumnProps) {
         </div>
         <button
           type="button"
-          aria-label="Open chart settings in Builder"
-          onClick={onKebabClick}
-          className="inline-flex h-5 w-5 items-center justify-center rounded text-cg-text-muted hover:bg-cg-surface-2"
+          aria-label={expanded ? 'Collapse chart settings' : 'Expand chart settings'}
+          aria-expanded={expanded}
+          onClick={() => dispatch({ type: 'TOGGLE_GRID_SETTINGS' })}
+          className="inline-flex h-6 w-6 items-center justify-center rounded text-cg-text-muted hover:bg-cg-surface-2"
         >
-          <KebabIcon />
+          <span
+            className={cn(
+              'inline-flex transition-transform duration-150',
+              expanded ? 'rotate-180' : 'rotate-0',
+            )}
+            aria-hidden
+          >
+            <Icons.ChevD size={12} />
+          </span>
         </button>
       </header>
       <div className="px-2 py-2 text-[11px] text-cg-text-muted">{summary}</div>
+      {expanded ? (
+        <div className="border-t border-cg-border bg-cg-surface-2 p-2">
+          <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-cg-text-muted">
+            Type: {chart.chart_type}
+          </p>
+          <button
+            type="button"
+            onClick={scrollToChart}
+            className="rounded border border-cg-border bg-cg-surface px-2 py-1 text-[10.5px] font-medium text-cg-text-muted hover:bg-cg-surface-2 hover:text-cg-text"
+          >
+            Open in Builder
+          </button>
+        </div>
+      ) : null}
     </div>
-  );
-}
-
-function KebabIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-      <circle cx="12" cy="5" r="1.5" />
-      <circle cx="12" cy="12" r="1.5" />
-      <circle cx="12" cy="19" r="1.5" />
-    </svg>
   );
 }
