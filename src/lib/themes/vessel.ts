@@ -1,8 +1,5 @@
 import { deriveChartPalette } from './derive-chart-palette';
-import {
-  SINGLE_COLUMN_PATTERN,
-  TWO_COLUMN_PATTERN,
-} from './layout-patterns';
+
 import type { Theme } from './types';
 
 export const vessel: Theme = {
@@ -48,5 +45,4 @@ export const vessel: Theme = {
   cols3: '1fr 1fr 1.5fr',
   headerH: 64,
   cardTints: null,
-  layoutPatterns: [SINGLE_COLUMN_PATTERN, TWO_COLUMN_PATTERN],
 };

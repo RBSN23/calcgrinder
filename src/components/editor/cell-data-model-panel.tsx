@@ -247,7 +247,7 @@ function SegmentedToggle({
             className={cn(
               'flex-1 rounded px-1.5 py-0.5 text-[10.5px] capitalize transition-colors',
               selected
-                ? 'bg-cg-surface text-cg-text shadow-sm'
+                ? 'bg-cg-accent text-cg-accent-fg shadow-sm'
                 : 'text-cg-text-muted hover:text-cg-text',
               opt.disabled && 'cursor-not-allowed opacity-40',
             )}

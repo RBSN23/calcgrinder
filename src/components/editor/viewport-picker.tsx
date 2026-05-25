@@ -22,8 +22,8 @@ interface ViewportOption {
 
 const OPTIONS: ViewportOption[] = [
   { mode: 'desktop', label: 'Desktop', icon: <Icons.Monitor size={14} /> },
-  { mode: 'tablet', label: 'Tablet', icon: <Icons.LayoutGrid size={14} /> },
-  { mode: 'mobile', label: 'Mobile', icon: <Icons.Menu size={14} /> },
+  { mode: 'tablet', label: 'Tablet', icon: <Icons.Tablet size={14} /> },
+  { mode: 'mobile', label: 'Mobile', icon: <Icons.Smartphone size={14} /> },
 ];
 
 export function ViewportPicker({ compact = false }: { compact?: boolean }) {

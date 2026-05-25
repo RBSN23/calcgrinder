@@ -11,9 +11,7 @@
 // text_size, text_colour) + display_order. The body is byte-capped at
 // MAX_TEXT_BLOCK_BODY_BYTES (50 KB UTF-8) before the database is touched.
 //
-// Reorders are within-section only via `display_order`; cross-section
-// moves (`section_id` in body) are rejected with 422
-// `cross_section_move_unsupported`.
+// Reorders use `display_order`; cross-section moves pass `section_id`.
 //
 // DELETE is hard; PROJ-13's soft-delete is calculator-level. Surviving
 // siblings in the same section are re-packed (display_order shifted
@@ -88,14 +86,6 @@ export async function PATCH(req: Request, { params }: Ctx): Promise<Response> {
   }
   const { updated_at: staleUpdatedAt, ...patch } = parsed.data;
 
-  // Reject cross-section moves (v1).
-  if (patch.section_id !== undefined) {
-    return NextResponse.json(
-      { error: 'cross_section_move_unsupported' },
-      { status: 422 },
-    );
-  }
-
   // Body byte-cap pre-check (50 KB UTF-8 backstop). Must happen before any
   // DB write — spec says "before touching the database."
   if (patch.body !== undefined) {
@@ -143,71 +133,107 @@ export async function PATCH(req: Request, { params }: Ctx): Promise<Response> {
   if (patch.text_size !== undefined) updates.text_size = patch.text_size;
   if (patch.text_colour !== undefined) updates.text_colour = patch.text_colour;
 
+  const crossSectionMove =
+    patch.section_id !== undefined && patch.section_id !== current.section_id;
+  if (crossSectionMove) updates.section_id = patch.section_id;
+
   // Reorder: walk siblings within the same section. Same algorithm as the
   // chart PATCH route — park current at a temp slot, then shift the
   // affected range up/down, then settle current at the target.
   const reorderRequested =
     patch.display_order !== undefined &&
-    patch.display_order !== current.display_order;
+    (patch.display_order !== current.display_order || crossSectionMove);
   if (reorderRequested) {
+    if (crossSectionMove) {
+      const { data: sourceSiblings } = await textBlocksTable(supabase)
+        .select('id, display_order')
+        .eq('section_id', current.section_id)
+        .gt('display_order', current.display_order)
+        .order('display_order', { ascending: true });
+      for (const row of (sourceSiblings ?? []) as Array<{ id: string; display_order: number }>) {
+        await textBlocksTable(supabase)
+          .update({ display_order: row.display_order - 1 })
+          .eq('id', row.id);
+      }
+    }
+
+    const targetSectionId = crossSectionMove ? patch.section_id! : current.section_id;
     const { data: siblings, error: sibErr } = await textBlocksTable(supabase)
       .select('id, display_order')
-      .eq('section_id', current.section_id)
+      .eq('section_id', targetSectionId)
       .order('display_order', { ascending: true });
     if (sibErr) {
       console.error('PATCH text_block: sibling read failed', sibErr);
       return NextResponse.json({ error: 'update_failed' }, { status: 500 });
     }
     const all = (siblings ?? []) as Array<{ id: string; display_order: number }>;
-    const target = Math.max(0, Math.min(all.length - 1, patch.display_order!));
 
-    const temp = all.length + 1;
-    const { error: parkErr } = await textBlocksTable(supabase)
-      .update({ display_order: temp })
-      .eq('id', blockId);
-    if (parkErr) {
-      console.error('PATCH text_block: park failed', parkErr);
-      return NextResponse.json({ error: 'update_failed' }, { status: 500 });
-    }
-
-    if (target > current.display_order) {
+    if (crossSectionMove) {
+      const target = Math.max(0, Math.min(all.length, patch.display_order!));
       const shifting = all
-        .filter(
-          (s) =>
-            s.id !== blockId &&
-            s.display_order > current.display_order &&
-            s.display_order <= target,
-        )
-        .sort((a, b) => a.display_order - b.display_order);
-      for (const row of shifting) {
-        const { error } = await textBlocksTable(supabase)
-          .update({ display_order: row.display_order - 1 })
-          .eq('id', row.id);
-        if (error) {
-          console.error('PATCH text_block: shift down failed', error);
-          return NextResponse.json({ error: 'update_failed' }, { status: 500 });
-        }
-      }
-    } else {
-      const shifting = all
-        .filter(
-          (s) =>
-            s.id !== blockId &&
-            s.display_order >= target &&
-            s.display_order < current.display_order,
-        )
+        .filter((s) => s.display_order >= target)
         .sort((a, b) => b.display_order - a.display_order);
       for (const row of shifting) {
         const { error } = await textBlocksTable(supabase)
           .update({ display_order: row.display_order + 1 })
           .eq('id', row.id);
         if (error) {
-          console.error('PATCH text_block: shift up failed', error);
+          console.error('PATCH text_block: cross-section shift failed', error);
           return NextResponse.json({ error: 'update_failed' }, { status: 500 });
         }
       }
+      updates.display_order = target;
+    } else {
+      const target = Math.max(0, Math.min(all.length - 1, patch.display_order!));
+
+      const temp = all.length + 1;
+      const { error: parkErr } = await textBlocksTable(supabase)
+        .update({ display_order: temp })
+        .eq('id', blockId);
+      if (parkErr) {
+        console.error('PATCH text_block: park failed', parkErr);
+        return NextResponse.json({ error: 'update_failed' }, { status: 500 });
+      }
+
+      if (target > current.display_order) {
+        const shifting = all
+          .filter(
+            (s) =>
+              s.id !== blockId &&
+              s.display_order > current.display_order &&
+              s.display_order <= target,
+          )
+          .sort((a, b) => a.display_order - b.display_order);
+        for (const row of shifting) {
+          const { error } = await textBlocksTable(supabase)
+            .update({ display_order: row.display_order - 1 })
+            .eq('id', row.id);
+          if (error) {
+            console.error('PATCH text_block: shift down failed', error);
+            return NextResponse.json({ error: 'update_failed' }, { status: 500 });
+          }
+        }
+      } else {
+        const shifting = all
+          .filter(
+            (s) =>
+              s.id !== blockId &&
+              s.display_order >= target &&
+              s.display_order < current.display_order,
+          )
+          .sort((a, b) => b.display_order - a.display_order);
+        for (const row of shifting) {
+          const { error } = await textBlocksTable(supabase)
+            .update({ display_order: row.display_order + 1 })
+            .eq('id', row.id);
+          if (error) {
+            console.error('PATCH text_block: shift up failed', error);
+            return NextResponse.json({ error: 'update_failed' }, { status: 500 });
+          }
+        }
+      }
+      updates.display_order = target;
     }
-    updates.display_order = target;
   }
 
   let lastBumpAt: string = calculator.updated_at;

@@ -44,7 +44,6 @@ describe('bento theme tokens', () => {
         hero: '#1A1A2E',
         heroFg: '#FFF8E7',
       },
-      layoutPatterns: bento.layoutPatterns,
       chartPalette: bento.chartPalette,
     });
   });

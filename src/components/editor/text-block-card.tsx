@@ -21,6 +21,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useEditor } from '@/lib/editor/EditorProvider';
 import { useDebouncedCallback } from '@/lib/text-blocks/use-debounced-callback';
 import { TextBlockApiError } from '@/lib/text-blocks/client';
@@ -161,22 +162,36 @@ function TextBlockEditAffordance({
 
   return (
     <>
-      {/* Hover affordances: pencil (visual panel) + delete */}
       <div className="pointer-events-none absolute right-2 top-2 z-10 flex items-center gap-1 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
         <TooltipProvider delayDuration={120}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                aria-label="Text block style"
-                onClick={() => setVisualPanelOpen((v) => !v)}
-                className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-cg-surface/90 text-cg-text-muted shadow-sm ring-1 ring-cg-border hover:text-cg-text"
-              >
-                <PencilIcon />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="left">Style controls</TooltipContent>
-          </Tooltip>
+          <Popover open={visualPanelOpen} onOpenChange={setVisualPanelOpen}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Text block style"
+                    className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-cg-surface/90 text-cg-text-muted shadow-sm ring-1 ring-cg-border hover:text-cg-text"
+                  >
+                    <PencilIcon />
+                  </button>
+                </PopoverTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="left">Style controls</TooltipContent>
+            </Tooltip>
+            <PopoverContent
+              side="right"
+              align="start"
+              sideOffset={8}
+              className="w-[320px] border-cg-border bg-cg-surface p-3"
+            >
+              <TextBlockVisualPanel
+                textBlock={textBlock}
+                theme={theme}
+                onPatch={(patchBody) => patchTextBlock(textBlock.id, patchBody)}
+              />
+            </PopoverContent>
+          </Popover>
           <Tooltip>
             <TooltipTrigger asChild>
               <button
@@ -235,13 +250,6 @@ function TextBlockEditAffordance({
         </div>
       )}
 
-      {visualPanelOpen ? (
-        <TextBlockVisualPanel
-          textBlock={textBlock}
-          theme={theme}
-          onPatch={(patchBody) => patchTextBlock(textBlock.id, patchBody)}
-        />
-      ) : null}
     </>
   );
 }

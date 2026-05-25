@@ -39,7 +39,6 @@ describe('terminal theme tokens', () => {
       cols3: '1fr 1fr 1.5fr',
       headerH: 60,
       cardTints: null,
-      layoutPatterns: terminal.layoutPatterns,
       chartPalette: terminal.chartPalette,
     });
   });

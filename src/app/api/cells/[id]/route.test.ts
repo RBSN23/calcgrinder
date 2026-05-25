@@ -122,24 +122,7 @@ describe('PATCH /api/cells/:id', () => {
     expect(res.status).toBe(409);
   });
 
-  it('returns 422 for cross-section moves', async () => {
-    installSupabaseMock(
-      mockCreateClient,
-      makeSupabaseMock({
-        user: USER_FIXTURE,
-        fromResults: [],
-      }),
-    );
-    const res = await PATCH(
-      patchRequest({
-        updated_at: STALE_AT,
-        section_id: '11111111-1111-4111-8111-111111111111',
-      }),
-      ctx(),
-    );
-    expect(res.status).toBe(422);
-    expect((await res.json()).error).toBe('cross_section_move_unsupported');
-  });
+  // Cross-section moves are now supported (PROJ-24 Item 9).
 
   it('updates a label and returns the refreshed cell + bumped calculator_updated_at', async () => {
     installSupabaseMock(

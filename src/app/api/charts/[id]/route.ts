@@ -116,14 +116,6 @@ export async function PATCH(req: Request, { params }: Ctx): Promise<Response> {
   }
   const { updated_at: staleUpdatedAt, ...patch } = parsed.data;
 
-  // Reject cross-section moves (v1).
-  if (patch.section_id !== undefined) {
-    return NextResponse.json(
-      { error: 'cross_section_move_unsupported' },
-      { status: 422 },
-    );
-  }
-
   // Load the chart (RLS-bound).
   const { data: currentRaw } = await supabase
     .from('charts')
@@ -235,61 +227,46 @@ export async function PATCH(req: Request, { params }: Ctx): Promise<Response> {
   if (patch.card_size_hint !== undefined)
     updates.card_size_hint = patch.card_size_hint;
 
+  const crossSectionMove =
+    patch.section_id !== undefined && patch.section_id !== current.section_id;
+  if (crossSectionMove) updates.section_id = patch.section_id;
+
   // Reorder: walk siblings within the same section.
   const reorderRequested =
     patch.display_order !== undefined &&
-    patch.display_order !== current.display_order;
+    (patch.display_order !== current.display_order || crossSectionMove);
   if (reorderRequested) {
+    if (crossSectionMove) {
+      const { data: sourceSiblings } = await supabase
+        .from('charts')
+        .select('id, display_order')
+        .eq('section_id', current.section_id)
+        .gt('display_order', current.display_order)
+        .order('display_order', { ascending: true });
+      for (const row of (sourceSiblings ?? []) as Array<{ id: string; display_order: number }>) {
+        await supabase
+          .from('charts')
+          .update({ display_order: row.display_order - 1 } as never)
+          .eq('id', row.id);
+      }
+    }
+
+    const targetSectionId = crossSectionMove ? patch.section_id! : current.section_id;
     const { data: siblings, error: sibErr } = await supabase
       .from('charts')
       .select('id, display_order')
-      .eq('section_id', current.section_id)
+      .eq('section_id', targetSectionId)
       .order('display_order', { ascending: true });
     if (sibErr) {
       console.error('PATCH chart: sibling read failed', sibErr);
       return NextResponse.json({ error: 'update_failed' }, { status: 500 });
     }
     const all = (siblings ?? []) as Array<{ id: string; display_order: number }>;
-    const target = Math.max(0, Math.min(all.length - 1, patch.display_order!));
 
-    // Park current chart at a temporary slot.
-    const temp = all.length + 1;
-    const { error: parkErr } = await supabase
-      .from('charts')
-      .update({ display_order: temp } as never)
-      .eq('id', chartId);
-    if (parkErr) {
-      console.error('PATCH chart: park failed', parkErr);
-      return NextResponse.json({ error: 'update_failed' }, { status: 500 });
-    }
-
-    if (target > current.display_order) {
+    if (crossSectionMove) {
+      const target = Math.max(0, Math.min(all.length, patch.display_order!));
       const shifting = all
-        .filter(
-          (s) =>
-            s.id !== chartId &&
-            s.display_order > current.display_order &&
-            s.display_order <= target,
-        )
-        .sort((a, b) => a.display_order - b.display_order);
-      for (const row of shifting) {
-        const { error } = await supabase
-          .from('charts')
-          .update({ display_order: row.display_order - 1 } as never)
-          .eq('id', row.id);
-        if (error) {
-          console.error('PATCH chart: shift down failed', error);
-          return NextResponse.json({ error: 'update_failed' }, { status: 500 });
-        }
-      }
-    } else {
-      const shifting = all
-        .filter(
-          (s) =>
-            s.id !== chartId &&
-            s.display_order >= target &&
-            s.display_order < current.display_order,
-        )
+        .filter((s) => s.display_order >= target)
         .sort((a, b) => b.display_order - a.display_order);
       for (const row of shifting) {
         const { error } = await supabase
@@ -297,12 +274,65 @@ export async function PATCH(req: Request, { params }: Ctx): Promise<Response> {
           .update({ display_order: row.display_order + 1 } as never)
           .eq('id', row.id);
         if (error) {
-          console.error('PATCH chart: shift up failed', error);
+          console.error('PATCH chart: cross-section shift failed', error);
           return NextResponse.json({ error: 'update_failed' }, { status: 500 });
         }
       }
+      updates.display_order = target;
+    } else {
+      const target = Math.max(0, Math.min(all.length - 1, patch.display_order!));
+
+      const temp = all.length + 1;
+      const { error: parkErr } = await supabase
+        .from('charts')
+        .update({ display_order: temp } as never)
+        .eq('id', chartId);
+      if (parkErr) {
+        console.error('PATCH chart: park failed', parkErr);
+        return NextResponse.json({ error: 'update_failed' }, { status: 500 });
+      }
+
+      if (target > current.display_order) {
+        const shifting = all
+          .filter(
+            (s) =>
+              s.id !== chartId &&
+              s.display_order > current.display_order &&
+              s.display_order <= target,
+          )
+          .sort((a, b) => a.display_order - b.display_order);
+        for (const row of shifting) {
+          const { error } = await supabase
+            .from('charts')
+            .update({ display_order: row.display_order - 1 } as never)
+            .eq('id', row.id);
+          if (error) {
+            console.error('PATCH chart: shift down failed', error);
+            return NextResponse.json({ error: 'update_failed' }, { status: 500 });
+          }
+        }
+      } else {
+        const shifting = all
+          .filter(
+            (s) =>
+              s.id !== chartId &&
+              s.display_order >= target &&
+              s.display_order < current.display_order,
+          )
+          .sort((a, b) => b.display_order - a.display_order);
+        for (const row of shifting) {
+          const { error } = await supabase
+            .from('charts')
+            .update({ display_order: row.display_order + 1 } as never)
+            .eq('id', row.id);
+          if (error) {
+            console.error('PATCH chart: shift up failed', error);
+            return NextResponse.json({ error: 'update_failed' }, { status: 500 });
+          }
+        }
+      }
+      updates.display_order = target;
     }
-    updates.display_order = target;
   }
 
   // The chart-table BEFORE-UPDATE trigger sets NEW.updated_at = NOW() and

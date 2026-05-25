@@ -129,21 +129,7 @@ describe('PATCH /api/charts/:id', () => {
     expect(body.server_updated_at).toBe(BUMPED_UPDATED_AT);
   });
 
-  it('rejects cross-section moves with 422', async () => {
-    installSupabaseMock(
-      mockCreateClient,
-      makeSupabaseMock({ user: USER_FIXTURE, fromResults: [] }),
-    );
-    const res = await PATCH(
-      patchRequest({
-        updated_at: SERVER_UPDATED_AT,
-        section_id: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',
-      }),
-      ctx(),
-    );
-    expect(res.status).toBe(422);
-    expect((await res.json()).error).toBe('cross_section_move_unsupported');
-  });
+  // Cross-section moves are now supported (PROJ-24 Item 9).
 
   it('returns 409 with conflicting_chart_id when renaming to an existing chart name', async () => {
     installSupabaseMock(

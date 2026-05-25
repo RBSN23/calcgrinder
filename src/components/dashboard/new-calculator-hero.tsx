@@ -51,8 +51,24 @@ export function NewCalculatorHero() {
         disabled={creating}
         className="h-10 gap-1.5 bg-cg-accent px-4 text-[13px] font-semibold text-cg-accent-fg hover:bg-cg-accent-hov"
       >
-        <Icons.Plus size={16} />
-        <span>Build a new calculator</span>
+        {creating ? (
+          <svg
+            width={16}
+            height={16}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            className="animate-spin"
+            aria-hidden="true"
+          >
+            <path d="M21 12a9 9 0 11-6.219-8.56" />
+          </svg>
+        ) : (
+          <Icons.Plus size={16} />
+        )}
+        <span>{creating ? 'Creating…' : 'Build a new calculator'}</span>
       </Button>
     </section>
   );

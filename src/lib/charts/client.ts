@@ -100,7 +100,7 @@ export interface DeleteChartResult {
 
 export interface PatchChartBody extends Omit<CreateChartBody, 'id' | 'insert_after_element_id'> {
   updated_at: string;
-  section_id?: string; // server rejects this with 422 (cross-section move unsupported)
+  section_id?: string;
 }
 
 export interface PatchChartResponse {

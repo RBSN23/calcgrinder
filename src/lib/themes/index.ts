@@ -72,11 +72,15 @@ export function getTheme(id: string | null | undefined): Theme {
 
 export type { CardStyle, CardTintKind, CardTints, Theme, ThemeId } from './types';
 export {
+  FOUR_COLUMN_PATTERN,
   ONE_THIRD_TWO_THIRDS_PATTERN,
+  QUARTER_QUARTER_HALF_PATTERN,
   SINGLE_COLUMN_PATTERN,
   THREE_COLUMN_PATTERN,
+  THREE_QUARTERS_ONE_QUARTER_PATTERN,
   TWO_COLUMN_PATTERN,
   TWO_THIRDS_ONE_THIRD_PATTERN,
+  UNIVERSAL_LAYOUT_CATALOG,
   resolveLayoutPattern,
 } from './layout-patterns';
 export type { LayoutPattern } from './layout-patterns';

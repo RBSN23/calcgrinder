@@ -136,6 +136,8 @@ export default async function PublicCalculatorRoute({
           token={token}
           approvedUser={approvedUser}
           isAdmin={isAdmin}
+          isOwner={!!current && current.user.id === calculatorForRender.owner_id}
+          calculatorId={calculatorForRender.id}
         >
           <ScenarioMigrationMount approved={approvedUser !== null} />
           <PublicCalculatorPage

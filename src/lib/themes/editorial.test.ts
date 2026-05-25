@@ -36,7 +36,6 @@ describe('editorial theme tokens', () => {
       cols3: '1fr 1fr 1.55fr',
       headerH: 68,
       cardTints: null,
-      layoutPatterns: editorial.layoutPatterns,
       chartPalette: editorial.chartPalette,
     });
   });

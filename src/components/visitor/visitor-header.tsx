@@ -18,6 +18,7 @@ import * as React from 'react';
 import {
   AvatarPopover,
   Avatar,
+  Icons,
   Wordmark,
   deriveInitials,
   type AvatarPopoverUser,
@@ -28,21 +29,14 @@ import { CloneHeaderButton } from './clone-header-button';
 import { SaveScenarioHeaderButton } from './save-scenario-header-button';
 
 interface VisitorHeaderProps {
-  /** Token for the calculator being viewed; threaded into the Log in
-   * deep-link (`?next=/c/<token>`). Pass null/empty (e.g. 404 page)
-   * to drop the `?next=` param. Sign up has no `?next=` (PROJ-3
-   * deep-link chain is broken — documented in Out of Scope). */
   token: string | null;
-  /** Approved, registered user that should see the avatar popover.
-   * Null for anonymous visitors and for users whose status is
-   * pending/declined/expired (they fall back to the anonymous CTAs). */
   approvedUser: AvatarPopoverUser | null;
-  /** True if the approved user is a sysadmin (shows the Admin row in
-   * the popover when PROJ-19 lights it up). */
   isAdmin?: boolean;
+  isOwner?: boolean;
+  calculatorId?: string;
 }
 
-export function VisitorHeader({ token, approvedUser, isAdmin }: VisitorHeaderProps) {
+export function VisitorHeader({ token, approvedUser, isAdmin, isOwner, calculatorId }: VisitorHeaderProps) {
   const loginHref = token
     ? `/auth/login?next=${encodeURIComponent(`/c/${token}`)}`
     : '/auth/login';
@@ -55,6 +49,15 @@ export function VisitorHeader({ token, approvedUser, isAdmin }: VisitorHeaderPro
         <div className="flex items-center gap-1.5 md:gap-2">
           <SaveScenarioHeaderButton />
           <CloneHeaderButton />
+          {isOwner && calculatorId ? (
+            <Link
+              href={`/editor/${calculatorId}`}
+              aria-label="Edit this calculator"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-cg-text-muted hover:bg-cg-surface-2"
+            >
+              <Icons.Pencil size={14} />
+            </Link>
+          ) : null}
           {approvedUser ? (
             <AvatarPopover user={approvedUser} isAdmin={isAdmin}>
               <button

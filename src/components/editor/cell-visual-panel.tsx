@@ -1,15 +1,20 @@
 'use client';
 
-// PROJ-9 — Cell visual-presentation panel.
+// PROJ-9 / PROJ-24 — Cell visual-presentation panel.
 //
-// Opens from the hover edit-icon on a cell card. Contains card-level
-// and cell-specific visual settings. Output cells get the
-// display_emphasis picker (Plain / KPI — Tabular is hidden in P0).
-// PATCH fires immediately on every change (incremental save).
+// Contains card-level and cell-specific visual settings with compact
+// icon-based toggles. Used inside the cell settings flyout (PROJ-24
+// Item 8) and shared between cell, chart, and text-block cards.
 
 import * as React from 'react';
 
 import { Input } from '@/components/ui/input';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import type {
   CellCardBackgroundTint,
   CellCardBorder,
@@ -44,106 +49,223 @@ export function CellVisualPanel({ cell, theme, onClose, onPatch, onRemove }: Cel
   React.useEffect(() => setLabel(cell.label), [cell.label]);
 
   return (
-    <div className="mt-2 rounded-md border border-cg-border bg-cg-surface p-3 text-cg-text">
-      <header className="mb-2 flex items-center justify-between">
-        <h3 className="text-[12px] font-semibold uppercase tracking-wide text-cg-text-muted">
-          Appearance
-        </h3>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={onRemove}
-            className="rounded px-2 py-1 text-[11.5px] font-medium text-red-600 hover:bg-red-50"
-          >
-            Delete cell
-          </button>
-          <button
-            type="button"
-            aria-label="Close appearance panel"
-            onClick={onClose}
-            className="inline-flex h-6 w-6 items-center justify-center rounded-md text-cg-text-muted hover:bg-cg-surface-2"
-          >
-            ✕
-          </button>
-        </div>
-      </header>
+    <TooltipProvider delayDuration={300}>
+      <div className="flex flex-col gap-3 text-cg-text">
+        <header className="flex items-center justify-between">
+          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-cg-text-muted">
+            Appearance
+          </h3>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={onRemove}
+              className="rounded px-2 py-1 text-[11.5px] font-medium text-red-600 hover:bg-red-50"
+            >
+              Delete cell
+            </button>
+            <button
+              type="button"
+              aria-label="Close appearance panel"
+              onClick={onClose}
+              className="inline-flex h-6 w-6 items-center justify-center rounded-md text-cg-text-muted hover:bg-cg-surface-2"
+            >
+              ✕
+            </button>
+          </div>
+        </header>
 
-      {/* PROJ-23 Issue 3 — Label field at top of Visual Panel */}
-      <div className="mb-3 flex flex-col gap-1">
-        <label className="text-[10.5px] font-semibold uppercase tracking-wide text-cg-text-muted">
-          Label
-        </label>
         <Input
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           onBlur={() => {
             if (label !== cell.label) onPatch({ label });
           }}
-          placeholder={cell.name}
+          placeholder="Label (optional)"
           className="h-8 text-[12px]"
         />
-      </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <SegmentedField
-          label="Background tint"
-          value={cell.card_background_tint}
-          options={TINT_OPTIONS}
-          onChange={(v) => onPatch({ card_background_tint: v as CellCardBackgroundTint })}
-        />
-        <SegmentedField
-          label="Border"
-          value={cell.card_border}
-          options={BORDER_OPTIONS}
-          onChange={(v) => onPatch({ card_border: v as CellCardBorder })}
-        />
-        <SegmentedField
-          label="Size"
-          value={cell.card_size_hint}
-          options={SIZE_OPTIONS}
-          onChange={(v) => onPatch({ card_size_hint: v as CellCardSizeHint })}
-        />
-        <SegmentedField
-          label="Text size"
-          value={cell.text_size}
-          options={TEXT_SIZE_OPTIONS}
-          onChange={(v) => onPatch({ text_size: v })}
-        />
-        <SegmentedField
-          label="Text colour"
-          value={cell.text_colour}
-          options={TEXT_COLOUR_OPTIONS}
-          onChange={(v) => onPatch({ text_colour: v })}
-        />
-        <WidgetPicker
-          cell={cell}
-          onChange={(w) => onPatch({ display_widget: w })}
-        />
-      </div>
-
-      {cell.kind === 'output' ? (
-        <div className="mt-3">
-          <SegmentedField
-            label="Emphasis"
-            value={cell.display_emphasis}
-            options={['plain', 'kpi', 'tabular'] as CellDisplayEmphasis[]}
-            onChange={(v) => onPatch({ display_emphasis: v as CellDisplayEmphasis })}
+        <div className="grid grid-cols-2 gap-3">
+          <IconSegmentedField
+            label="Text size"
+            value={cell.text_size}
+            options={TEXT_SIZE_OPTIONS}
+            onChange={(v) => onPatch({ text_size: v })}
+            renderOption={(opt) => (
+              <span style={{ fontSize: textSizeGlyphPx(opt), fontWeight: 600, lineHeight: 1 }}>T</span>
+            )}
+            tooltips={['Small', 'Medium', 'Large', 'Extra large']}
           />
-          {cell.display_emphasis === 'tabular' ? (
-            <TabularColumnConfig
-              columns={cell.tabular_columns ?? []}
-              fallbackCurrencyCode={cell.currency_code || 'USD'}
-              hasShapeMatch={(cell.tabular_columns ?? []).length > 0}
-              onChange={(next: TabularColumn[]) =>
-                onPatch({ tabular_columns: next })
-              }
-            />
-          ) : null}
+          <IconSegmentedField
+            label="Border"
+            value={cell.card_border}
+            options={BORDER_OPTIONS}
+            onChange={(v) => onPatch({ card_border: v as CellCardBorder })}
+            renderOption={(opt) => <BorderIcon kind={opt as CellCardBorder} />}
+            tooltips={['None', 'Hairline', 'Strong']}
+          />
+          <IconSegmentedField
+            label="Text colour"
+            value={cell.text_colour}
+            options={TEXT_COLOUR_OPTIONS}
+            onChange={(v) => onPatch({ text_colour: v })}
+            renderOption={(opt) => (
+              <span
+                className="inline-block h-3.5 w-3.5 rounded-full border border-cg-border"
+                style={{ backgroundColor: textColourSwatch(opt, theme) }}
+              />
+            )}
+            tooltips={['Default', 'Accent 1', 'Accent 2']}
+          />
+          <IconSegmentedField
+            label="Background tint"
+            value={cell.card_background_tint}
+            options={TINT_OPTIONS}
+            onChange={(v) => onPatch({ card_background_tint: v as CellCardBackgroundTint })}
+            renderOption={(opt) => <TintIcon kind={opt as CellCardBackgroundTint} theme={theme} />}
+            tooltips={['None', 'Soft', 'Strong']}
+          />
+          <IconSegmentedField
+            label="Size"
+            value={cell.card_size_hint}
+            options={SIZE_OPTIONS}
+            onChange={(v) => onPatch({ card_size_hint: v as CellCardSizeHint })}
+            renderOption={(opt) => <SizeIcon kind={opt as CellCardSizeHint} />}
+            tooltips={['Narrow', 'Wide', 'Full']}
+          />
+          <WidgetPicker
+            cell={cell}
+            onChange={(w) => onPatch({ display_widget: w })}
+          />
         </div>
-      ) : null}
 
-      <div className="mt-3 flex items-center justify-between">
-        <span className="text-[11.5px] text-cg-text-muted">Active theme: {theme.displayName}</span>
+        {cell.kind === 'output' ? (
+          <div>
+            <SegmentedField
+              label="Emphasis"
+              value={cell.display_emphasis}
+              options={['plain', 'kpi', 'tabular'] as CellDisplayEmphasis[]}
+              onChange={(v) => onPatch({ display_emphasis: v as CellDisplayEmphasis })}
+            />
+            {cell.display_emphasis === 'tabular' ? (
+              <TabularColumnConfig
+                columns={cell.tabular_columns ?? []}
+                fallbackCurrencyCode={cell.currency_code || 'USD'}
+                hasShapeMatch={(cell.tabular_columns ?? []).length > 0}
+                onChange={(next: TabularColumn[]) =>
+                  onPatch({ tabular_columns: next })
+                }
+              />
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className="flex items-center justify-between">
+          <span className="text-[11.5px] text-cg-text-muted">Active theme: {theme.displayName}</span>
+        </div>
+      </div>
+    </TooltipProvider>
+  );
+}
+
+function textSizeGlyphPx(opt: string): number {
+  switch (opt) {
+    case 's': return 10;
+    case 'm': return 13;
+    case 'l': return 16;
+    case 'xl': return 20;
+    default: return 13;
+  }
+}
+
+function textColourSwatch(opt: string, theme: Theme): string {
+  switch (opt) {
+    case 'accent_1': return theme.accent;
+    case 'accent_2': return theme.accentSoft;
+    default: return theme.text;
+  }
+}
+
+function BorderIcon({ kind }: { kind: CellCardBorder }) {
+  const border =
+    kind === 'none' ? 'none' : kind === 'hairline' ? '1px solid currentColor' : '2px solid currentColor';
+  return (
+    <span
+      className="inline-block h-3.5 w-3.5 rounded-[2px] bg-cg-surface-2"
+      style={{ border }}
+    />
+  );
+}
+
+function TintIcon({ kind, theme }: { kind: CellCardBackgroundTint; theme: Theme }) {
+  if (kind === 'none') {
+    return (
+      <span className="inline-block h-3.5 w-3.5 rounded-[2px] border border-cg-border bg-transparent" />
+    );
+  }
+  const opacity = kind === 'soft' ? 0.15 : 0.4;
+  return (
+    <span
+      className="inline-block h-3.5 w-3.5 rounded-[2px] border border-cg-border"
+      style={{ backgroundColor: theme.accent, opacity }}
+    />
+  );
+}
+
+function SizeIcon({ kind }: { kind: CellCardSizeHint }) {
+  const w = kind === 'narrow' ? '33%' : kind === 'wide' ? '66%' : '100%';
+  return (
+    <span className="inline-flex h-3.5 w-full items-center">
+      <span
+        className="block h-2 rounded-[1px] bg-cg-text-muted/60"
+        style={{ width: w }}
+      />
+    </span>
+  );
+}
+
+interface IconSegmentedFieldProps {
+  label: string;
+  value: string;
+  options: readonly string[];
+  onChange: (v: string) => void;
+  renderOption: (opt: string) => React.ReactNode;
+  tooltips: string[];
+}
+
+function IconSegmentedField({ label, value, options, onChange, renderOption, tooltips }: IconSegmentedFieldProps) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-[10.5px] font-semibold uppercase tracking-wide text-cg-text-muted">
+        {label}
+      </label>
+      <div role="radiogroup" aria-label={label} className="inline-flex rounded-md border border-cg-border bg-cg-surface-2 p-0.5">
+        {options.map((opt, i) => {
+          const selected = opt === value;
+          return (
+            <Tooltip key={opt}>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  aria-label={tooltips[i] ?? opt}
+                  onClick={() => onChange(opt)}
+                  className={cn(
+                    'flex flex-1 items-center justify-center rounded px-1.5 py-1 transition-colors',
+                    selected
+                      ? 'bg-cg-accent text-cg-accent-fg shadow-sm'
+                      : 'text-cg-text-muted hover:text-cg-text',
+                  )}
+                >
+                  {renderOption(opt)}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                {tooltips[i] ?? opt}
+              </TooltipContent>
+            </Tooltip>
+          );
+        })}
       </div>
     </div>
   );
@@ -156,7 +278,7 @@ interface SegmentedFieldProps<T extends string> {
   onChange: (v: T) => void;
 }
 
-function SegmentedField<T extends string>({ label, value, options, onChange }: SegmentedFieldProps<T>) {
+export function SegmentedField<T extends string>({ label, value, options, onChange }: SegmentedFieldProps<T>) {
   return (
     <div className="flex flex-col gap-1">
       <label className="text-[10.5px] font-semibold uppercase tracking-wide text-cg-text-muted">
@@ -175,7 +297,7 @@ function SegmentedField<T extends string>({ label, value, options, onChange }: S
               className={cn(
                 'flex-1 rounded px-2 py-1 text-[11.5px] capitalize transition-colors',
                 selected
-                  ? 'bg-cg-surface text-cg-text shadow-sm'
+                  ? 'bg-cg-accent text-cg-accent-fg shadow-sm'
                   : 'text-cg-text-muted hover:text-cg-text',
               )}
             >

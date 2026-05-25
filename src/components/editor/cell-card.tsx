@@ -35,6 +35,7 @@ import { cn } from '@/lib/utils';
 import type { CellResult } from '@/lib/formula';
 
 import { CellInputWidget } from './cell-input-widget';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CellVisualPanel } from './cell-visual-panel';
 import { DragHandle } from './dnd-helpers';
 import { TabularRenderer } from './tabular-renderer';
@@ -203,30 +204,36 @@ function CellEditAffordance({ cell, theme }: CellEditAffordanceProps) {
     [cell, getResult, patchCell],
   );
   return (
-    <>
-      <div className="pointer-events-none absolute right-2 top-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
-        <button
-          type="button"
-          aria-label="Edit cell appearance"
-          onClick={() => setPanelOpen((v) => !v)}
-          className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-cg-surface/90 text-cg-text-muted shadow-sm ring-1 ring-cg-border hover:text-cg-text"
+    <div className="pointer-events-none absolute right-2 top-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+      <Popover open={panelOpen} onOpenChange={setPanelOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            aria-label="Edit cell appearance"
+            className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-cg-surface/90 text-cg-text-muted shadow-sm ring-1 ring-cg-border hover:text-cg-text"
+          >
+            <PencilIcon />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          side="right"
+          align="start"
+          sideOffset={8}
+          className="w-[320px] border-cg-border bg-cg-surface p-3"
         >
-          <PencilIcon />
-        </button>
-      </div>
-      {panelOpen ? (
-        <CellVisualPanel
-          cell={cell}
-          theme={theme}
-          onClose={() => setPanelOpen(false)}
-          onPatch={handlePatch}
-          onRemove={() => {
-            setPanelOpen(false);
-            void removeCell(cell.id);
-          }}
-        />
-      ) : null}
-    </>
+          <CellVisualPanel
+            cell={cell}
+            theme={theme}
+            onClose={() => setPanelOpen(false)}
+            onPatch={handlePatch}
+            onRemove={() => {
+              setPanelOpen(false);
+              void removeCell(cell.id);
+            }}
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
   );
 }
 

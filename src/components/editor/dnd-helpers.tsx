@@ -55,15 +55,11 @@ interface SortableItemProps {
   }) => React.ReactNode;
   /** Optional className applied to the outermost element. */
   className?: string;
+  /** Section-level sortable data (for cross-section DnD). */
+  data?: Record<string, unknown>;
 }
 
-/**
- * Headless sortable item. The caller renders whatever element it
- * wants, attaches `setNodeRef` to its outer node, and spreads
- * `dragHandleProps` onto the dedicated drag handle. The lift state
- * (`isDragging`) lets the caller dim or shadow the dragged card.
- */
-export function SortableItem({ id, children }: SortableItemProps) {
+export function SortableItem({ id, children, data }: SortableItemProps) {
   const {
     setNodeRef,
     transform,
@@ -71,7 +67,7 @@ export function SortableItem({ id, children }: SortableItemProps) {
     isDragging,
     attributes,
     listeners,
-  } = useSortable({ id });
+  } = useSortable({ id, data });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),

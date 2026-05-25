@@ -57,11 +57,46 @@ export const THREE_COLUMN_PATTERN: LayoutPattern = {
   columnSpans: [1, 1, 1],
 };
 
+export const FOUR_COLUMN_PATTERN: LayoutPattern = {
+  id: 'four_column',
+  displayName: 'Four columns',
+  description: 'Four equal-width columns.',
+  columns: 4,
+  columnSpans: [1, 1, 1, 1],
+};
+
+export const THREE_QUARTERS_ONE_QUARTER_PATTERN: LayoutPattern = {
+  id: 'three_quarters_one_quarter',
+  displayName: 'Three-quarters + one-quarter',
+  description: 'A wide main area with a narrow sidebar.',
+  columns: 2,
+  columnSpans: [3, 1],
+};
+
+export const QUARTER_QUARTER_HALF_PATTERN: LayoutPattern = {
+  id: 'quarter_quarter_half',
+  displayName: '¼ + ¼ + ½',
+  description: 'Two narrow columns and one wide column.',
+  columns: 3,
+  columnSpans: [1, 1, 2],
+};
+
+export const UNIVERSAL_LAYOUT_CATALOG: readonly LayoutPattern[] = [
+  SINGLE_COLUMN_PATTERN,
+  TWO_COLUMN_PATTERN,
+  TWO_THIRDS_ONE_THIRD_PATTERN,
+  ONE_THIRD_TWO_THIRDS_PATTERN,
+  THREE_COLUMN_PATTERN,
+  FOUR_COLUMN_PATTERN,
+  THREE_QUARTERS_ONE_QUARTER_PATTERN,
+  QUARTER_QUARTER_HALF_PATTERN,
+];
+
 /**
- * Resolves a stored layout_pattern_id against a theme's published
- * catalogue, returning the matching pattern or the single_column
- * fallback when the id is missing. The caller decides whether to
- * surface the fallback banner (Builder does; visitor view does not).
+ * Resolves a stored layout_pattern_id against a catalogue,
+ * returning the matching pattern or the single_column fallback
+ * when the id is missing. The caller decides whether to surface
+ * the fallback banner (Builder does; visitor view does not).
  */
 export function resolveLayoutPattern(
   patterns: readonly LayoutPattern[],

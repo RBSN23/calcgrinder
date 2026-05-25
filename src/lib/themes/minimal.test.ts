@@ -36,7 +36,6 @@ describe('minimal theme tokens', () => {
       cols3: '1fr 1.05fr 1.6fr',
       headerH: 56,
       cardTints: null,
-      layoutPatterns: minimal.layoutPatterns,
       chartPalette: minimal.chartPalette,
     });
   });

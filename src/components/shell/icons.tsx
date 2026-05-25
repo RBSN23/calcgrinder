@@ -163,6 +163,20 @@ export const Icons = {
   Bookmark: makeIcon(
     <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />,
   ),
+  // PROJ-24 — Tablet silhouette (portrait rectangle, rounded corners).
+  Tablet: makeIcon(
+    <>
+      <rect x="5" y="2" width="14" height="20" rx="2" />
+      <path d="M12 18h.01" />
+    </>,
+  ),
+  // PROJ-24 — Smartphone silhouette (narrow portrait, notch line).
+  Smartphone: makeIcon(
+    <>
+      <rect x="6" y="2" width="12" height="20" rx="2" />
+      <path d="M10 18h4" />
+    </>,
+  ),
   // PROJ-13 — Counter-clockwise rotate — Restore from Trash kebab.
   RotateCcw: makeIcon(
     <>

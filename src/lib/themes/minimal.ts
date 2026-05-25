@@ -1,10 +1,5 @@
 import { deriveChartPalette } from './derive-chart-palette';
-import {
-  SINGLE_COLUMN_PATTERN,
-  THREE_COLUMN_PATTERN,
-  TWO_COLUMN_PATTERN,
-  TWO_THIRDS_ONE_THIRD_PATTERN,
-} from './layout-patterns';
+
 import type { Theme } from './types';
 
 export const minimal: Theme = {
@@ -49,10 +44,4 @@ export const minimal: Theme = {
   cols3: '1fr 1.05fr 1.6fr',
   headerH: 56,
   cardTints: null,
-  layoutPatterns: [
-    SINGLE_COLUMN_PATTERN,
-    TWO_COLUMN_PATTERN,
-    THREE_COLUMN_PATTERN,
-    TWO_THIRDS_ONE_THIRD_PATTERN,
-  ],
 };

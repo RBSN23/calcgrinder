@@ -71,6 +71,7 @@ export function CalcCard({
   const [renameValue, setRenameValue] = React.useState(calculator.title);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
+  const [navigating, startNavigation] = React.useTransition();
   const inputRef = React.useRef<HTMLInputElement | null>(null);
 
   // Refresh state from prop whenever the server-fetched calculator changes
@@ -433,12 +434,12 @@ export function CalcCard({
                   aria-label="Edit calculator"
                   onClick={(e) => {
                     stop(e);
-                    router.push(editorHref);
+                    startNavigation(() => { router.push(editorHref); });
                   }}
                   onMouseDown={stop}
                   className="inline-flex h-7 w-7 items-center justify-center rounded-md text-cg-text-muted hover:bg-cg-surface-2"
                 >
-                  <Icons.Pencil size={14} />
+                  {navigating ? <CardSpinner /> : <Icons.Pencil size={14} />}
                 </button>
                 <button
                   type="button"
@@ -455,7 +456,7 @@ export function CalcCard({
                 <button
                   type="button"
                   aria-label="Duplicate calculator"
-                  disabled={busy}
+                  disabled={busy || navigating}
                   onClick={(e) => {
                     stop(e);
                     void handleDuplicate(true);

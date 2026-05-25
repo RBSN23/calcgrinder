@@ -832,9 +832,6 @@ class EditorStore {
           if (e.code === 'readonly_input_requires_value') {
             return `Readonly inputs must have a default value.`;
           }
-          if (e.code === 'cross_section_move_unsupported') {
-            return `Cross-section moves aren't supported yet.`;
-          }
           if (e.code === 'formula_too_long_after_rewrite') {
             return `Rename would exceed the formula length limit.`;
           }
@@ -981,6 +978,7 @@ class EditorStore {
           card_background_tint: previous.card_background_tint,
           card_border: previous.card_border,
           card_size_hint: previous.card_size_hint,
+          section_id: previous.section_id,
           display_order: previous.display_order,
           updated_at: next?.updated_at ?? previous.updated_at,
         });
@@ -995,8 +993,6 @@ class EditorStore {
             return `"${e.reservedWord ?? body.name ?? ''}" is reserved — pick a different name.`;
           if (e.code === 'name_invalid')
             return 'Names must start with a letter and contain only lowercase letters, digits, and underscores.';
-          if (e.code === 'cross_section_move_unsupported')
-            return `Cross-section moves aren't supported yet.`;
           if (e.code === 'color_token_invalid')
             return 'Pick a colour from the theme palette.';
         }
@@ -1118,6 +1114,7 @@ class EditorStore {
           card_size_hint: previous.card_size_hint,
           text_size: previous.text_size,
           text_colour: previous.text_colour,
+          section_id: previous.section_id,
           display_order: previous.display_order,
           updated_at: next?.updated_at ?? previous.updated_at,
         });
@@ -1128,9 +1125,6 @@ class EditorStore {
         if (e instanceof TextBlockApiError) {
           if (e.code === 'body_too_large') {
             return 'Text too long — keep your block under ~50 KB.';
-          }
-          if (e.code === 'cross_section_move_unsupported') {
-            return `Cross-section moves aren't supported yet.`;
           }
         }
         return undefined;

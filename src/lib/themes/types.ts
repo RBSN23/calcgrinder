@@ -10,8 +10,6 @@
 import type { CSSProperties } from 'react';
 
 import type { ChartPalette } from './derive-chart-palette';
-import type { LayoutPattern } from './layout-patterns';
-
 export type ThemeId =
   | 'calcgrinder'
   | 'vessel'
@@ -92,11 +90,6 @@ interface ThemeBase {
   uppercase?: boolean;
   monoEverything?: boolean;
 
-  // PROJ-9 — Layout-pattern catalogue. Every theme MUST publish at least
-  // 'single_column'; richer themes add multi-column patterns. The Builder
-  // reads this when rendering a section; an unknown stored id falls back
-  // to single_column with an inline banner.
-  layoutPatterns: readonly LayoutPattern[];
 }
 
 // `tinted` / `glass` MUST carry cardTints. Everything else MAY set

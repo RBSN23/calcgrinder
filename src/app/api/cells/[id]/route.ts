@@ -113,14 +113,6 @@ export async function PATCH(req: Request, { params }: Ctx): Promise<Response> {
   }
   const { updated_at: staleUpdatedAt, rewrite_dependents, ...patch } = parsed.data;
 
-  // Reject cross-section moves (v1).
-  if (patch.section_id !== undefined) {
-    return NextResponse.json(
-      { error: 'cross_section_move_unsupported' },
-      { status: 422 },
-    );
-  }
-
   // Load current cell + parent calculator (RLS-bound).
   const { data: current } = await supabase
     .from('cells')
@@ -314,61 +306,49 @@ export async function PATCH(req: Request, { params }: Ctx): Promise<Response> {
     updates.tabular_columns = nextTabularColumns;
   }
 
+  const crossSectionMove =
+    patch.section_id !== undefined && patch.section_id !== current.section_id;
+  if (crossSectionMove) updates.section_id = patch.section_id;
+
   // Reorder: walk siblings within the same section.
   const reorderRequested =
     patch.display_order !== undefined &&
-    patch.display_order !== current.display_order;
+    (patch.display_order !== current.display_order || crossSectionMove);
   if (reorderRequested) {
+    // Close the gap in the source section when moving cross-section.
+    if (crossSectionMove) {
+      const { data: sourceSiblings } = await supabase
+        .from('cells')
+        .select('id, display_order')
+        .eq('section_id', current.section_id)
+        .gt('display_order', current.display_order)
+        .order('display_order', { ascending: true });
+      for (const row of sourceSiblings ?? []) {
+        await supabase
+          .from('cells')
+          .update({ display_order: row.display_order - 1 })
+          .eq('id', row.id);
+      }
+    }
+
+    const targetSectionId = crossSectionMove ? patch.section_id! : current.section_id;
     const { data: siblings, error: sibErr } = await supabase
       .from('cells')
       .select('id, display_order')
-      .eq('section_id', current.section_id)
+      .eq('section_id', targetSectionId)
       .order('display_order', { ascending: true });
     if (sibErr) {
       console.error('PATCH cell: sibling read failed', sibErr);
       return NextResponse.json({ error: 'update_failed' }, { status: 500 });
     }
     const all = siblings ?? [];
-    const target = Math.max(0, Math.min(all.length - 1, patch.display_order!));
 
-    // Park current cell at a temporary slot.
-    const temp = all.length + 1;
-    const { error: parkErr } = await supabase
-      .from('cells')
-      .update({ display_order: temp })
-      .eq('id', cellId);
-    if (parkErr) {
-      console.error('PATCH cell: park failed', parkErr);
-      return NextResponse.json({ error: 'update_failed' }, { status: 500 });
-    }
-
-    if (target > current.display_order) {
+    if (crossSectionMove) {
+      // Inserting into target section: clamp to [0, length] and shift
+      // existing elements at or after the target position up by 1.
+      const target = Math.max(0, Math.min(all.length, patch.display_order!));
       const shifting = all
-        .filter(
-          (s) =>
-            s.id !== cellId &&
-            s.display_order > current.display_order &&
-            s.display_order <= target,
-        )
-        .sort((a, b) => a.display_order - b.display_order);
-      for (const row of shifting) {
-        const { error } = await supabase
-          .from('cells')
-          .update({ display_order: row.display_order - 1 })
-          .eq('id', row.id);
-        if (error) {
-          console.error('PATCH cell: shift down failed', error);
-          return NextResponse.json({ error: 'update_failed' }, { status: 500 });
-        }
-      }
-    } else {
-      const shifting = all
-        .filter(
-          (s) =>
-            s.id !== cellId &&
-            s.display_order >= target &&
-            s.display_order < current.display_order,
-        )
+        .filter((s) => s.display_order >= target)
         .sort((a, b) => b.display_order - a.display_order);
       for (const row of shifting) {
         const { error } = await supabase
@@ -376,13 +356,66 @@ export async function PATCH(req: Request, { params }: Ctx): Promise<Response> {
           .update({ display_order: row.display_order + 1 })
           .eq('id', row.id);
         if (error) {
-          console.error('PATCH cell: shift up failed', error);
+          console.error('PATCH cell: cross-section shift failed', error);
           return NextResponse.json({ error: 'update_failed' }, { status: 500 });
         }
       }
-    }
+      updates.display_order = target;
+    } else {
+      const target = Math.max(0, Math.min(all.length - 1, patch.display_order!));
 
-    updates.display_order = target;
+      // Park current cell at a temporary slot.
+      const temp = all.length + 1;
+      const { error: parkErr } = await supabase
+        .from('cells')
+        .update({ display_order: temp })
+        .eq('id', cellId);
+      if (parkErr) {
+        console.error('PATCH cell: park failed', parkErr);
+        return NextResponse.json({ error: 'update_failed' }, { status: 500 });
+      }
+
+      if (target > current.display_order) {
+        const shifting = all
+          .filter(
+            (s) =>
+              s.id !== cellId &&
+              s.display_order > current.display_order &&
+              s.display_order <= target,
+          )
+          .sort((a, b) => a.display_order - b.display_order);
+        for (const row of shifting) {
+          const { error } = await supabase
+            .from('cells')
+            .update({ display_order: row.display_order - 1 })
+            .eq('id', row.id);
+          if (error) {
+            console.error('PATCH cell: shift down failed', error);
+            return NextResponse.json({ error: 'update_failed' }, { status: 500 });
+          }
+        }
+      } else {
+        const shifting = all
+          .filter(
+            (s) =>
+              s.id !== cellId &&
+              s.display_order >= target &&
+              s.display_order < current.display_order,
+          )
+          .sort((a, b) => b.display_order - a.display_order);
+        for (const row of shifting) {
+          const { error } = await supabase
+            .from('cells')
+            .update({ display_order: row.display_order + 1 })
+            .eq('id', row.id);
+          if (error) {
+            console.error('PATCH cell: shift up failed', error);
+            return NextResponse.json({ error: 'update_failed' }, { status: 500 });
+          }
+        }
+      }
+      updates.display_order = target;
+    }
   }
 
   // Track calculator.updated_at via UPDATE...RETURNING instead of a

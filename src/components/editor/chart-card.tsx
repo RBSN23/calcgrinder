@@ -28,6 +28,7 @@ import type { ChartRow, ChartType } from '@/lib/charts/types';
 import { defaultBindings, type ChartBindings } from '@/lib/charts/bindings';
 import { getChartStructuralErrors } from '@/lib/charts/structural-errors';
 import { animateNode, prefersReducedMotion } from '@/lib/charts/animate';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useEditor } from '@/lib/editor/EditorProvider';
 import { cardSurface, type Theme } from '@/lib/themes';
 import { cn } from '@/lib/utils';
@@ -264,41 +265,46 @@ function ChartEditAffordance({ chart, theme }: ChartEditAffordanceProps) {
   }, [chart.id]);
 
   return (
-    <>
-      <div className="pointer-events-none absolute right-2 top-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
-        <TooltipProvider delayDuration={120}>
+    <div className="pointer-events-none absolute right-2 top-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+      <TooltipProvider delayDuration={120}>
+        <Popover open={configOpen} onOpenChange={setConfigOpen}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <button
-                type="button"
-                aria-label={configOpen ? 'Close chart settings' : 'Edit chart'}
-                onClick={() => setConfigOpen((v) => !v)}
-                className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-cg-surface/90 text-cg-text-muted shadow-sm ring-1 ring-cg-border hover:text-cg-text"
-              >
-                <PencilIcon />
-              </button>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={configOpen ? 'Close chart settings' : 'Edit chart'}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-cg-surface/90 text-cg-text-muted shadow-sm ring-1 ring-cg-border hover:text-cg-text"
+                >
+                  <PencilIcon />
+                </button>
+              </PopoverTrigger>
             </TooltipTrigger>
             <TooltipContent side="left">Configure chart</TooltipContent>
           </Tooltip>
-        </TooltipProvider>
-      </div>
-
-      {configOpen ? (
-        <ChartConfigurator
-          chart={chart}
-          cells={cells}
-          evaluation={results}
-          palette={theme.chartPalette}
-          defaultTab={isFresh ? 'type' : 'data'}
-          onPatch={(body) => patchChart(chart.id, body)}
-          onRemove={() => {
-            setConfigOpen(false);
-            void removeChart(chart.id);
-          }}
-          onCollapse={() => setConfigOpen(false)}
-        />
-      ) : null}
-    </>
+          <PopoverContent
+            side="right"
+            align="start"
+            sideOffset={8}
+            className="w-[380px] border-cg-border bg-cg-surface p-0"
+          >
+            <ChartConfigurator
+              chart={chart}
+              cells={cells}
+              evaluation={results}
+              palette={theme.chartPalette}
+              defaultTab={isFresh ? 'type' : 'data'}
+              onPatch={(body) => patchChart(chart.id, body)}
+              onRemove={() => {
+                setConfigOpen(false);
+                void removeChart(chart.id);
+              }}
+              onCollapse={() => setConfigOpen(false)}
+            />
+          </PopoverContent>
+        </Popover>
+      </TooltipProvider>
+    </div>
   );
 }
 

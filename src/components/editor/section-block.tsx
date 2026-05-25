@@ -11,12 +11,6 @@
 
 import * as React from 'react';
 
-import {
-  DndContext,
-  DragOverlay,
-  closestCenter,
-  type DragEndEvent,
-} from '@dnd-kit/core';
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 
 import {
@@ -30,11 +24,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { EmptyOrErrorState } from '@/components/shell';
-import { useEditor, useEditorToast } from '@/lib/editor/EditorProvider';
+import { useEditor } from '@/lib/editor/EditorProvider';
 import type { CellRow } from '@/lib/cells/types';
 import type { SectionRow } from '@/lib/sections/types';
 import { MAX_SECTION_TITLE_LENGTH, validateSectionTitle } from '@/lib/sections/types';
-import { resolveLayoutPattern, type Theme } from '@/lib/themes';
+import { UNIVERSAL_LAYOUT_CATALOG, resolveLayoutPattern, type Theme } from '@/lib/themes';
 import { cn } from '@/lib/utils';
 
 import type { ChartRow } from '@/lib/charts/types';
@@ -44,7 +38,7 @@ import { CellCard } from './cell-card';
 import { ChartCard } from './chart-card';
 import { TextBlockCard } from './text-block-card';
 import { DestructiveConfirmSheet } from './destructive-confirm-sheet';
-import { DragHandle, SortableItem, useEditorDndSensors } from './dnd-helpers';
+import { DragHandle, SortableItem } from './dnd-helpers';
 import { EditableText } from './editable-text';
 import { HiddenCellDot } from './hidden-cell-dot';
 import { LayoutPatternPicker } from './layout-pattern-picker';
@@ -71,7 +65,7 @@ export function SectionBlock({
   isDragging,
 }: SectionBlockProps) {
   const isBuilder = useIsBuilder();
-  const { pattern, fellBack } = resolveLayoutPattern(theme.layoutPatterns, section.layout_pattern_id);
+  const { pattern, fellBack } = resolveLayoutPattern(UNIVERSAL_LAYOUT_CATALOG, section.layout_pattern_id);
   const { charts, text_blocks } = useCalculatorState();
 
   const visibleCells = React.useMemo(
@@ -294,7 +288,7 @@ function SectionToolbar({
   return (
     <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover/section:opacity-100">
       <LayoutPatternPicker
-        patterns={theme.layoutPatterns}
+        patterns={UNIVERSAL_LAYOUT_CATALOG}
         activeId={activePatternId}
         onPick={(id) => patchSection(section.id, { layout_pattern_id: id })}
       />
@@ -464,103 +458,72 @@ function BuilderLayoutGrid({
   sectionTextBlocks,
   theme,
 }: BuilderLayoutGridProps) {
-  const { cells: allCells } = useCalculatorState();
-  const { patchCell } = useEditor();
-  const toast = useEditorToast();
   const template = columnSpans.map((s) => `${s}fr`).join(' ');
 
-  const sensors = useEditorDndSensors();
-  const [activeId, setActiveId] = React.useState<string | null>(null);
-
-  // Drag scope: only the visible cells of THIS section. Cross-section
-  // drag is intentionally blocked at the API; we mirror that in the UI
-  // by giving each section its own DndContext + SortableContext.
-  const orderedIds = React.useMemo(
-    () => visibleCells.map((c) => c.id),
-    [visibleCells],
+  const allElementIds = React.useMemo(
+    () => [
+      ...visibleCells.map((c) => c.id),
+      ...sectionCharts.map((c) => c.id),
+      ...sectionTextBlocks.map((t) => t.id),
+    ],
+    [visibleCells, sectionCharts, sectionTextBlocks],
   );
-
-  const handleDragEnd = React.useCallback(
-    (event: DragEndEvent) => {
-      setActiveId(null);
-      const { active, over } = event;
-      if (!over) return;
-      // Defensive: cross-section drops are nominally impossible (each
-      // section is its own SortableContext), but if a stray id leaks
-      // surface the spec-mandated toast and abort.
-      const targetSectionId = allCells.find((c) => c.id === over.id)?.section_id;
-      if (targetSectionId && targetSectionId !== sectionId) {
-        toast("Cross-section moves aren't supported yet.");
-        return;
-      }
-      if (active.id === over.id) return;
-      const oldIndex = visibleCells.findIndex((c) => c.id === active.id);
-      const newIndex = visibleCells.findIndex((c) => c.id === over.id);
-      if (oldIndex === -1 || newIndex === -1) return;
-      // Server-side renumber repacks siblings; we only PATCH the
-      // dragged cell's new index. The patchCell call enrolls an undo
-      // entry so a single Cmd-Z restores the prior order.
-      void patchCell(active.id as string, { display_order: newIndex });
-    },
-    [visibleCells, sectionId, allCells, patchCell, toast],
-  );
-
-  const activeCell = activeId
-    ? visibleCells.find((c) => c.id === activeId) ?? null
-    : null;
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragStart={(e) => setActiveId(e.active.id as string)}
-      onDragCancel={() => setActiveId(null)}
-      onDragEnd={handleDragEnd}
-    >
-      <SortableContext items={orderedIds} strategy={rectSortingStrategy}>
-        <div className="grid w-full gap-3" style={{ gridTemplateColumns: template }}>
-          {visibleCells.map((cell) => (
-            <SortableItem key={cell.id} id={cell.id}>
-              {({ setNodeRef, style, dragHandleProps, isDragging }) => (
-                <div ref={setNodeRef} style={style} className="min-w-0">
-                  <CellCard
-                    cell={cell}
-                    theme={theme}
-                    dragHandleProps={dragHandleProps}
-                    isDragging={isDragging}
-                  />
-                </div>
-              )}
-            </SortableItem>
-          ))}
-          {sectionCharts.map((chart) => (
-            <div
-              key={chart.id}
-              className="min-w-0"
-              style={chartColumnSpanStyle(chart.card_size_hint, columnSpans.length)}
-            >
-              <ChartCard chart={chart} theme={theme} />
-            </div>
-          ))}
-          {sectionTextBlocks.map((tb) => (
-            <div
-              key={tb.id}
-              className="min-w-0"
-              style={textBlockColumnSpanStyle(tb.card_size_hint, columnSpans.length)}
-            >
-              <TextBlockCard textBlock={tb} theme={theme} />
-            </div>
-          ))}
-        </div>
-      </SortableContext>
-      <DragOverlay>
-        {activeCell ? (
-          <div className="rounded-md border border-cg-accent/40 bg-cg-surface p-3 shadow-lg">
-            <p className="text-[12px] font-medium text-cg-text">{activeCell.label || activeCell.name}</p>
-          </div>
-        ) : null}
-      </DragOverlay>
-    </DndContext>
+    <SortableContext items={allElementIds} strategy={rectSortingStrategy}>
+      <div className="grid w-full gap-3" style={{ gridTemplateColumns: template }}>
+        {visibleCells.map((cell) => (
+          <SortableItem key={cell.id} id={cell.id} data={{ sectionId, type: 'cell' }}>
+            {({ setNodeRef, style, dragHandleProps, isDragging }) => (
+              <div ref={setNodeRef} style={style} className="min-w-0">
+                <CellCard
+                  cell={cell}
+                  theme={theme}
+                  dragHandleProps={dragHandleProps}
+                  isDragging={isDragging}
+                />
+              </div>
+            )}
+          </SortableItem>
+        ))}
+        {sectionCharts.map((chart) => (
+          <SortableItem key={chart.id} id={chart.id} data={{ sectionId, type: 'chart' }}>
+            {({ setNodeRef, style, dragHandleProps, isDragging }) => (
+              <div
+                ref={setNodeRef}
+                style={{ ...style, ...chartColumnSpanStyle(chart.card_size_hint, columnSpans.length) }}
+                className="min-w-0"
+              >
+                <ChartCard
+                  chart={chart}
+                  theme={theme}
+                  dragHandleProps={dragHandleProps}
+                  isDragging={isDragging}
+                />
+              </div>
+            )}
+          </SortableItem>
+        ))}
+        {sectionTextBlocks.map((tb) => (
+          <SortableItem key={tb.id} id={tb.id} data={{ sectionId, type: 'text_block' }}>
+            {({ setNodeRef, style, dragHandleProps, isDragging }) => (
+              <div
+                ref={setNodeRef}
+                style={{ ...style, ...textBlockColumnSpanStyle(tb.card_size_hint, columnSpans.length) }}
+                className="min-w-0"
+              >
+                <TextBlockCard
+                  textBlock={tb}
+                  theme={theme}
+                  dragHandleProps={dragHandleProps}
+                  isDragging={isDragging}
+                />
+              </div>
+            )}
+          </SortableItem>
+        ))}
+      </div>
+    </SortableContext>
   );
 }
 

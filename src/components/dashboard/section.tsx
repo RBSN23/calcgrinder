@@ -56,7 +56,7 @@ export function Section({
 
   return (
     <Collapsible open={open} onOpenChange={setOpen} asChild>
-      <section className={`overflow-hidden rounded-[10px] border ${frame}`}>
+      <section className={`overflow-hidden rounded-[10px] border [contain:inline-size] ${frame}`}>
         <CollapsibleTrigger asChild>
           <button
             type="button"

@@ -42,7 +42,6 @@ describe('calcgrinder theme tokens', () => {
       cols3: '1fr 1fr 1.45fr',
       headerH: 62,
       cardTints: null,
-      layoutPatterns: calcgrinder.layoutPatterns,
       chartPalette: calcgrinder.chartPalette,
     });
   });

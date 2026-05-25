@@ -144,8 +144,7 @@ export async function createCell(
 
 export interface PatchCellBody extends Omit<CreateCellBody, 'id'> {
   updated_at: string;
-  // For renames: rewrite dependent formulas in the same transaction.
-  // Defaults to true server-side.
+  section_id?: string;
   rewrite_dependents?: boolean;
 }
 
