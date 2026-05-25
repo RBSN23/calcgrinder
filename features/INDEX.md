@@ -33,7 +33,7 @@
 | PROJ-16 | Text Blocks (Markdown)                               | P1       | PROJ-6, PROJ-8, PROJ-9, PROJ-11       | Deployed | [PROJ-16](PROJ-16-text-blocks-markdown.md) | 2026-05-22 |
 | PROJ-17 | Tabular Output Cells                                 | P1       | PROJ-6, PROJ-7, PROJ-9, PROJ-11       | Deployed | [PROJ-17](PROJ-17-tabular-output-cells.md) | 2026-05-22 |
 | PROJ-18 | Cloning & Preset Discoverability                     | P1       | PROJ-5, PROJ-10, PROJ-11              | Deployed | [PROJ-18](PROJ-18-cloning-and-preset-discoverability.md) | 2026-05-22 |
-| PROJ-19 | Sysadmin Moderation                                  | P1       | PROJ-5, PROJ-13                       | Approved | [PROJ-19](PROJ-19-sysadmin-moderation.md) | 2026-05-22 |
+| PROJ-19 | Sysadmin Moderation                                  | P1       | PROJ-5, PROJ-13                       | Deployed | [PROJ-19](PROJ-19-sysadmin-moderation.md) | 2026-05-22 |
 | PROJ-20 | Concurrent Editing — Optimistic Concurrency          | P1       | PROJ-8                                | Roadmap | —    | 2026-05-22 |
 | PROJ-21 | Code-Import (Smart merge / Append / Replace all)     | P1       | PROJ-9, PROJ-15, PROJ-16              | Roadmap | —    | 2026-05-22 |
 | PROJ-22 | JSON Export / Import                                 | P2       | PROJ-9, PROJ-15, PROJ-16              | Roadmap | —    | 2026-05-22 |

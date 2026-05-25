@@ -1,6 +1,6 @@
 # PROJ-19: Sysadmin Moderation
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-25
 **Last Updated:** 2026-05-25
 
@@ -324,4 +324,9 @@ None.
 - **Recommendation:** Deploy. BUG-M1 (non-atomic delete) is a hardening improvement for next sprint. BUG-L1 and BUG-L2 are nice-to-have polish.
 
 ## Deployment
-_To be added by /deploy_
+
+- **Deployed:** 2026-05-25
+- **Commit:** feat(PROJ-19): Implement Sysadmin Moderation
+- **Migration:** `20260525064014_sysadmin_moderation.sql` (applied)
+- **New routes:** `/api/admin/calculators/[id]` (DELETE), `/api/admin/calculators/[id]/scenarios-count` (GET)
+- **Known issues deferred:** BUG-M1 (non-atomic delete — wrap in RPC next sprint), BUG-L1 (Zod UUID validation), BUG-L2 (public link icon on drafts)
