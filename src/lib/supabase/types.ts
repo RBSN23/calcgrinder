@@ -556,6 +556,20 @@ export type Database = {
           updated_at: string
         }[]
       }
+      fn_list_all_user_calculators: {
+        Args: Record<string, never>
+        Returns: {
+          description: string
+          id: string
+          owner_id: string
+          owner_name: string
+          public_token: string
+          published: boolean
+          theme_id: string
+          title: string
+          updated_at: string
+        }[]
+      }
       fn_get_public_calculator: {
         Args: { p_token: string }
         Returns: {

@@ -232,3 +232,27 @@ export async function getScenariosCount(
   if (!res.ok) throw await parseError(res);
   return (await res.json()) as ScenariosCountResponse;
 }
+
+export async function adminDeleteCalculator(
+  id: string,
+): Promise<{ ok: true }> {
+  const res = await fetch(
+    `/api/admin/calculators/${encodeURIComponent(id)}`,
+    {
+      method: 'DELETE',
+      headers: { 'content-type': 'application/json' },
+    },
+  );
+  if (!res.ok) throw await parseError(res);
+  return (await res.json()) as { ok: true };
+}
+
+export async function getAdminScenariosCount(
+  id: string,
+): Promise<ScenariosCountResponse> {
+  const res = await fetch(
+    `/api/admin/calculators/${encodeURIComponent(id)}/scenarios-count`,
+  );
+  if (!res.ok) throw await parseError(res);
+  return (await res.json()) as ScenariosCountResponse;
+}

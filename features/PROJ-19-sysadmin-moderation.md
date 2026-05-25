@@ -1,6 +1,6 @@
 # PROJ-19: Sysadmin Moderation
 
-## Status: Architected
+## Status: Approved
 **Created:** 2026-05-25
 **Last Updated:** 2026-05-25
 
@@ -207,8 +207,121 @@ No new packages. Builds on existing infrastructure: `Section`
 | `src/lib/calculators/client.ts` | Add `adminDeleteCalculator()` + `getAdminScenariosCount()` |
 | `src/lib/calculators/server.ts` | Add `listAllUserCalculators()` + `ModerationCalculatorRow` type |
 
+## Implementation Notes (Frontend + Backend)
+
+### Files created
+- `supabase/migrations/20260525064014_sysadmin_moderation.sql` — `fn_list_all_user_calculators` SECURITY DEFINER RPC (same pattern as `fn_list_presets`)
+- `src/components/dashboard/moderation-calc-card.tsx` — Card component showing title, description (2-line clamp), owner name, kebab with "Delete permanently", footer with relative timestamp + Published/Draft pill + Public Link icon
+- `src/components/dashboard/moderation-delete-sheet.tsx` — Confirmation sheet wrapping `DestructiveConfirmSheet`, fetches scenarios count on open, calls `DELETE /api/admin/calculators/:id`
+- `src/components/dashboard/user-calculators-section.tsx` — Section wrapper with `tint="danger"`, hide-when-empty, card grid (1-col mobile, 2-col sm+)
+- `src/app/api/admin/calculators/[id]/route.ts` — Sysadmin hard-delete endpoint. Verifies sysadmin role, rejects own-calculator deletion (403), hard-deletes scenarios first, then calculator (FK CASCADE handles children)
+- `src/app/api/admin/calculators/[id]/scenarios-count/route.ts` — Sysadmin scenarios count endpoint for the confirmation sheet
+
+### Files modified
+- `src/app/(app)/dashboard/page.tsx` — Conditional `listAllUserCalculators()` fetch for sysadmins; `UserCalculatorsSection` in slot 5
+- `src/components/dashboard/index.ts` — Barrel exports for new components
+- `src/lib/calculators/client.ts` — `adminDeleteCalculator()` + `getAdminScenariosCount()` helpers
+- `src/lib/calculators/server.ts` — `listAllUserCalculators()` + `ModerationCalculatorRow` type
+- `src/lib/supabase/types.ts` — Added `fn_list_all_user_calculators` RPC type (regenerate after `supabase db push`)
+
+### Deviations from spec
+None.
+
 ## QA Test Results
-_To be added by /qa_
+
+**Tested:** 2026-05-25
+**App URL:** http://localhost:3000
+**Tester:** QA Engineer (AI)
+
+### Acceptance Criteria Status
+
+#### Section visibility
+
+- [x] AC1: Sysadmin sees "User Calculators" section as the last section (slot 5, danger tint)
+- [x] AC2: Non-sysadmin user does not see the "User Calculators" section
+- [x] AC3: Sysadmin's own calculators excluded from section; section hidden when no other users' calculators exist
+
+#### Section content
+
+- [x] AC4: Each card shows title, description (2-line clamp), owner name, relative timestamp, Published/Draft pill, Public Link icon
+- [x] AC5: Sysadmin's own calculators excluded from "User Calculators" section
+- [x] AC6: Count pill shows correct number of other users' active calculators
+- [x] AC7: Published calculator card opens public view in new tab (`/c/<token>`, `target="_blank"`)
+
+#### Delete permanently action
+
+- [x] AC8: Kebab menu has single destructive "Delete permanently" option (red text)
+- [x] AC9: Confirmation sheet displays: "Permanently delete «{title}»? This will also delete all scenarios linked to this calculator. This cannot be undone."
+- [x] AC10: Confirmation sheet includes scenarios count when N > 0; omits count line when N = 0
+- [x] AC11: Successful delete → success toast, card disappears, DB row hard-deleted, scenarios cascade-deleted
+- [x] AC12: Error path (toast + sheet stays open) — covered by unit test mock; not triggered in E2E
+
+#### API authorization
+
+- [x] AC13: Non-sysadmin DELETE → 403 Forbidden
+- [x] AC14: Unauthenticated DELETE → 307 redirect (middleware) + route handler 401 (defense-in-depth, verified by unit test)
+- [x] AC15: Non-existent calculator → 404 Not Found
+- [x] Edge: Sysadmin deleting own calculator via moderation endpoint → 403
+
+#### Server-side data fetch
+
+- [x] AC16: Sysadmin dashboard fetches all active (non-soft-deleted) calculators from other users, ordered `updated_at DESC`, LIMIT 200
+- [x] AC17: Non-sysadmin does not trigger the "all user calculators" query
+
+### Edge Cases Status
+
+- [x] EC1: Sysadmin deletes calculator that has active shared-scenario URLs — scenarios hard-deleted, visitor sees "Scenario not found"
+- [x] EC2: Sysadmin deletes a calculator that was cloned by another user — `cloned_from_id` FK is `ON DELETE SET NULL`, clone survives
+- [x] EC3: Sysadmin deletes a calculator that is in Trash — not visible in section (only active calcs shown)
+- [x] EC4: Race condition: two sysadmins delete same calculator — second DELETE returns 404
+- [x] EC5: Sysadmin tries to delete own calculator via moderation endpoint — 403
+
+### Security Audit Results
+
+- [x] Authentication: Unauthenticated requests blocked at middleware (307 redirect) and route handler (401)
+- [x] Authorization: Non-sysadmin users receive 403; role check uses admin client (bypasses RLS), not user client
+- [x] IDOR: Sysadmin self-deletion correctly blocked (403)
+- [x] SQL injection: Supabase JS client uses parameterized queries; no injection vector
+- [x] RPC function: `fn_list_all_user_calculators` is SECURITY DEFINER with explicit `is_sysadmin()` check; REVOKE FROM PUBLIC + GRANT TO authenticated
+- [x] Input validation: `id` path parameter validated by PostgreSQL UUID type + `.maybeSingle()` (non-UUID returns 404); Zod validation would be stricter but Low priority
+- [x] Information leakage: Error responses are opaque (`read_failed`, `delete_failed`, `forbidden`); no internal details exposed to client
+
+### Bugs Found
+
+#### BUG-M1: Non-atomic delete (scenarios then calculator) creates a race-condition window
+- **Severity:** Medium
+- **Description:** The delete operation runs two sequential queries — delete scenarios, then delete calculator — without a database transaction. If step 1 succeeds but step 2 fails, scenarios are orphaned/lost while the calculator survives.
+- **Impact:** In a single-deployer, low-volume instance with 1-2 sysadmins, extremely unlikely. But the failure mode is silent data loss.
+- **Recommendation:** Consider wrapping both deletes in a single SECURITY DEFINER RPC for atomicity. Fix in next sprint.
+- **Priority:** Fix in next sprint
+
+#### BUG-L1: No Zod UUID validation on `id` path parameter
+- **Severity:** Low
+- **Description:** The `id` parameter from the URL path is used directly in Supabase queries without Zod validation. The DB-level UUID type + `.maybeSingle()` prevents SQL injection and returns null for non-UUID strings, but a malformed ID returns 404 instead of 400.
+- **Impact:** Standards violation (project security rules require Zod on all user input). No exploitable vulnerability.
+- **Priority:** Nice to have
+
+#### BUG-L2: Public link icon active for draft calculators
+- **Severity:** Low
+- **Description:** `ModerationCalcCard` renders the public link icon button for all calculators, including unpublished drafts. Clicking opens `/c/<token>` which shows an empty/error page for drafts.
+- **Impact:** Minor UX confusion. Sysadmin can see the "Draft" pill, so the behavior is predictable.
+- **Priority:** Nice to have
+
+### Automated Test Coverage
+
+#### Unit Tests (Vitest) — 21 new tests
+- `src/app/api/admin/calculators/[id]/route.test.ts` — 11 tests (DELETE endpoint: auth, role check, IDOR, error paths, success, cascade order)
+- `src/app/api/admin/calculators/[id]/scenarios-count/route.test.ts` — 10 tests (GET endpoint: auth, role check, error paths, count response, null fallback)
+
+#### E2E Tests (Playwright) — 19 new tests x 2 browsers = 38
+- `tests/PROJ-19-sysadmin-moderation.spec.ts` — 19 tests across 4 describe blocks covering all acceptance criteria
+
+### Summary
+- **Acceptance Criteria:** 17/17 passed
+- **Bugs Found:** 3 total (0 critical, 0 high, 1 medium, 2 low)
+- **Security:** Pass — no critical or high findings
+- **Production Ready:** YES
+- **Recommendation:** Deploy. BUG-M1 (non-atomic delete) is a hardening improvement for next sprint. BUG-L1 and BUG-L2 are nice-to-have polish.
 
 ## Deployment
 _To be added by /deploy_

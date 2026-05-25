@@ -183,6 +183,33 @@ export async function listPresets(): Promise<PresetCalculatorRow[]> {
   }));
 }
 
+export interface ModerationCalculatorRow extends CalculatorRow {
+  owner_id: string;
+  owner_name: string;
+}
+
+export async function listAllUserCalculators(): Promise<
+  ModerationCalculatorRow[]
+> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc('fn_list_all_user_calculators');
+  if (error || !data) {
+    if (error) console.error('listAllUserCalculators: RPC failed', error);
+    return [];
+  }
+  return data.map((row) => ({
+    id: row.id,
+    title: row.title,
+    description: row.description ?? '',
+    theme_id: row.theme_id,
+    updated_at: row.updated_at,
+    published: row.published,
+    public_token: row.public_token,
+    owner_id: row.owner_id,
+    owner_name: row.owner_name ?? '',
+  }));
+}
+
 export async function getCalculatorForEditor(
   id: string,
 ): Promise<CalculatorRow | null> {

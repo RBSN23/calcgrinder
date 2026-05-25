@@ -15,10 +15,12 @@ import {
   NewCalculatorHero,
   PresetsSection,
   TrashSection,
+  UserCalculatorsSection,
   WelcomeLine,
 } from '@/components/dashboard';
 import { getCurrentProfile } from '@/lib/auth/getCurrentProfile';
 import {
+  listAllUserCalculators,
   listMyCalculators,
   listMySoftDeletedCalculators,
   listPresets,
@@ -42,18 +44,21 @@ export default async function DashboardPage() {
   if (!current) redirect('/auth/login');
 
   const role = (current.profile.role as 'registered' | 'sysadmin') ?? 'registered';
+  const isSysadmin = role === 'sysadmin';
   const [
     myCalculators,
     myScenarios,
     trashedCalculators,
     orphanCount,
     presets,
+    userCalculators,
   ] = await Promise.all([
     listMyCalculators(),
     listMyScenariosWithCalc(),
     listMySoftDeletedCalculators(),
     countMyOrphanScenarios(),
     listPresets(),
+    isSysadmin ? listAllUserCalculators() : Promise.resolve([]),
   ]);
   const retentionPeriodDaysRaw = parseInt(
     process.env.RETENTION_PERIOD_DAYS ?? '30',
@@ -95,6 +100,9 @@ export default async function DashboardPage() {
           calculators={trashedCalculators}
           retentionPeriodDays={retentionPeriodDays}
         />
+        {isSysadmin ? (
+          <UserCalculatorsSection calculators={userCalculators} />
+        ) : null}
       </div>
     </div>
   );
