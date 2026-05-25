@@ -1,8 +1,9 @@
 # PROJ-23: UI/UX Polish Part 1 — Editor
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-25
 **Last Updated:** 2026-05-25
+**Deployed:** 2026-05-25
 
 ## Dependencies
 - Requires: PROJ-8 (Editor — Grid + Builder Two-Panel Split)
