@@ -46,14 +46,18 @@ async function parseError(res: Response): Promise<CalculatorApiError> {
   );
 }
 
-export async function createCalculator(): Promise<CalculatorRow> {
+export interface CreateCalculatorResponse extends CalculatorRow {
+  default_section_id: string;
+}
+
+export async function createCalculator(): Promise<CreateCalculatorResponse> {
   const res = await fetch('/api/calculators', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: '{}',
   });
   if (!res.ok) throw await parseError(res);
-  return (await res.json()) as CalculatorRow;
+  return (await res.json()) as CreateCalculatorResponse;
 }
 
 export interface PatchCalculatorBody {

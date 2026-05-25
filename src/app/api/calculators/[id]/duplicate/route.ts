@@ -79,7 +79,7 @@ export async function POST(req: Request, { params }: Ctx): Promise<Response> {
 
   const { data, error } = await supabase.rpc('fn_duplicate_calculator', {
     source_id: id,
-    source_token: source_token ?? null,
+    source_token: source_token ?? undefined,
   });
 
   if (error) {

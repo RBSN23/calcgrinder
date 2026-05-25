@@ -144,6 +144,7 @@ export function AvatarPopoverContent({ user, isAdmin = false }: AvatarPopoverCon
 
       <Link
         href="/settings"
+        prefetch={false}
         role="menuitem"
         className="flex h-9 items-center gap-[10px] rounded-md px-[10px] text-[13px] font-medium text-cg-text hover:bg-cg-surface-2"
       >

@@ -100,6 +100,7 @@ export function TopBarDesktop({
     >
       <Link
         href="/dashboard"
+        prefetch={false}
         aria-label="Calcgrinder home"
         className="-mx-1 rounded-md px-1 outline-none focus-visible:ring-2 focus-visible:ring-cg-accent"
       >

@@ -528,43 +528,28 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: undefined
       }
-      fn_duplicate_calculator: {
-        Args: { source_id: string; source_token?: string | null }
+      fn_create_calculator: {
+        Args: never
         Returns: {
           default_section_id: string
           description: string
           id: string
           public_token: string
           published: boolean
-          source_calculator_id: string | null
           theme_id: string
           title: string
           updated_at: string
         }[]
       }
-      fn_list_presets: {
-        Args: Record<string, never>
+      fn_duplicate_calculator: {
+        Args: { source_id: string; source_token?: string }
         Returns: {
+          default_section_id: string
           description: string
           id: string
-          owner_id: string
-          owner_name: string
           public_token: string
           published: boolean
-          theme_id: string
-          title: string
-          updated_at: string
-        }[]
-      }
-      fn_list_all_user_calculators: {
-        Args: Record<string, never>
-        Returns: {
-          description: string
-          id: string
-          owner_id: string
-          owner_name: string
-          public_token: string
-          published: boolean
+          source_calculator_id: string
           theme_id: string
           title: string
           updated_at: string
@@ -596,6 +581,34 @@ export type Database = {
           scenario_title: string
           scenario_updated_at: string
           scenario_values: Json
+        }[]
+      }
+      fn_list_all_user_calculators: {
+        Args: never
+        Returns: {
+          description: string
+          id: string
+          owner_id: string
+          owner_name: string
+          public_token: string
+          published: boolean
+          theme_id: string
+          title: string
+          updated_at: string
+        }[]
+      }
+      fn_list_presets: {
+        Args: never
+        Returns: {
+          description: string
+          id: string
+          owner_id: string
+          owner_name: string
+          public_token: string
+          published: boolean
+          theme_id: string
+          title: string
+          updated_at: string
         }[]
       }
       gen_calculator_public_token: { Args: never; Returns: string }

@@ -31,7 +31,7 @@ export function NewCalculatorHero() {
         asChild
         className="h-10 gap-1.5 bg-cg-accent px-4 text-[13px] font-semibold text-cg-accent-fg hover:bg-cg-accent-hov"
       >
-        <Link href="/editor/new">
+        <Link href="/editor/new" prefetch={false}>
           <Icons.Plus size={16} />
           <span>Build a new calculator</span>
         </Link>

@@ -114,7 +114,7 @@ describe('POST /api/calculators/:id/duplicate', () => {
     // selects the same-owner branch.
     expect(mock.rpc).toHaveBeenCalledWith('fn_duplicate_calculator', {
       source_id: SOURCE_ID,
-      source_token: null,
+      source_token: undefined,
     });
   });
 

@@ -50,6 +50,7 @@ export function TopBarMobile({
         {effectiveLeftSlot ?? (
           <Link
             href="/dashboard"
+            prefetch={false}
             aria-label="Calcgrinder home"
             className="-ml-1 rounded-md p-1 outline-none focus-visible:ring-2 focus-visible:ring-cg-accent"
           >
