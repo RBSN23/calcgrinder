@@ -1,11 +1,7 @@
-// PROJ-5 — Account Dashboard.
+// PROJ-5 / PROJ-25 — Account Dashboard.
 //
-// Server Component. Reuses the request-scoped `getCurrentProfile()`
-// already invoked by the `(app)` layout (no extra Supabase round-trip).
-// Renders the desktop-only welcome line, the "Build a new calculator"
-// hero, the PROJ-10 My Calculators section, and the Presets section
-// (other slots — My Scenarios, Trash, User Calculators — are reserved
-// for downstream features and hidden when empty).
+// Server Component. Fetches all dashboard data in a single RPC call
+// (`fn_get_dashboard`) instead of 6 parallel Supabase queries.
 
 import { redirect } from 'next/navigation';
 
@@ -19,47 +15,43 @@ import {
   WelcomeLine,
 } from '@/components/dashboard';
 import { getCurrentProfile } from '@/lib/auth/getCurrentProfile';
-import {
-  listAllUserCalculators,
-  listMyCalculators,
-  listMySoftDeletedCalculators,
-  listPresets,
-} from '@/lib/calculators/server';
-import {
-  countMyOrphanScenarios,
-  listMyScenariosWithCalc,
-} from '@/lib/scenarios/server';
+import type { CalculatorRow } from '@/lib/calculators/types';
+import type { TrashedCalculatorRow, PresetCalculatorRow, ModerationCalculatorRow } from '@/lib/calculators/server';
+import type { ScenarioRowWithCalc } from '@/lib/scenarios/types';
+import { createClient } from '@/lib/supabase/server';
 
 export const metadata = {
   title: 'Dashboard · Calcgrinder',
 };
 
-// Always re-read server-fetched data on each request — mutations
-// (rename, publish, duplicate, soft-delete) call router.refresh()
-// which expects fresh data on the next render.
 export const dynamic = 'force-dynamic';
+
+interface DashboardData {
+  calculators: CalculatorRow[];
+  scenarios: ScenarioRowWithCalc[];
+  trashed_calculators: TrashedCalculatorRow[];
+  orphan_scenario_count: number;
+  presets: PresetCalculatorRow[];
+  user_calculators: ModerationCalculatorRow[];
+  is_sysadmin: boolean;
+}
 
 export default async function DashboardPage() {
   const current = await getCurrentProfile();
   if (!current) redirect('/auth/login');
 
   const role = (current.profile.role as 'registered' | 'sysadmin') ?? 'registered';
-  const isSysadmin = role === 'sysadmin';
-  const [
-    myCalculators,
-    myScenarios,
-    trashedCalculators,
-    orphanCount,
-    presets,
-    userCalculators,
-  ] = await Promise.all([
-    listMyCalculators(),
-    listMyScenariosWithCalc(),
-    listMySoftDeletedCalculators(),
-    countMyOrphanScenarios(),
-    listPresets(),
-    isSysadmin ? listAllUserCalculators() : Promise.resolve([]),
-  ]);
+
+  const supabase = await createClient();
+  const { data: raw, error } = await supabase.rpc('fn_get_dashboard');
+
+  if (error || !raw) {
+    console.error('fn_get_dashboard failed', error);
+    redirect('/auth/login');
+  }
+
+  const d = raw as unknown as DashboardData;
+
   const retentionPeriodDaysRaw = parseInt(
     process.env.RETENTION_PERIOD_DAYS ?? '30',
     10,
@@ -74,34 +66,22 @@ export default async function DashboardPage() {
       <WelcomeLine name={current.profile.name} role={role} />
       <NewCalculatorHero />
 
-      {/*
-        Canonical section order — downstream features insert their
-        <Section> blocks into the matching slot:
-          1. My Calculators  (PROJ-10) — wired below
-          2. My Scenarios    (PROJ-12)
-          3. Presets         (PROJ-5 / PROJ-18)
-          4. Trash           (PROJ-13) — wired below
-          5. User Calculators (PROJ-19, sysadmin-only)
-        Sections hide when their data is empty. Presets is the
-        exception — its empty state is the call-to-action surface for
-        the curated-templates feature.
-      */}
       <div className="flex flex-col gap-3">
         <MyCalculatorsSection
-          calculators={myCalculators}
+          calculators={d.calculators}
           retentionPeriodDays={retentionPeriodDays}
         />
         <MyScenariosSection
-          scenarios={myScenarios}
-          orphanCount={orphanCount}
+          scenarios={d.scenarios}
+          orphanCount={d.orphan_scenario_count}
         />
-        <PresetsSection presets={presets} />
+        <PresetsSection presets={d.presets} />
         <TrashSection
-          calculators={trashedCalculators}
+          calculators={d.trashed_calculators}
           retentionPeriodDays={retentionPeriodDays}
         />
-        {isSysadmin ? (
-          <UserCalculatorsSection calculators={userCalculators} />
+        {d.is_sysadmin ? (
+          <UserCalculatorsSection calculators={d.user_calculators} />
         ) : null}
       </div>
     </div>

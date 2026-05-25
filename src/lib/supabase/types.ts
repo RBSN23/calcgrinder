@@ -555,6 +555,7 @@ export type Database = {
           updated_at: string
         }[]
       }
+      fn_get_dashboard: { Args: never; Returns: Json }
       fn_get_public_calculator: {
         Args: { p_token: string }
         Returns: {
