@@ -10,7 +10,7 @@
 import * as React from 'react';
 
 import { useEditor } from './EditorProvider';
-import { useEvaluation } from './useEvaluation';
+import { useWorkerEvaluation } from './useWorkerEvaluation';
 import type { CellResult, EvaluationResult, Inputs } from '@/lib/formula';
 
 interface EvaluationContextValue {
@@ -30,7 +30,7 @@ export function EvaluationProvider({ children }: { children: React.ReactNode }) 
     setInputs((prev) => ({ ...prev, [name]: value }));
   }, []);
 
-  const results = useEvaluation(state.cells, inputs);
+  const results = useWorkerEvaluation(state.cells, inputs);
   const getResult = React.useCallback(
     (name: string) => results[name],
     [results],

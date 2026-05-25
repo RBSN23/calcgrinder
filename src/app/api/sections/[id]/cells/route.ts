@@ -106,45 +106,42 @@ export async function POST(req: Request, { params }: Ctx): Promise<Response> {
   if (!section) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
-  const { data: calculator } = await supabase
-    .from('calculators')
-    .select('id')
-    .eq('id', section.calculator_id)
-    .is('soft_delete_at', null)
-    .maybeSingle();
-  if (!calculator) {
+
+  // PROJ-25 — run ownership check and cell lookup in parallel (previously sequential).
+  const [calcResult, cellsResult] = await Promise.all([
+    supabase
+      .from('calculators')
+      .select('id')
+      .eq('id', section.calculator_id)
+      .is('soft_delete_at', null)
+      .maybeSingle(),
+    supabase
+      .from('cells')
+      .select('name, section_id')
+      .eq('calculator_id', section.calculator_id),
+  ]);
+
+  if (!calcResult.data) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
-
-  // Cell-cap guard.
-  const { count: cellCount, error: countErr } = await supabase
-    .from('cells')
-    .select('id', { count: 'exact', head: true })
-    .eq('calculator_id', section.calculator_id);
-  if (countErr) {
-    console.error('POST cell: count failed', countErr);
+  if (cellsResult.error) {
+    console.error('POST cell: cells read failed', cellsResult.error);
     return NextResponse.json({ error: 'create_failed' }, { status: 500 });
   }
-  if ((cellCount ?? 0) >= MAX_CELLS) {
+  const cellRows = cellsResult.data ?? [];
+
+  // Cell-cap guard.
+  if (cellRows.length >= MAX_CELLS) {
     return NextResponse.json(
       { error: 'cell_cap_reached', max: MAX_CELLS },
       { status: 422 },
     );
   }
 
-  // Resolve name. If client didn't supply one, compute the next free
-  // `cell_N` against the calculator's existing names.
+  // Resolve name.
   let name = body.name;
   if (name === undefined) {
-    const { data: existingCells, error: namesErr } = await supabase
-      .from('cells')
-      .select('name')
-      .eq('calculator_id', section.calculator_id);
-    if (namesErr) {
-      console.error('POST cell: name read failed', namesErr);
-      return NextResponse.json({ error: 'create_failed' }, { status: 500 });
-    }
-    name = nextDefaultCellName((existingCells ?? []).map((c) => c.name));
+    name = nextDefaultCellName(cellRows.map((c) => c.name));
   } else {
     name = name.trim();
     const v = validateCellNameField(name);
@@ -177,15 +174,10 @@ export async function POST(req: Request, { params }: Ctx): Promise<Response> {
   });
   if (!inv.ok) return NextResponse.json(inv.body, { status: inv.status });
 
-  // Resolve display_order: append at the end of the section unless
-  // explicitly placed.
+  // Resolve display_order: append at end of section unless explicitly placed.
   let display_order = body.display_order;
   if (display_order === undefined) {
-    const { count: siblingCount } = await supabase
-      .from('cells')
-      .select('id', { count: 'exact', head: true })
-      .eq('section_id', sectionId);
-    display_order = siblingCount ?? 0;
+    display_order = cellRows.filter((c) => c.section_id === sectionId).length;
   }
 
   const { data: inserted, error: insertErr } = await supabase

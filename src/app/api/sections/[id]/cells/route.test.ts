@@ -99,11 +99,9 @@ describe('POST /api/sections/:id/cells', () => {
       user: USER_FIXTURE,
       fromResults: [
         { data: SECTION_PARENT, error: null }, // section
-        { data: { id: CALC_ID }, error: null }, // calculator
-        { data: null, error: null, count: 0 }, // cell-cap count
-        { data: [], error: null }, // existing names
-        { data: null, error: null, count: 0 }, // section cell count
-        { data: INSERTED_CELL, error: null }, // insert (RETURNING)
+        { data: { id: CALC_ID }, error: null }, // calculator (Promise.all)
+        { data: [], error: null },              // all cells (Promise.all)
+        { data: INSERTED_CELL, error: null },   // insert (RETURNING)
       ],
     });
     installSupabaseMock(mockCreateClient, supabase);
@@ -113,12 +111,9 @@ describe('POST /api/sections/:id/cells', () => {
     const body = await res.json();
     expect(body.cell.name).toBe('cell_1');
     expect(body.cell.kind).toBe('input');
-    // Inserted row's updated_at is the same NOW() the parent-bump
-    // trigger used (same transaction), so we return it directly
-    // instead of via a separate, race-prone SELECT.
     expect(body.calculator_updated_at).toBe(INSERTED_CELL.updated_at);
 
-    const insertCall = supabase._builders[5]?.insert.mock.calls[0]?.[0] as {
+    const insertCall = supabase._builders[3]?.insert.mock.calls[0]?.[0] as {
       kind: string;
       name: string;
       value_type: string;
@@ -137,6 +132,10 @@ describe('POST /api/sections/:id/cells', () => {
   });
 
   it('returns 422 when the calculator has hit the 200-cell cap', async () => {
+    const fakeCells = Array.from({ length: 200 }, (_, i) => ({
+      name: `cell_${i + 1}`,
+      section_id: SECTION_ID,
+    }));
     installSupabaseMock(
       mockCreateClient,
       makeSupabaseMock({
@@ -144,7 +143,7 @@ describe('POST /api/sections/:id/cells', () => {
         fromResults: [
           { data: SECTION_PARENT, error: null },
           { data: { id: CALC_ID }, error: null },
-          { data: null, error: null, count: 200 },
+          { data: fakeCells, error: null },
         ],
       }),
     );
@@ -161,7 +160,7 @@ describe('POST /api/sections/:id/cells', () => {
         fromResults: [
           { data: SECTION_PARENT, error: null },
           { data: { id: CALC_ID }, error: null },
-          { data: null, error: null, count: 0 },
+          { data: [], error: null },
         ],
       }),
     );
@@ -180,7 +179,7 @@ describe('POST /api/sections/:id/cells', () => {
         fromResults: [
           { data: SECTION_PARENT, error: null },
           { data: { id: CALC_ID }, error: null },
-          { data: null, error: null, count: 0 },
+          { data: [], error: null },
         ],
       }),
     );
@@ -197,7 +196,6 @@ describe('POST /api/sections/:id/cells', () => {
         fromResults: [
           { data: SECTION_PARENT, error: null },
           { data: { id: CALC_ID }, error: null },
-          { data: null, error: null, count: 0 },
           { data: [], error: null },
         ],
       }),
@@ -211,9 +209,6 @@ describe('POST /api/sections/:id/cells', () => {
   });
 
   it('returns 422 when an Output is created without a formula default', async () => {
-    // Default behavior gives Output cells formula = '' so this should
-    // NOT trigger output_requires_formula. Test the override: pass
-    // formula: null explicitly.
     installSupabaseMock(
       mockCreateClient,
       makeSupabaseMock({
@@ -221,16 +216,15 @@ describe('POST /api/sections/:id/cells', () => {
         fromResults: [
           { data: SECTION_PARENT, error: null },
           { data: { id: CALC_ID }, error: null },
-          { data: null, error: null, count: 0 },
           { data: [], error: null },
+          { data: INSERTED_CELL, error: null }, // insert
         ],
       }),
     );
     const res = await POST(
-      postRequest({ kind: 'output', formula: '' }), // empty string allowed
+      postRequest({ kind: 'output', formula: '' }),
       ctx(),
     );
-    // empty-string formula IS allowed; we just need this not to be 422.
     expect(res.status).not.toBe(422);
   });
 });

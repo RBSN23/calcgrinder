@@ -143,18 +143,10 @@ describe('<CalcCard>', () => {
     expect(pushMock).toHaveBeenCalledWith('/editor/calc-1');
   });
 
-  it('Duplicate icon-button calls duplicate API then pushes to new editor', async () => {
-    const dup = vi.spyOn(clientApi, 'duplicateCalculator').mockResolvedValue({
-      ...ROW,
-      id: 'calc-2',
-      title: 'Mortgage Calculator — Copy',
-      public_token: 'tok-new',
-      default_section_id: 'sec-1',
-    } as never);
+  it('Duplicate icon-button navigates to /editor/new with duplicate param', () => {
     render(<CalcCard calculator={ROW} retentionPeriodDays={30} />);
     fireEvent.click(screen.getByRole('button', { name: 'Duplicate calculator' }));
-    await waitFor(() => expect(dup).toHaveBeenCalledWith('calc-1'));
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/editor/calc-2'));
+    expect(pushMock).toHaveBeenCalledWith('/editor/new?duplicate=calc-1');
   });
 
   it('reflects Published pill when row.published is true', () => {
@@ -272,15 +264,7 @@ describe("<CalcCard variant='preset'>", () => {
     expect(anchor).toHaveAttribute('target', '_blank');
   });
 
-  it('clicking the Clone icon-button calls cloneCalculator with the source token', async () => {
-    const clone = vi.spyOn(clientApi, 'cloneCalculator').mockResolvedValue({
-      ...ROW,
-      id: 'calc-2',
-      title: 'Mortgage Calculator — Copy',
-      public_token: 'tok-new',
-      default_section_id: 'sec-1',
-      source_calculator_id: ROW.id,
-    } as never);
+  it('clicking the Clone icon-button navigates to /editor/new with clone params', () => {
     render(
       <CalcCard
         calculator={ROW}
@@ -293,34 +277,9 @@ describe("<CalcCard variant='preset'>", () => {
         name: 'Clone this calculator into your account',
       }),
     );
-    await waitFor(() =>
-      expect(clone).toHaveBeenCalledWith('calc-1', 'tok-123'),
+    expect(pushMock).toHaveBeenCalledWith(
+      '/editor/new?clone=calc-1&token=tok-123',
     );
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/editor/calc-2'));
-  });
-
-  it('shows an error toast when the clone request fails', async () => {
-    vi.spyOn(clientApi, 'cloneCalculator').mockRejectedValue(
-      new CalculatorApiError(500, 'boom'),
-    );
-    render(
-      <CalcCard
-        calculator={ROW}
-        retentionPeriodDays={30}
-        variant="preset"
-      />,
-    );
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'Clone this calculator into your account',
-      }),
-    );
-    await waitFor(() =>
-      expect(toastError).toHaveBeenCalledWith(
-        "Couldn't clone — please try again.",
-      ),
-    );
-    expect(pushMock).not.toHaveBeenCalled();
   });
 });
 

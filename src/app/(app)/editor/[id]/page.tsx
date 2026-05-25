@@ -1,6 +1,9 @@
+import { Suspense } from 'react';
 import { notFound, redirect } from 'next/navigation';
 
 import { EditorBody } from '@/components/editor';
+import { EditorSkeleton } from '@/components/editor/editor-skeleton';
+import { NewCalculatorLoader } from '@/components/editor/new-calculator-loader';
 import { EditorProvider } from '@/lib/editor/EditorProvider';
 import { getCurrentProfile } from '@/lib/auth/getCurrentProfile';
 import { getEditorBundle } from '@/lib/calculators/server';
@@ -18,10 +21,17 @@ export default async function EditorPage({
   const current = await getCurrentProfile();
   if (!current) redirect(`/auth/login?next=/editor/${encodeURIComponent(id)}`);
 
-  // PROJ-9 — fetch calculator + sections + cells in one round-trip, with
-  // the zero-section backfill applied transparently for pre-PROJ-9 rows.
-  // The 404 opacity rule (not yours / not found / soft-deleted → 404)
-  // is enforced inside getEditorBundle().
+  // PROJ-25 — skeleton editor for New Calculator and Clone flows.
+  // Navigate immediately, create/clone in the background, redirect to
+  // the real editor on success.
+  if (id === 'new') {
+    return (
+      <Suspense fallback={<EditorSkeleton />}>
+        <NewCalculatorLoader />
+      </Suspense>
+    );
+  }
+
   const bundle = await getEditorBundle(id);
   if (!bundle) notFound();
 

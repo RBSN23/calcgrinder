@@ -62,6 +62,7 @@ and cloning.
 | P1       | Sysadmin Moderation                                  | Deployed |
 | P1       | UI/UX Polish Part 1 — Editor                         | Deployed |
 | P1       | UI/UX Polish Part 2 — Dashboard + Visitor + Editor   | Deployed |
+| P1       | Performance — Core Interaction Speed                  | Planned  |
 | P1       | Concurrent Editing — Optimistic Concurrency          | Roadmap  |
 | P1       | Code-Import (Smart merge / Append / Replace all)     | Roadmap  |
 | P2       | JSON Export / Import                                 | Roadmap  |

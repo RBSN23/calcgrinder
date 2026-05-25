@@ -1,35 +1,16 @@
 'use client';
 
-// PROJ-8 — Dashboard Hero "Build a new calculator" button.
+// PROJ-8 / PROJ-25 — Dashboard Hero "Build a new calculator" button.
 //
-// Always visible on /dashboard (the PROJ-5 visibility deferral is retired).
-// Uses the same create handler as the top-bar "+ New calculator" button.
+// PROJ-25: navigates immediately to `/editor/new` (skeleton editor) instead
+// of waiting for the POST response. The skeleton page handles creation.
 
-import { useRouter } from 'next/navigation';
-import * as React from 'react';
+import Link from 'next/link';
 
 import { Icons } from '@/components/shell';
 import { Button } from '@/components/ui/button';
-import { createCalculator } from '@/lib/calculators/client';
 
 export function NewCalculatorHero() {
-  const router = useRouter();
-  const [creating, setCreating] = React.useState(false);
-
-  async function handleClick() {
-    if (creating) return;
-    setCreating(true);
-    try {
-      const row = await createCalculator();
-      router.push(`/editor/${row.id}`);
-    } catch {
-      const { toast } = await import('sonner');
-      toast.error("Couldn't create calculator — please try again.");
-    } finally {
-      setCreating(false);
-    }
-  }
-
   return (
     <section
       aria-label="Build a new calculator"
@@ -47,28 +28,13 @@ export function NewCalculatorHero() {
       <Button
         size="sm"
         variant="default"
-        onClick={handleClick}
-        disabled={creating}
+        asChild
         className="h-10 gap-1.5 bg-cg-accent px-4 text-[13px] font-semibold text-cg-accent-fg hover:bg-cg-accent-hov"
       >
-        {creating ? (
-          <svg
-            width={16}
-            height={16}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            strokeLinecap="round"
-            className="animate-spin"
-            aria-hidden="true"
-          >
-            <path d="M21 12a9 9 0 11-6.219-8.56" />
-          </svg>
-        ) : (
+        <Link href="/editor/new">
           <Icons.Plus size={16} />
-        )}
-        <span>{creating ? 'Creating…' : 'Build a new calculator'}</span>
+          <span>Build a new calculator</span>
+        </Link>
       </Button>
     </section>
   );

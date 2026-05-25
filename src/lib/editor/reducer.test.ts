@@ -211,3 +211,99 @@ describe('clampGridHeight', () => {
     expect(clampGridHeight(20, 100)).toBe(MIN_GRID_HEIGHT);
   });
 });
+
+describe('editorReducer — RECONCILE_CELL', () => {
+  const TEMP_CELL = {
+    id: '__temp_1',
+    calculator_id: ROW.id,
+    section_id: 'sec-1',
+    kind: 'input' as const,
+    name: 'cell_1',
+    label: 'New cell',
+    description: '',
+    description_render: 'caption' as const,
+    value_type: 'number' as const,
+    visibility: 'visible' as const,
+    editability: 'editable' as const,
+    default_value: null,
+    formula: null,
+    display_widget: 'number_field' as const,
+    display_format: 'auto',
+    display_emphasis: 'plain' as const,
+    unit: null,
+    numeric_min: null,
+    numeric_max: null,
+    numeric_step: null,
+    select_options: null,
+    currency_code: null,
+    card_accent: 'theme',
+    card_background_tint: 'none' as const,
+    card_border: 'none' as const,
+    card_size_hint: 'narrow' as const,
+    text_size: 'm',
+    text_colour: 'default',
+    tabular_columns: [],
+    display_order: 0,
+    created_at: '2026-05-25T10:00:00.000Z',
+    updated_at: '2026-05-25T10:00:00.000Z',
+  };
+
+  const REAL_CELL = {
+    ...TEMP_CELL,
+    id: 'real-uuid-1234',
+    updated_at: '2026-05-25T10:00:01.000Z',
+  };
+
+  it('replaces the temp cell with the real cell', () => {
+    const state = editorReducer(initialEditorState(ROW), {
+      type: 'UPSERT_CELL',
+      cell: TEMP_CELL,
+    });
+    expect(state.cells).toHaveLength(1);
+    expect(state.cells[0].id).toBe('__temp_1');
+
+    const next = editorReducer(state, {
+      type: 'RECONCILE_CELL',
+      tempId: '__temp_1',
+      cell: REAL_CELL,
+    });
+    expect(next.cells).toHaveLength(1);
+    expect(next.cells[0].id).toBe('real-uuid-1234');
+    expect(next.cells[0].updated_at).toBe('2026-05-25T10:00:01.000Z');
+  });
+
+  it('does nothing when tempId is not found', () => {
+    const state = editorReducer(initialEditorState(ROW), {
+      type: 'UPSERT_CELL',
+      cell: TEMP_CELL,
+    });
+    const next = editorReducer(state, {
+      type: 'RECONCILE_CELL',
+      tempId: '__temp_99',
+      cell: REAL_CELL,
+    });
+    expect(next.cells).toHaveLength(1);
+    expect(next.cells[0].id).toBe('__temp_1');
+  });
+
+  it('preserves other cells when reconciling', () => {
+    let state = editorReducer(initialEditorState(ROW), {
+      type: 'UPSERT_CELL',
+      cell: { ...TEMP_CELL, id: 'existing', name: 'price', display_order: 0 },
+    });
+    state = editorReducer(state, {
+      type: 'UPSERT_CELL',
+      cell: { ...TEMP_CELL, display_order: 1 },
+    });
+    expect(state.cells).toHaveLength(2);
+
+    const next = editorReducer(state, {
+      type: 'RECONCILE_CELL',
+      tempId: '__temp_1',
+      cell: { ...REAL_CELL, display_order: 1 },
+    });
+    expect(next.cells).toHaveLength(2);
+    expect(next.cells.find((c) => c.id === 'existing')).toBeTruthy();
+    expect(next.cells.find((c) => c.id === 'real-uuid-1234')).toBeTruthy();
+  });
+});

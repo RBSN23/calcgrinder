@@ -248,15 +248,46 @@ export async function getEditorBundle(
 
   const supabase = await createClient();
 
-  let { data: sections } = await supabase
-    .from('sections')
-    .select(
-      'id, calculator_id, title, description, layout_pattern_id, display_order, created_at, updated_at',
-    )
-    .eq('calculator_id', id)
-    .order('display_order', { ascending: true });
+  // PROJ-25 — run child-table queries in parallel (previously sequential).
+  const [sectionsResult, cellsResult, chartsResult, textBlocksResult] =
+    await Promise.all([
+      supabase
+        .from('sections')
+        .select(
+          'id, calculator_id, title, description, layout_pattern_id, display_order, created_at, updated_at',
+        )
+        .eq('calculator_id', id)
+        .order('display_order', { ascending: true }),
+      supabase
+        .from('cells')
+        .select(
+          'id, calculator_id, section_id, kind, name, label, description, description_render, value_type, visibility, editability, default_value, formula, display_widget, display_format, display_emphasis, unit, numeric_min, numeric_max, numeric_step, select_options, currency_code, card_accent, card_background_tint, card_border, card_size_hint, text_size, text_colour, tabular_columns, display_order, created_at, updated_at',
+        )
+        .eq('calculator_id', id)
+        .order('section_id', { ascending: true })
+        .order('display_order', { ascending: true }),
+      supabase
+        .from('charts')
+        .select(
+          'id, calculator_id, section_id, name, chart_type, title, subtitle, bindings, style, card_accent, card_background_tint, card_border, card_size_hint, display_order, created_at, updated_at',
+        )
+        .eq('calculator_id', id)
+        .order('section_id', { ascending: true })
+        .order('display_order', { ascending: true }),
+      supabase
+        .from('text_blocks')
+        .select(
+          'id, calculator_id, section_id, body, card_accent, card_background_tint, card_border, card_size_hint, text_size, text_colour, display_order, created_at, updated_at',
+        )
+        .eq('calculator_id', id)
+        .order('section_id', { ascending: true })
+        .order('display_order', { ascending: true }),
+    ]);
+
+  let sections = sectionsResult.data;
 
   // Backfill: legacy calculators created in PROJ-8 have no sections.
+  let didBackfill = false;
   if (!sections || sections.length === 0) {
     const { data: created } = await supabase
       .from('sections')
@@ -272,54 +303,16 @@ export async function getEditorBundle(
       )
       .single();
     sections = created ? [created] : [];
+    didBackfill = true;
   }
 
-  const { data: cells } = await supabase
-    .from('cells')
-    .select(
-      // PROJ-17 — `tabular_columns` is included so the editor doesn't
-      // hydrate with `undefined` columns and then phantom-seed on
-      // every mount (which would clobber the persisted config + drop
-      // an unwanted PATCH into the undo stack). Audit surface per
-      // the BUG-H2 maintenance contract: cell-column enumeration
-      // must stay in sync across server.ts (editor bundle),
-      // fn_get_public_calculator + fn_get_scenario_by_share_token
-      // (read RPCs), and fn_duplicate_calculator (write RPC).
-      'id, calculator_id, section_id, kind, name, label, description, description_render, value_type, visibility, editability, default_value, formula, display_widget, display_format, display_emphasis, unit, numeric_min, numeric_max, numeric_step, select_options, currency_code, card_accent, card_background_tint, card_border, card_size_hint, text_size, text_colour, tabular_columns, display_order, created_at, updated_at',
-    )
-    .eq('calculator_id', id)
-    .order('section_id', { ascending: true })
-    .order('display_order', { ascending: true });
-
-  // PROJ-15 — charts ride alongside cells in the editor bundle so a page
-  // reload restores the canvas verbatim (without this, charts created in
-  // a session vanish on refresh — QA BUG-C2).
-  const { data: charts } = await supabase
-    .from('charts')
-    .select(
-      'id, calculator_id, section_id, name, chart_type, title, subtitle, bindings, style, card_accent, card_background_tint, card_border, card_size_hint, display_order, created_at, updated_at',
-    )
-    .eq('calculator_id', id)
-    .order('section_id', { ascending: true })
-    .order('display_order', { ascending: true });
-
-  // PROJ-16 — text blocks ride alongside cells/charts in the editor
-  // bundle for the same reload-restore reason.
-  const { data: textBlocksRaw } = await supabase
-    .from('text_blocks')
-    .select(
-      'id, calculator_id, section_id, body, card_accent, card_background_tint, card_border, card_size_hint, text_size, text_colour, display_order, created_at, updated_at',
-    )
-    .eq('calculator_id', id)
-    .order('section_id', { ascending: true })
-    .order('display_order', { ascending: true });
-  const textBlocks = (textBlocksRaw ?? []) as unknown as TextBlockRow[];
+  const textBlocks = (textBlocksResult.data ?? []) as unknown as TextBlockRow[];
 
   // The section backfill bumped calculators.updated_at via the
   // parent-bump trigger — refresh the token so the client doesn't
   // immediately see a 409 on its first PATCH.
   let refreshedUpdatedAt = calculator.updated_at;
-  if (sections && sections.length > 0) {
+  if (didBackfill) {
     const { data: refreshed } = await supabase
       .from('calculators')
       .select('updated_at')
@@ -331,8 +324,8 @@ export async function getEditorBundle(
   return {
     calculator: { ...calculator, updated_at: refreshedUpdatedAt },
     sections: (sections ?? []) as SectionRow[],
-    cells: (cells ?? []) as unknown as CellRow[],
-    charts: (charts ?? []) as unknown as ChartRow[],
+    cells: (cellsResult.data ?? []) as unknown as CellRow[],
+    charts: (chartsResult.data ?? []) as unknown as ChartRow[],
     textBlocks,
   };
 }

@@ -12,12 +12,11 @@
 // segment when the page passes `editorTitle` + `onEditorTitleCommit`.
 
 import Link from 'next/link';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import * as React from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { createCalculator } from '@/lib/calculators/client';
 import { MAX_TITLE_LENGTH, validateTitle } from '@/lib/calculators/types';
 import { cn } from '@/lib/utils';
 
@@ -168,33 +167,12 @@ export function TopBarDesktop({
 }
 
 function NewCalculatorButton() {
-  const router = useRouter();
-  const [creating, setCreating] = React.useState(false);
-
-  async function handleClick() {
-    if (creating) return;
-    setCreating(true);
-    try {
-      const row = await createCalculator();
-      router.push(`/editor/${row.id}`);
-    } catch {
-      const { toast } = await import('sonner');
-      toast.error("Couldn't create calculator — please try again.");
-    } finally {
-      setCreating(false);
-    }
-  }
-
   return (
-    <Button
-      size="sm"
-      variant="outline"
-      onClick={handleClick}
-      disabled={creating}
-      className="h-8 gap-1 text-[13px]"
-    >
-      <Icons.Plus size={14} />
-      <span>New calculator</span>
+    <Button size="sm" variant="outline" asChild className="h-8 gap-1 text-[13px]">
+      <Link href="/editor/new">
+        <Icons.Plus size={14} />
+        <span>New calculator</span>
+      </Link>
     </Button>
   );
 }

@@ -22,7 +22,6 @@ import * as React from 'react';
 
 import {
   CalculatorApiError,
-  cloneCalculator,
   duplicateCalculator,
   patchCalculator,
   softDeleteCalculator,
@@ -141,38 +140,31 @@ export function CalcCard({
     }
   }
 
-  async function handleDuplicate(navigate: boolean): Promise<void> {
+  function handleDuplicate(navigate: boolean): void {
     if (busy) return;
-    setBusy(true);
-    try {
-      const created = await duplicateCalculator(row.id);
-      const { toast } = await import('sonner');
-      if (navigate) {
-        router.push(`/editor/${created.id}`);
-      } else {
-        toast.success(`Duplicated «${row.title}»`);
-        router.refresh();
-      }
-    } catch {
-      const { toast } = await import('sonner');
-      toast.error("Couldn't duplicate — please try again.");
-    } finally {
-      setBusy(false);
+    if (navigate) {
+      router.push(`/editor/new?duplicate=${encodeURIComponent(row.id)}`);
+    } else {
+      setBusy(true);
+      duplicateCalculator(row.id)
+        .then(async () => {
+          const { toast } = await import('sonner');
+          toast.success(`Duplicated «${row.title}»`);
+          router.refresh();
+        })
+        .catch(async () => {
+          const { toast } = await import('sonner');
+          toast.error("Couldn't duplicate — please try again.");
+        })
+        .finally(() => setBusy(false));
     }
   }
 
-  async function handleClone(): Promise<void> {
+  function handleClone(): void {
     if (busy) return;
-    setBusy(true);
-    try {
-      const created = await cloneCalculator(row.id, row.public_token);
-      // Keep the spinner state through navigation — busy stays true.
-      router.push(`/editor/${created.id}`);
-    } catch {
-      const { toast } = await import('sonner');
-      toast.error("Couldn't clone — please try again.");
-      setBusy(false);
-    }
+    router.push(
+      `/editor/new?clone=${encodeURIComponent(row.id)}&token=${encodeURIComponent(row.public_token)}`,
+    );
   }
 
   async function handlePublishToggle(): Promise<void> {

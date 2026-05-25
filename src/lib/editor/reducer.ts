@@ -88,6 +88,7 @@ export type EditorAction =
   | { type: 'REMOVE_SECTION'; id: string }
   | { type: 'UPSERT_CELL'; cell: CellRow }
   | { type: 'UPSERT_CELLS'; cells: CellRow[] }
+  | { type: 'RECONCILE_CELL'; tempId: string; cell: CellRow }
   | { type: 'REMOVE_CELL'; id: string }
   // PROJ-15 — chart mutations.
   | { type: 'SET_CHARTS'; charts: ChartRow[] }
@@ -286,6 +287,12 @@ export function editorReducer(
         (c) => !state.cells.some((existing) => existing.id === c.id),
       );
       return { ...state, cells: sortCells([...merged, ...newOnes]) };
+    }
+    case 'RECONCILE_CELL': {
+      const next = state.cells.map((c) =>
+        c.id === action.tempId ? action.cell : c,
+      );
+      return { ...state, cells: sortCells(next) };
     }
     case 'REMOVE_CELL':
       return { ...state, cells: state.cells.filter((c) => c.id !== action.id) };

@@ -37,6 +37,12 @@ import {
 } from '@/lib/cells/client';
 import type { CellRow } from '@/lib/cells/types';
 import {
+  DEFAULT_CELL_LABEL,
+  defaultEditability,
+  defaultWidget,
+  nextDefaultCellName,
+} from '@/lib/cells/types';
+import {
   ChartApiError,
   createChart as createChartApi,
   deleteChart as deleteChartApi,
@@ -77,6 +83,11 @@ import { computeReorderUpdates } from './reorder';
 
 type PatchFn = typeof patchCalculator;
 type ToastReporter = (message: string) => void;
+
+let tempCellCounter = 0;
+function nextTempCellId(): string {
+  return `__temp_${++tempCellCounter}`;
+}
 
 const GENERIC_STALE_MESSAGE = 'Save failed — reload to retry.';
 const GENERIC_NETWORK_MESSAGE = "Couldn't save — please try again.";
@@ -153,6 +164,7 @@ class EditorStore {
   private listeners = new Set<() => void>();
   private patchFn: PatchFn;
   private toast?: ToastReporter;
+  private mutationTail: Promise<void> = Promise.resolve();
 
   constructor(
     initialRow: CalculatorRow,
@@ -168,6 +180,12 @@ class EditorStore {
     this.state = initialEditorState(initialRow, opts);
     this.patchFn = patchFn;
     this.toast = toast;
+  }
+
+  private enqueue<T>(fn: () => Promise<T>): Promise<T> {
+    const next = this.mutationTail.then(fn, fn);
+    this.mutationTail = next.then(() => {}, () => {});
+    return next;
   }
 
   subscribe = (listener: () => void): (() => void) => {
@@ -239,35 +257,37 @@ class EditorStore {
     }
   };
 
-  private async recordOperation<T>(op: {
+  private recordOperation<T>(op: {
     label: string;
     doFn: () => Promise<T>;
     undoFn: () => Promise<void>;
     errorOverride?: (e: unknown) => string | undefined;
   }): Promise<T | null> {
-    if (this.state.stale) {
-      this.reportError(new CalculatorApiError(409, 'stale'));
-      return null;
-    }
-    let result: T;
-    try {
-      result = await op.doFn();
-    } catch (e) {
-      if (this.isStale(e)) {
-        this.dispatch({ type: 'MARK_STALE' });
+    return this.enqueue(async () => {
+      if (this.state.stale) {
+        this.reportError(new CalculatorApiError(409, 'stale'));
+        return null;
       }
-      this.reportError(e, op.errorOverride?.(e));
-      return null;
-    }
-    const operation: Operation = {
-      label: op.label,
-      do: async () => {
-        await op.doFn();
-      },
-      undo: op.undoFn,
-    };
-    this.dispatch({ type: 'PUSH_OPERATION', op: operation });
-    return result;
+      let result: T;
+      try {
+        result = await op.doFn();
+      } catch (e) {
+        if (this.isStale(e)) {
+          this.dispatch({ type: 'MARK_STALE' });
+        }
+        this.reportError(e, op.errorOverride?.(e));
+        return null;
+      }
+      const operation: Operation = {
+        label: op.label,
+        do: async () => {
+          await op.doFn();
+        },
+        undo: op.undoFn,
+      };
+      this.dispatch({ type: 'PUSH_OPERATION', op: operation });
+      return result;
+    });
   }
 
   renameCalculator = async (next: string): Promise<void> => {
@@ -305,68 +325,70 @@ class EditorStore {
   // Surfaces validation codes back to the caller instead of toasting
   // them, so the caller can render an inline error below the input.
   // The undo-stack enrollment matches renameCalculator on success.
-  renameCalculatorChecked = async (
+  renameCalculatorChecked = (
     next: string,
   ): Promise<{ ok: true } | { ok: false; code?: string }> => {
-    const current = this.state.calculator;
-    const previousTitle = current.title;
-    if (previousTitle === next) return { ok: true };
-    if (this.state.stale) {
-      this.reportError(new CalculatorApiError(409, 'stale'));
-      return { ok: false };
-    }
-    let row;
-    try {
-      row = await this.patchFn(current.id, {
-        updated_at: this.state.calculator.updated_at,
-        title: next,
-      });
-    } catch (e) {
-      if (e instanceof CalculatorApiError) {
-        if (
-          e.code === 'title_taken' ||
-          e.code === 'title_required' ||
-          e.code === 'title_too_long'
-        ) {
-          return { ok: false, code: e.code };
-        }
+    return this.enqueue(async () => {
+      const current = this.state.calculator;
+      const previousTitle = current.title;
+      if (previousTitle === next) return { ok: true };
+      if (this.state.stale) {
+        this.reportError(new CalculatorApiError(409, 'stale'));
+        return { ok: false };
       }
-      if (this.isStale(e)) this.dispatch({ type: 'MARK_STALE' });
-      this.reportError(e);
-      return { ok: false };
-    }
-    this.dispatch({
-      type: 'SET_TITLE',
-      title: row.title,
-      updated_at: row.updated_at,
-    });
-    const operation: Operation = {
-      label: `Rename to "${next}"`,
-      do: async () => {
-        const r = await this.patchFn(current.id, {
+      let row;
+      try {
+        row = await this.patchFn(current.id, {
           updated_at: this.state.calculator.updated_at,
           title: next,
         });
-        this.dispatch({
-          type: 'SET_TITLE',
-          title: r.title,
-          updated_at: r.updated_at,
-        });
-      },
-      undo: async () => {
-        const r = await this.patchFn(current.id, {
-          updated_at: this.state.calculator.updated_at,
-          title: previousTitle,
-        });
-        this.dispatch({
-          type: 'SET_TITLE',
-          title: r.title,
-          updated_at: r.updated_at,
-        });
-      },
-    };
-    this.dispatch({ type: 'PUSH_OPERATION', op: operation });
-    return { ok: true };
+      } catch (e) {
+        if (e instanceof CalculatorApiError) {
+          if (
+            e.code === 'title_taken' ||
+            e.code === 'title_required' ||
+            e.code === 'title_too_long'
+          ) {
+            return { ok: false, code: e.code };
+          }
+        }
+        if (this.isStale(e)) this.dispatch({ type: 'MARK_STALE' });
+        this.reportError(e);
+        return { ok: false };
+      }
+      this.dispatch({
+        type: 'SET_TITLE',
+        title: row.title,
+        updated_at: row.updated_at,
+      });
+      const operation: Operation = {
+        label: `Rename to "${next}"`,
+        do: async () => {
+          const r = await this.patchFn(current.id, {
+            updated_at: this.state.calculator.updated_at,
+            title: next,
+          });
+          this.dispatch({
+            type: 'SET_TITLE',
+            title: r.title,
+            updated_at: r.updated_at,
+          });
+        },
+        undo: async () => {
+          const r = await this.patchFn(current.id, {
+            updated_at: this.state.calculator.updated_at,
+            title: previousTitle,
+          });
+          this.dispatch({
+            type: 'SET_TITLE',
+            title: r.title,
+            updated_at: r.updated_at,
+          });
+        },
+      };
+      this.dispatch({ type: 'PUSH_OPERATION', op: operation });
+      return { ok: true };
+    });
   };
 
   setDescription = async (next: string): Promise<void> => {
@@ -622,24 +644,70 @@ class EditorStore {
 
   // ── PROJ-9 — cell mutations ──────────────────────────────────────────────
 
-  addCell = async (
+  addCell = (
     sectionId: string,
     body: CreateCellBody = {},
   ): Promise<CellRow | null> => {
+    const tempId = nextTempCellId();
+    const kind = body.kind ?? 'input';
+    const value_type = body.value_type ?? 'number';
+    const sectionCells = this.state.cells.filter((c) => c.section_id === sectionId);
+    const display_order = body.display_order ?? sectionCells.length;
+    const name = body.name ?? nextDefaultCellName(this.state.cells.map((c) => c.name));
+
+    const tempCell: CellRow = {
+      id: tempId,
+      calculator_id: this.state.calculator.id,
+      section_id: sectionId,
+      kind,
+      name,
+      label: body.label ?? DEFAULT_CELL_LABEL,
+      description: body.description ?? '',
+      description_render: body.description_render ?? 'caption',
+      value_type,
+      visibility: body.visibility ?? 'visible',
+      editability: body.editability ?? defaultEditability(kind),
+      default_value: body.default_value !== undefined ? (body.default_value as CellRow['default_value']) : null,
+      formula: body.formula !== undefined ? body.formula : kind === 'output' ? '' : null,
+      display_widget: (body.display_widget as CellRow['display_widget']) ?? defaultWidget(value_type),
+      display_format: body.display_format ?? 'auto',
+      display_emphasis: body.display_emphasis ?? 'plain',
+      unit: body.unit ?? null,
+      numeric_min: body.numeric_min ?? null,
+      numeric_max: body.numeric_max ?? null,
+      numeric_step: body.numeric_step ?? null,
+      select_options: body.select_options ?? null,
+      currency_code: body.currency_code ?? null,
+      card_accent: body.card_accent ?? 'theme',
+      card_background_tint: body.card_background_tint ?? 'none',
+      card_border: body.card_border ?? 'none',
+      card_size_hint: body.card_size_hint ?? 'narrow',
+      text_size: body.text_size ?? 'm',
+      text_colour: body.text_colour ?? 'default',
+      tabular_columns: [],
+      display_order,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    this.dispatch({ type: 'UPSERT_CELL', cell: tempCell });
+
     let createdId: string | null = null;
+    let reconciled = false;
     return this.recordOperation<CellRow>({
       label: 'Add cell',
       doFn: async () => {
-        // On redo, forward the original id so the recreated row keeps the
-        // same UUID — selection / scroll-into-view / "added cell" anchors
-        // that referenced it stay valid across undo/redo (PROJ-9 spec AC
-        // line 985-989: original id is restored).
         const res = await createCellApi(sectionId, {
           ...body,
           ...(createdId ? { id: createdId } : {}),
         });
         createdId = res.cell.id;
-        this.dispatch({ type: 'UPSERT_CELL', cell: res.cell });
+        if (!reconciled) {
+          this.dispatch({ type: 'RECONCILE_CELL', tempId, cell: res.cell });
+          reconciled = true;
+        } else {
+          this.dispatch({ type: 'UPSERT_CELL', cell: res.cell });
+        }
         this.refreshCalculatorUpdatedAt(res.calculatorUpdatedAt);
         return res.cell;
       },
@@ -650,10 +718,10 @@ class EditorStore {
         this.refreshCalculatorUpdatedAt(res.calculatorUpdatedAt);
       },
       errorOverride: (e) => {
-        if (e instanceof CellApiError) {
-          if (e.code === 'cell_cap_reached') {
-            return `${e.max ?? 200}-cell limit reached. Delete a cell to add more.`;
-          }
+        const rollbackId = reconciled ? createdId : tempId;
+        if (rollbackId) this.dispatch({ type: 'REMOVE_CELL', id: rollbackId });
+        if (e instanceof CellApiError && e.code === 'cell_cap_reached') {
+          return `${e.max ?? 200}-cell limit reached. Delete a cell to add more.`;
         }
         return undefined;
       },
@@ -842,28 +910,30 @@ class EditorStore {
   };
 
   // PROJ-17 BUG-M2 — non-undoable cell PATCH (see EditorApi docstring).
-  patchCellSilent = async (
+  patchCellSilent = (
     id: string,
     body: Omit<PatchCellBody, 'updated_at'>,
   ): Promise<CellRow | null> => {
-    if (this.state.stale) return null;
-    const previous = this.state.cells.find((c) => c.id === id);
-    if (!previous) return null;
-    try {
-      const res = await patchCellApi(id, {
-        ...body,
-        updated_at: this.state.calculator.updated_at,
-      });
-      this.dispatch({ type: 'UPSERT_CELL', cell: res.cell });
-      this.refreshCalculatorUpdatedAt(res.calculatorUpdatedAt);
-      return res.cell;
-    } catch (e) {
-      if (this.isStale(e)) {
-        this.dispatch({ type: 'MARK_STALE' });
+    return this.enqueue(async () => {
+      if (this.state.stale) return null;
+      const previous = this.state.cells.find((c) => c.id === id);
+      if (!previous) return null;
+      try {
+        const res = await patchCellApi(id, {
+          ...body,
+          updated_at: this.state.calculator.updated_at,
+        });
+        this.dispatch({ type: 'UPSERT_CELL', cell: res.cell });
+        this.refreshCalculatorUpdatedAt(res.calculatorUpdatedAt);
+        return res.cell;
+      } catch (e) {
+        if (this.isStale(e)) {
+          this.dispatch({ type: 'MARK_STALE' });
+        }
+        this.reportError(e);
+        return null;
       }
-      this.reportError(e);
-      return null;
-    }
+    });
   };
 
   removeCell = async (id: string): Promise<void> => {
@@ -1164,38 +1234,42 @@ class EditorStore {
     });
   };
 
-  undo = async (): Promise<void> => {
-    if (this.state.stale) return;
-    const past = this.state.past;
-    if (past.length === 0) return;
-    const op = past[past.length - 1];
-    try {
-      await op.undo();
-    } catch (e) {
-      if (e instanceof CalculatorApiError && e.status === 409) {
-        this.dispatch({ type: 'MARK_STALE' });
+  undo = (): Promise<void> => {
+    return this.enqueue(async () => {
+      if (this.state.stale) return;
+      const past = this.state.past;
+      if (past.length === 0) return;
+      const op = past[past.length - 1];
+      try {
+        await op.undo();
+      } catch (e) {
+        if (e instanceof CalculatorApiError && e.status === 409) {
+          this.dispatch({ type: 'MARK_STALE' });
+        }
+        this.reportError(e);
+        return;
       }
-      this.reportError(e);
-      return;
-    }
-    this.dispatch({ type: 'UNDO' });
+      this.dispatch({ type: 'UNDO' });
+    });
   };
 
-  redo = async (): Promise<void> => {
-    if (this.state.stale) return;
-    const future = this.state.future;
-    if (future.length === 0) return;
-    const op = future[future.length - 1];
-    try {
-      await op.do();
-    } catch (e) {
-      if (e instanceof CalculatorApiError && e.status === 409) {
-        this.dispatch({ type: 'MARK_STALE' });
+  redo = (): Promise<void> => {
+    return this.enqueue(async () => {
+      if (this.state.stale) return;
+      const future = this.state.future;
+      if (future.length === 0) return;
+      const op = future[future.length - 1];
+      try {
+        await op.do();
+      } catch (e) {
+        if (e instanceof CalculatorApiError && e.status === 409) {
+          this.dispatch({ type: 'MARK_STALE' });
+        }
+        this.reportError(e);
+        return;
       }
-      this.reportError(e);
-      return;
-    }
-    this.dispatch({ type: 'REDO' });
+      this.dispatch({ type: 'REDO' });
+    });
   };
 }
 
