@@ -39,7 +39,7 @@
 | PROJ-22 | JSON Export / Import                                 | P2       | PROJ-9, PROJ-15, PROJ-16              | Roadmap | —    | 2026-05-22 |
 | PROJ-23 | UI/UX Polish Part 1 — Editor                         | P1       | PROJ-6, PROJ-8, PROJ-9, PROJ-15, PROJ-16 | Deployed | [PROJ-23](PROJ-23-ui-ux-polish-editor.md) | 2026-05-25 |
 | PROJ-24 | UI/UX Polish Part 2 — Dashboard + Visitor + Editor   | P1       | PROJ-6, PROJ-8, PROJ-9, PROJ-11, PROJ-23 | Deployed | [PROJ-24](PROJ-24-ui-ux-polish-dashboard-visitor.md) | 2026-05-25 |
-| PROJ-25 | Performance — Core Interaction Speed                  | P1       | PROJ-5, PROJ-7, PROJ-8, PROJ-9, PROJ-14, PROJ-18 | Approved  | [PROJ-25](PROJ-25-performance-core-interaction-speed.md) | 2026-05-25 |
+| PROJ-25 | Performance — Core Interaction Speed                  | P1       | PROJ-5, PROJ-7, PROJ-8, PROJ-9, PROJ-14, PROJ-18 | Deployed  | [PROJ-25](PROJ-25-performance-core-interaction-speed.md) | 2026-05-25 |
 
 <!-- Add features above this line -->
 

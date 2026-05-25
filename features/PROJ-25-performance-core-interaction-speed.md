@@ -1,6 +1,6 @@
 # PROJ-25: Performance — Core Interaction Speed
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-25
 **Last Updated:** 2026-05-25
 
@@ -632,4 +632,8 @@ No bugs found.
 - **Recommendation:** Deploy
 
 ## Deployment
-_To be added by /deploy_
+
+- **Deployed:** 2026-05-25
+- **Production URL:** https://calcgrinder.vercel.app
+- **Commit:** `84d64ae` feat(PROJ-25): Implement Performance — Core Interaction Speed
+- **Tag:** `v1.25.0-PROJ-25`
