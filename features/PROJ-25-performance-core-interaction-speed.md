@@ -631,9 +631,103 @@ No bugs found.
 - **Production Ready:** YES
 - **Recommendation:** Deploy
 
+## Round 2 — Production Performance Fix (2026-05-25)
+
+### Problem
+
+After PROJ-25's initial deploy, real-world testing on Vercel production revealed
+that "New Calculator" click still took **7-10 seconds** to render the editor.
+Chrome DevTools performance recordings confirmed the bottleneck:
+
+**POST /api/calculators took 8,446ms** — the handler made 6 sequential Supabase
+round-trips, and each hop from Vercel serverless → Supabase Cloud added ~500ms-1.5s:
+
+1. `supabase.auth.getUser()` — auth check
+2. `resolveUniqueTitle()` — loop of SELECT queries checking title uniqueness
+3. `profiles.select('default_calculator_theme')` — theme preference lookup
+4. `calculators.insert()` — create the calculator row
+5. `sections.insert()` — create the default section
+6. `calculators.select('updated_at')` — re-read after trigger bump
+
+After the POST returned, `router.replace('/editor/{id}')` triggered a second
+server round-trip: a full RSC page load running `getEditorBundle()` (auth +
+calculator SELECT + 4 parallel child-table queries), adding another ~1.4s.
+
+**Root cause:** The template workflow builds features for correctness, not
+latency budgets. Each sequential Supabase call is logically correct but the
+architecture didn't account for the fact that Vercel → Supabase round-trips
+are ~500ms-1.5s each. Locally these total ~200ms and feel fine; in production
+they stack to 8.4s.
+
+Dashboard reload also had 4 unnecessary RSC prefetch requests caused by
+Next.js `<Link>` default prefetch behaviour on self-referencing and duplicate
+links.
+
+### Fixes Applied
+
+**Fix 1: `fn_create_calculator` stored procedure**
+- New migration `20260603000000_fn_create_calculator.sql`
+- Collapses steps 2-6 into a single PL/pgSQL function: title resolution
+  (loop inside Postgres — microseconds), theme lookup, calculator INSERT,
+  section INSERT, updated_at re-read — one round-trip instead of five
+- Follows the same patterns as existing `fn_duplicate_calculator`
+- POST route simplified to: `getUser()` → `rpc('fn_create_calculator')`
+
+**Fix 2: Client-side editor hydration for new calculators**
+- `NewCalculatorLoader` now renders `EditorProvider` + `EditorBody` directly
+  from the POST response data (calculator row + synthetic default section +
+  empty cells/charts/text_blocks)
+- Uses `window.history.replaceState` to update the URL without triggering
+  Next.js navigation
+- Eliminates the `router.replace()` → full server RSC → `getEditorBundle()`
+  waterfall entirely
+- Clone and duplicate flows still use `router.replace()` since their bundles
+  may contain cells/charts/text_blocks
+
+**Fix 3: Prefetch cleanup on dashboard**
+- Added `prefetch={false}` to self-referencing wordmark links (desktop + mobile),
+  hero "New calculator" button, and settings link inside closed popover
+- Eliminated 4 redundant RSC prefetch requests on dashboard reload
+
+### Results (Before → After)
+
+| Metric | Before (Vercel) | After (localhost*) | Improvement |
+|--------|----------------|--------------------|-------------|
+| POST /api/calculators | 8,446ms | 284ms | **30x faster** |
+| RSC nav to /editor/{id} | 1,367ms | 0ms (eliminated) | **-1.4s** |
+| Total requests (new calc) | 18 | 5 | **-13** |
+| Editor first paint | ~10,565ms | ~757ms | **14x faster** |
+| Dashboard RSC prefetches | 4 | 0 | **Eliminated** |
+
+*Localhost numbers — production will be ~500ms-1s for the RPC due to Vercel →
+Supabase latency, but still dramatically better than 8.4s.
+
+### Affected Files
+
+- `supabase/migrations/20260603000000_fn_create_calculator.sql` (new)
+- `src/app/api/calculators/route.ts` (simplified to single RPC)
+- `src/app/api/calculators/route.test.ts` (rewritten for RPC-based handler)
+- `src/components/editor/new-calculator-loader.tsx` (client-side hydration)
+- `src/lib/calculators/client.ts` (`CreateCalculatorResponse` with `default_section_id`)
+- `src/components/shell/top-bar-desktop.tsx` (prefetch={false} on wordmark)
+- `src/components/shell/top-bar-mobile.tsx` (prefetch={false} on wordmark)
+- `src/components/shell/avatar-popover.tsx` (prefetch={false} on settings)
+- `src/components/dashboard/new-calculator-hero.tsx` (prefetch={false} on hero)
+- `src/lib/supabase/types.ts` (regenerated with fn_create_calculator)
+
+### Lesson Learned
+
+**Sequential Supabase calls from Vercel serverless are a performance trap.**
+Any API route that chains more than 2-3 `.from()` or `.rpc()` calls should
+be collapsed into a stored procedure. The per-hop latency (500ms-1.5s on cold
+paths) is invisible in local dev but devastating in production. Future features
+should profile on the deployed Vercel URL, not just localhost, before marking
+performance as "Deployed".
+
 ## Deployment
 
-- **Deployed:** 2026-05-25
+- **Initial Deploy:** 2026-05-25
 - **Production URL:** https://calcgrinder.vercel.app
-- **Commit:** `84d64ae` feat(PROJ-25): Implement Performance — Core Interaction Speed
+- **Initial Commit:** `84d64ae` feat(PROJ-25): Implement Performance — Core Interaction Speed
+- **Round 2 Commit:** `30f76c7` perf(PROJ-25): Collapse calculator creation into single DB round-trip
 - **Tag:** `v1.25.0-PROJ-25`
